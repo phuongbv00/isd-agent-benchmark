@@ -3,7 +3,7 @@ Baseline ISD Agent: Single prompt ADDIE generator
 
 A simple baseline agent for comparison that generates complete
 instructional design outputs with a single LLM call.
-Supports multiple providers: Upstage, OpenRouter, OpenAI.
+Uses the shared provider-neutral LLM factory.
 """
 
 __version__ = "0.1.0"

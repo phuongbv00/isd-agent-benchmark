@@ -12,12 +12,12 @@ Dick & Carey 모형의 10단계 프로세스를 LangGraph StateGraph로 구현�
                               [Revision] → [FormativeEvaluation]
 """
 
-import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 from langgraph.graph import StateGraph, END
+from shared.llm import LLMConfig, configure_default_llm, llm_config_from_legacy
 
 from dick_carey_agent.state import (
     DickCareyState,
@@ -60,15 +60,25 @@ class DickCareyAgent:
         max_iterations: int = 3,
         quality_threshold: float = 6.5,  # 최적화: 7.0 → 6.5 (#80)
         debug: bool = False,
+        llm_config: Optional[LLMConfig] = None,
     ):
-        self.model = model
+        selected_model = model if llm_config is None or model != "solar-mini" else llm_config.model
+        self.llm_config = (
+            llm_config.copy_with(model=selected_model, temperature=temperature)
+            if llm_config is not None
+            else llm_config_from_legacy(
+                provider="upstage",
+                model=selected_model,
+                temperature=temperature,
+            )
+        )
+        configure_default_llm(self.llm_config)
+
+        self.model = self.llm_config.model
         self.temperature = temperature
         self.max_iterations = max_iterations
         self.quality_threshold = quality_threshold
         self.debug = debug
-
-        # 환경 변수 설정
-        os.environ["DICK_CAREY_MODEL"] = model
 
         # StateGraph 빌드
         self.graph = self._build_graph()

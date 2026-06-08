@@ -42,10 +42,23 @@ uv pip install -e .
 
 ## 환경 설정
 
-`.env` 파일에 API 키 설정:
+공통 모델 설정은 `--agent-model-*` CLI flags 또는 저장소 루트의 optional `.env`로 지정합니다. Dick & Carey
+도구들은 `shared/llm` factory를 통해 같은 cloud/local 설정을 사용합니다.
 
 ```bash
-UPSTAGE_API_KEY=your_api_key_here
+# Upstage Solar round-robin 예시
+AGENT_MODEL_PROVIDER=upstage
+AGENT_MODEL_API_SPEC=openai_compatible
+AGENT_MODEL_NAME=solar-pro3
+AGENT_MODEL_BASE_URL=https://api.upstage.ai/v1/solar
+AGENT_MODEL_API_KEY_ENVS=UPSTAGE_API_KEY,UPSTAGE_API_KEY2,UPSTAGE_API_KEY3
+AGENT_MODEL_CREDENTIAL_STRATEGY=round_robin
+
+# 로컬 Ollama 예시
+# AGENT_MODEL_PROVIDER=local-ollama
+# AGENT_MODEL_BASE_URL=http://localhost:11434/v1
+# AGENT_MODEL_NAME=qwen2.5:14b
+# AGENT_MODEL_API_KEY=not-needed
 ```
 
 ## 사용법

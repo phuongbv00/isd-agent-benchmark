@@ -1,1 +1,1 @@
-# Tests for baseline-solarpro2
+# Tests for baseline

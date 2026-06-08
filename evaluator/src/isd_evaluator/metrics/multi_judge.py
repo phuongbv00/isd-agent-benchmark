@@ -11,9 +11,11 @@ Judges (경량 모델 2개):
 
 import os
 import statistics
-from dataclasses import dataclass
+import threading
+from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 
 from openai import OpenAI
 
@@ -27,15 +29,53 @@ class JudgeConfig:
     """Configuration for a single judge"""
     provider: str
     model: str
-    api_key_env: str
+    api_key_env: Optional[str] = None
+    api_key_envs: tuple[str, ...] = ()
     base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    api_keys: tuple[str, ...] = ()
+    credential_strategy: str = "first"
+    _credential_index: int = field(default=0, init=False, repr=False)
+    _credential_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
+
+    @property
+    def all_api_key_envs(self) -> tuple[str, ...]:
+        envs: list[str] = []
+        if self.api_key_env:
+            envs.append(self.api_key_env)
+        envs.extend(self.api_key_envs)
+        return tuple(dict.fromkeys(envs))
+
+    @property
+    def all_api_keys(self) -> tuple[str, ...]:
+        keys: list[str] = []
+        if self.api_key:
+            keys.append(self.api_key)
+        keys.extend(self.api_keys)
+        return tuple(key for key in keys if key)
+
+    def resolve_api_key(self) -> Optional[str]:
+        keys = list(self.all_api_keys)
+        keys.extend(os.getenv(env) for env in self.all_api_key_envs)
+        keys = [key for key in keys if key]
+        if keys:
+            if self.credential_strategy == "round_robin":
+                with self._credential_lock:
+                    key = keys[self._credential_index % len(keys)]
+                    self._credential_index += 1
+                    return key
+            return keys[0]
+        if self.base_url:
+            host = urlparse(self.base_url).hostname or ""
+            if host in {"localhost", "127.0.0.1", "::1", "0.0.0.0"}:
+                return "not-needed"
+        return None
 
     def get_client(self) -> OpenAI:
         """Create OpenAI-compatible client for this judge"""
-        api_key = os.getenv(self.api_key_env)
+        api_key = self.resolve_api_key()
         if not api_key:
             raise ValueError(f"API key not found: {self.api_key_env}")
-
         if self.base_url:
             return OpenAI(api_key=api_key, base_url=self.base_url)
         return OpenAI(api_key=api_key)
@@ -60,6 +100,101 @@ DEFAULT_JUDGES: List[JudgeConfig] = [
         base_url=OPENROUTER_BASE_URL,
     ),
 ]
+
+
+def _split_env(value: Optional[str]) -> List[str]:
+    if not value:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _split_grouped_env(value: Optional[str]) -> List[tuple[str, ...]]:
+    """Split comma-separated judge groups, with pipe-separated values per judge."""
+    if not value:
+        return []
+    groups: List[tuple[str, ...]] = []
+    for group in value.split(","):
+        values = tuple(part.strip() for part in group.split("|") if part.strip())
+        groups.append(values)
+    return groups
+
+
+def _default_base_url_for_profile(profile: str) -> Optional[str]:
+    profile = profile.lower()
+    if profile in {"openrouter", "openai", "google", "deepseek", "anthropic"}:
+        return OPENROUTER_BASE_URL
+    if profile == "upstage":
+        return "https://api.upstage.ai/v1/solar"
+    if profile in {"local-ollama", "ollama"}:
+        return "http://localhost:11434/v1"
+    if profile in {"local-lmstudio", "lmstudio"}:
+        return "http://localhost:1234/v1"
+    if profile in {"local-vllm", "vllm"}:
+        return "http://localhost:8000/v1"
+    return None
+
+
+def _default_api_key_env_for_profile(profile: str) -> Optional[str]:
+    profile = profile.lower()
+    if profile == "upstage":
+        return "UPSTAGE_API_KEY"
+    if profile in {"local-ollama", "ollama", "local-lmstudio", "lmstudio", "local-vllm", "vllm"}:
+        return None
+    return "OPENROUTER_API_KEY"
+
+
+def _provider_for_model(model: str, fallback: str) -> str:
+    if "/" in model:
+        return model.split("/", 1)[0]
+    return fallback
+
+
+def load_judges_from_env() -> Optional[List[JudgeConfig]]:
+    """Load judge model configuration from JUDGE_MODEL_* env vars.
+
+    Returns None when no explicit judge override is present, so callers can use
+    DEFAULT_JUDGES unchanged.
+    """
+    models = _split_env(os.getenv("JUDGE_MODEL_NAMES") or os.getenv("JUDGE_MODEL_NAME"))
+    if not models:
+        return None
+
+    profile = os.getenv("JUDGE_MODEL_PROVIDER", "openrouter")
+    providers = _split_env(os.getenv("JUDGE_MODEL_PROVIDERS") or os.getenv("JUDGE_MODEL_PROVIDER"))
+    api_key_env_groups = _split_grouped_env(
+        os.getenv("JUDGE_MODEL_API_KEY_ENVS") or os.getenv("JUDGE_MODEL_API_KEY_ENV")
+    )
+    api_key_groups = _split_grouped_env(
+        os.getenv("JUDGE_MODEL_API_KEYS") or os.getenv("JUDGE_MODEL_API_KEY")
+    )
+    base_urls = _split_env(os.getenv("JUDGE_MODEL_BASE_URLS") or os.getenv("JUDGE_MODEL_BASE_URL"))
+    credential_strategies = _split_env(os.getenv("JUDGE_MODEL_CREDENTIAL_STRATEGIES"))
+
+    default_base_url = _default_base_url_for_profile(profile)
+    default_api_key_env = _default_api_key_env_for_profile(profile)
+
+    judges = []
+    for idx, model in enumerate(models):
+        provider = providers[idx] if idx < len(providers) else _provider_for_model(model, profile)
+        api_key_env_group = api_key_env_groups[idx] if idx < len(api_key_env_groups) else ()
+        api_key_group = api_key_groups[idx] if idx < len(api_key_groups) else ()
+        credential_strategy = (
+            credential_strategies[idx]
+            if idx < len(credential_strategies)
+            else ("round_robin" if len(api_key_env_group) + len(api_key_group) > 1 else "first")
+        )
+        judges.append(JudgeConfig(
+            provider=provider,
+            model=model,
+            api_key_env=api_key_env_group[0] if api_key_env_group else default_api_key_env,
+            api_key_envs=api_key_env_group[1:] if api_key_env_group else (),
+            api_key=api_key_group[0] if api_key_group else None,
+            api_keys=api_key_group[1:] if api_key_group else (),
+            credential_strategy=credential_strategy,
+            base_url=base_urls[idx] if idx < len(base_urls) else default_base_url,
+        ))
+
+    return judges
 
 
 @dataclass
@@ -106,6 +241,19 @@ class MultiJudgeResult:
         """Mean ADDIE score across judges"""
         return self.agreement_stats.get("addie_mean", self.median_addie_score)
 
+    def representative_judge(self) -> Optional[JudgeResult]:
+        """Judge result closest to the median ADDIE score."""
+        valid_results = [
+            r for r in self.judge_results
+            if r.normalized_score is not None
+        ]
+        if not valid_results:
+            return None
+        return min(
+            valid_results,
+            key=lambda r: abs((r.normalized_score or 0) - self.median_addie_score),
+        )
+
     @property
     def reliability_score(self) -> float:
         """
@@ -118,6 +266,18 @@ class MultiJudgeResult:
 
     def to_dict(self) -> dict:
         """Convert to dictionary with full statistics"""
+        representative = self.representative_judge()
+        details = representative.addie_score.to_dict() if representative and representative.addie_score else {}
+        phase_scores = {
+            phase: data.get("percentage", 0)
+            for phase, data in details.get("phases", {}).items()
+        }
+        trajectory_details = (
+            representative.trajectory_score.to_dict()
+            if representative and representative.trajectory_score
+            else None
+        )
+
         return {
             # Aggregated scores
             "scores": {
@@ -148,6 +308,10 @@ class MultiJudgeResult:
                 }
                 for r in self.judge_results
             ],
+            # Representative judge details for phase/item reporting
+            "phase_scores": phase_scores,
+            "details": details,
+            "trajectory_details": trajectory_details,
             # Meta
             "num_judges": self.agreement_stats.get("num_judges", 0),
             "num_valid": self.agreement_stats.get("num_valid_addie", 0),
@@ -237,7 +401,7 @@ class MultiJudgeEvaluator:
             max_workers: Maximum parallel workers
             include_benchmarks: Include benchmark examples in prompts
         """
-        self.judges = judges or DEFAULT_JUDGES
+        self.judges = judges or load_judges_from_env() or DEFAULT_JUDGES
         self.parallel = parallel
         self.max_workers = max_workers
         self.include_benchmarks = include_benchmarks
@@ -249,8 +413,8 @@ class MultiJudgeEvaluator:
         """Check if required API keys are available"""
         missing = []
         for judge in self.judges:
-            if not os.getenv(judge.api_key_env):
-                missing.append(f"{judge.provider}: {judge.api_key_env}")
+            if not judge.resolve_api_key():
+                missing.append(f"{judge.provider}: {judge.api_key_env or 'JUDGE_MODEL_API_KEY'}")
 
         if missing:
             print(f"[MultiJudgeEvaluator] Warning: Missing API keys: {missing}")
@@ -268,8 +432,10 @@ class MultiJudgeEvaluator:
             # Create ADDIE evaluator for this judge
             addie_evaluator = ADDIERubricEvaluator(
                 model=judge.model,
-                api_key=os.getenv(judge.api_key_env),
+                api_key=judge.resolve_api_key(),
                 provider=judge.provider,
+                base_url=judge.base_url,
+                api_key_env=judge.api_key_env,
                 include_benchmarks=self.include_benchmarks,
                 temperature=0.0,  # nothink mode
             )
@@ -282,8 +448,10 @@ class MultiJudgeEvaluator:
             if trajectory:
                 traj_evaluator = TrajectoryEvaluator(
                     model=judge.model,
-                    api_key=os.getenv(judge.api_key_env),
+                    api_key=judge.resolve_api_key(),
                     provider=judge.provider,
+                    base_url=judge.base_url,
+                    api_key_env=judge.api_key_env,
                 )
                 trajectory_score = traj_evaluator.evaluate(trajectory, metadata)
 
@@ -460,6 +628,7 @@ class MultiJudgeEvaluator:
         rankings = []
         for i, e in enumerate(evaluations):
             r = e["result"]
+            result_dict = r.to_dict()
             rankings.append({
                 "rank": i + 1,
                 "agent_id": e["agent_id"],
@@ -475,7 +644,11 @@ class MultiJudgeEvaluator:
                 "score_range": f"{r.agreement_stats.get('addie_min', 0):.1f}-{r.agreement_stats.get('addie_max', 0):.1f}",
                 "high_disagreement": r.agreement_stats.get("addie_high_disagreement", False),
                 # Individual judges
-                "judges": r.to_dict()["judges"],
+                "judges": result_dict["judges"],
+                # Representative judge details for report tables
+                "phase_scores": result_dict.get("phase_scores", {}),
+                "details": result_dict.get("details", {}),
+                "trajectory_details": result_dict.get("trajectory_details"),
             })
 
         return {

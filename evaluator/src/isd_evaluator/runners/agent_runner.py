@@ -15,8 +15,11 @@ from typing import Optional
 
 AGENT_COMMANDS = {
     "eduplanner": "eduplanner",
-    "baseline-solarpro2": "baseline-solarpro2",
+    "baseline": "baseline",
     "react-isd": "react-isd",
+    "addie-agent": "addie-agent",
+    "dick-carey-agent": "dick-carey-agent",
+    "rpisd-agent": "rpisd-agent",
 }
 
 
@@ -40,7 +43,8 @@ class AgentRunner:
         Agent를 CLI로 실행합니다.
 
         Args:
-            agent_id: Agent 식별자 (eduplanner, baseline-solarpro2, react-isd)
+            agent_id: Agent 식별자 (eduplanner, baseline, react-isd, addie-agent,
+                dick-carey-agent, rpisd-agent)
             scenario_path: 시나리오 JSON 파일 경로
             output_dir: 출력 디렉토리 (선택)
 

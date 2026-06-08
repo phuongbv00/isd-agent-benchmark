@@ -144,6 +144,8 @@ class TrajectoryEvaluator:
         model: Optional[str] = None,
         api_key: Optional[str] = None,
         provider: Optional[str] = None,
+        base_url: Optional[str] = None,
+        api_key_env: Optional[str] = None,
     ):
         """
         Args:
@@ -151,19 +153,28 @@ class TrajectoryEvaluator:
             api_key: API key
             provider: "upstage", "openai", "google", "deepseek", "anthropic"
         """
-        self.provider = provider or os.getenv("TRAJ_EVAL_PROVIDER", "upstage")
+        self.provider = provider or os.getenv("TRAJ_EVAL_PROVIDER") or os.getenv("JUDGE_MODEL_PROVIDER", "upstage")
 
         # Get provider config
         config = PROVIDER_CONFIG.get(self.provider, PROVIDER_CONFIG["openai"])
 
         self.model = model or os.getenv("TRAJ_EVAL_MODEL", config["default_model"])
+        base_url = base_url or os.getenv("TRAJ_EVAL_BASE_URL") or os.getenv("JUDGE_MODEL_BASE_URL") or config["base_url"]
+        api_key_env = api_key_env or os.getenv("TRAJ_EVAL_API_KEY_ENV") or os.getenv("JUDGE_MODEL_API_KEY_ENV") or config["api_key_env"]
+        resolved_api_key = api_key or os.getenv("TRAJ_EVAL_API_KEY") or os.getenv("JUDGE_MODEL_API_KEY") or os.getenv(api_key_env or "")
+
+        if not resolved_api_key and base_url:
+            from urllib.parse import urlparse
+            host = urlparse(base_url).hostname or ""
+            if host in {"localhost", "127.0.0.1", "::1", "0.0.0.0"}:
+                resolved_api_key = "not-needed"
 
         # Create client
         client_kwargs = {
-            "api_key": api_key or os.getenv(config["api_key_env"]),
+            "api_key": resolved_api_key,
         }
-        if config["base_url"]:
-            client_kwargs["base_url"] = config["base_url"]
+        if base_url:
+            client_kwargs["base_url"] = base_url
 
         self.client = OpenAI(**client_kwargs)
 

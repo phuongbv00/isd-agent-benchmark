@@ -7,12 +7,12 @@ Single prompt ADDIE instructional design generator with multi-provider support.
 Baseline is a reference agent that generates complete ADDIE outputs with a single prompt.
 Used as a comparison baseline for evaluating other agents.
 
-Supports multiple LLM providers: Upstage Solar, OpenRouter, OpenAI.
+Uses the shared provider-neutral LLM configuration for hosted and local models.
 
 ## Features
 
 - Single API call generates complete ADDIE output
-- Multi-provider support (Upstage, OpenRouter, OpenAI)
+- Provider-neutral LLM support (hosted and local backends)
 - Bloom's Taxonomy based learning objective design
 - Gagné's 9 Events of Instruction application
 - Structured JSON output
@@ -43,26 +43,30 @@ baseline info
 | `--model` | LLM model (default: varies by provider) |
 | `--verbose, -v` | Verbose output |
 
-## Environment Variables
+## LLM Configuration
+
+Baseline uses the shared provider-neutral LLM layer from `shared/llm`.
+Pass `--agent-model-*` flags to `run_benchmark.py`, or configure optional `.env` defaults/secrets at the repository root. Judge models are configured separately with `--judge-model-*`.
 
 ```bash
-# For Upstage Solar
-export UPSTAGE_API_KEY="your-api-key"
-
-# For OpenRouter
-export OPENROUTER_API_KEY="your-api-key"
-
-# For OpenAI
-export OPENAI_API_KEY="your-api-key"
+# OpenRouter example
+AGENT_MODEL_PROVIDER=openrouter
+AGENT_MODEL_API_SPEC=openai_compatible
+AGENT_MODEL_NAME=openai/gpt-4o-mini
+AGENT_MODEL_BASE_URL=https://openrouter.ai/api/v1
+AGENT_MODEL_API_KEY_ENV=OPENROUTER_API_KEY
 ```
 
-## Default Models
+For local backends, use an OpenAI-compatible endpoint such as Ollama,
+LM Studio, or vLLM:
 
-| Provider | Default Model |
-|----------|---------------|
-| Upstage | solar-pro-3 |
-| OpenRouter | anthropic/claude-3.5-sonnet |
-| OpenAI | gpt-4-turbo |
+```bash
+AGENT_MODEL_PROVIDER=local-lmstudio
+AGENT_MODEL_API_SPEC=openai_compatible
+AGENT_MODEL_NAME=local-model
+AGENT_MODEL_BASE_URL=http://localhost:1234/v1
+AGENT_MODEL_API_KEY=not-needed
+```
 
 ## Implementation Details
 
@@ -71,4 +75,4 @@ This implementation follows **Zero-shot Chain-of-Thought (CoT)** and **Single Pr
 ### Key Characteristics
 - **Single-Turn Generation**: Generates complete results with a single system prompt and user input, without complex agent interactions
 - **Zero-shot CoT**: Induces step-by-step reasoning through prompt instructions only, without few-shot examples
-- **Multi-Provider Support**: Serves as a benchmark baseline for measuring LLM performance across different providers
+- **Provider-neutral LLM Support**: Serves as a benchmark baseline across hosted and local OpenAI-compatible or native API specs

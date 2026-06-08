@@ -21,12 +21,12 @@ RPISD 모형의 순환적/반복적 프로세스를 LangGraph StateGraph로 구�
 - Evaluation: 5개 (quiz_items, rubric, program_evaluation 등)
 """
 
-import os
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langgraph.graph import StateGraph, END
+from shared.llm import LLMConfig, configure_default_llm, llm_config_from_legacy
 
 from rpisd_agent.state import (
     RPISDState,
@@ -79,15 +79,25 @@ class RPISDAgent:
         max_iterations: int = 2,  # 3→2: 래피드 프로토타이핑 최적화 (#78)
         quality_threshold: float = 0.75,  # 0.8→0.75: 현실적 임계값 (#78)
         debug: bool = False,
+        llm_config: Optional[LLMConfig] = None,
     ):
-        self.model = model
+        selected_model = model if llm_config is None or model != "solar-mini" else llm_config.model
+        self.llm_config = (
+            llm_config.copy_with(model=selected_model, temperature=temperature)
+            if llm_config is not None
+            else llm_config_from_legacy(
+                provider="upstage",
+                model=selected_model,
+                temperature=temperature,
+            )
+        )
+        configure_default_llm(self.llm_config)
+
+        self.model = self.llm_config.model
         self.temperature = temperature
         self.max_iterations = max_iterations
         self.quality_threshold = quality_threshold
         self.debug = debug
-
-        # 환경 변수 설정
-        os.environ["RPISD_MODEL"] = model
 
         # StateGraph 빌드
         self.graph = self._build_graph()

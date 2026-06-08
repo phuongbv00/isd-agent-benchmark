@@ -24,7 +24,7 @@
 | Agent | CLI 명령어 | 설계 모형 |
 |-------|-----------|----------|
 | EduPlanner | `eduplanner` | 3-Agent 협업 구조 |
-| Baseline-SolarPro2 | `baseline-solarpro2` | 단일 LLM 기준선 |
+| Baseline | `baseline` | 단일 LLM 기준선 |
 | ReAct-ISD | `react-isd` | LangGraph ReAct 패턴 |
 | ADDIE-Agent | `addie-agent` | ADDIE 5단계 순차 실행 |
 | Dick-Carey-Agent | `dick-carey-agent` | Dick & Carey 10단계 체제적 교수설계 |
@@ -67,8 +67,8 @@ eduplanner generate -i scenarios/idld_aligned/scenario_idld_0001.json -o results
 # ReAct-ISD (상세 로그)
 react-isd generate -i scenario.json -o result.json --verbose
 
-# Baseline-SolarPro2 (다른 모델)
-baseline-solarpro2 generate -i scenario.json -o result.json --model solar-pro2-251215
+# Baseline (다른 모델)
+baseline generate -i scenario.json -o result.json --model local-model
 
 # ADDIE-Agent (디버그 모드)
 addie-agent run scenario.json -o output.json --debug
@@ -209,12 +209,12 @@ isd-evaluator compare --agents <agent1,agent2,...> --scenarios <path> [OPTIONS]
 ```bash
 # 3종 Agent 비교
 isd-evaluator compare \
-  --agents eduplanner,baseline-solarpro2,react-isd \
+  --agents eduplanner,baseline,react-isd \
   --scenarios scenarios/idld_aligned/
 
 # 특정 시나리오만
 isd-evaluator compare \
-  --agents eduplanner,baseline-solarpro2 \
+  --agents eduplanner,baseline \
   --scenarios scenarios/idld_aligned/scenario_idld_0001.json
 ```
 
@@ -240,8 +240,23 @@ isd-evaluator report --results-dir results/ --output report.html --format html
 
 | 변수 | 설명 | 기본값 |
 |------|------|--------|
-| `UPSTAGE_API_KEY` | Upstage API 키 | - |
-| `ANTHROPIC_API_KEY` | Anthropic API 키 | - |
+| `AGENT_MODEL_PROVIDER` | Agent model provider preset (`openrouter`, `upstage`, `local-lmstudio`, etc.) | `openrouter` |
+| `AGENT_MODEL_API_SPEC` | Agent model API spec (`openai_compatible`, `anthropic`) | `openai_compatible` |
+| `AGENT_MODEL_NAME` | Agent model name sent to the backend | provider default |
+| `AGENT_MODEL_BASE_URL` | Agent model OpenAI-compatible endpoint | provider default |
+| `AGENT_MODEL_API_KEY_ENV` | Env var containing one agent model API key | - |
+| `AGENT_MODEL_API_KEY_ENVS` | Comma-separated agent key env vars for round-robin | - |
+| `AGENT_MODEL_API_KEY` | Direct agent model API key; use `not-needed` for local endpoints | - |
+| `JUDGE_MODEL_PROVIDER` | Default judge model provider preset/label | `openrouter` |
+| `JUDGE_MODEL_NAMES` | Comma-separated judge model names | evaluator default |
+| `JUDGE_MODEL_PROVIDERS` | Comma-separated judge provider labels, aligned with model names | model prefixes |
+| `JUDGE_MODEL_BASE_URL` | Default judge model OpenAI-compatible endpoint | provider default |
+| `JUDGE_MODEL_BASE_URLS` | Comma-separated judge model endpoints, aligned with model names | - |
+| `JUDGE_MODEL_API_KEY_ENV` | Env var containing one judge model API key | - |
+| `JUDGE_MODEL_API_KEY_ENVS` | Comma-separated judge model key env groups, `|` within a group for multiple keys | - |
+| `JUDGE_MODEL_API_KEY` | Direct judge model API key; use `not-needed` for local endpoints | - |
+| `JUDGE_MODEL_API_KEYS` | Comma-separated direct judge model API key groups, `|` within a group for multiple keys | - |
+| `JUDGE_MODEL_CREDENTIAL_STRATEGIES` | Comma-separated credential strategies (`first`, `round_robin`), aligned with model names | inferred |
 | `ISD_LOG_LEVEL` | 로그 레벨 | `INFO` |
 | `ISD_TIMEOUT` | 기본 타임아웃 (초) | `300` |
 
@@ -274,7 +289,7 @@ result = evaluator.evaluate_agent(
 
 # 비교 평가
 report = evaluator.compare_agents(
-    agent_ids=["eduplanner", "baseline-solarpro2", "react-isd"],
+    agent_ids=["eduplanner", "baseline", "react-isd"],
     scenario_paths=["scenarios/idld_aligned/"]
 )
 ```

@@ -2,7 +2,7 @@
 Baseline ISD Agent CLI
 
 Single prompt ADDIE generator CLI interface.
-Supports multiple providers: Upstage, OpenRouter, OpenAI.
+Uses the shared provider-neutral LLM configuration.
 """
 
 import json
@@ -29,10 +29,11 @@ except ImportError:
 import typer
 
 from baseline.generator import BaselineGenerator
+from shared.llm import llm_config_from_env
 
 app = typer.Typer(
     name="baseline",
-    help="Baseline ISD Agent CLI (Multi-provider support)",
+    help="Baseline ISD Agent CLI (provider-neutral LLM support)",
     add_completion=False,
 )
 
@@ -70,7 +71,7 @@ def export_slides_to_marp(
     """ADDIE 출력에서 슬라이드를 추출하여 Marp Markdown 파일로 저장"""
     try:
         # shared/utils/marp_exporter 임포트
-        # cli.py 위치: agents/baseline-solarpro2/src/baseline_solarpro2/cli.py
+        # cli.py 위치: agents/baseline/src/baseline/cli.py
         # project_root: 프로젝트 루트 (5단계 상위)
         project_root = Path(__file__).parent.parent.parent.parent.parent
         sys.path.insert(0, str(project_root))
@@ -143,7 +144,7 @@ def run(
     model: str = typer.Option(
         None,
         "--model",
-        help="LLM 모델 (기본: LLM_MODEL 환경변수 또는 solar-pro2-251215)",
+        help="LLM model override (otherwise resolved from shared LLM config)",
     ),
     temperature: float = typer.Option(
         0.7,
@@ -188,10 +189,8 @@ def run(
     if verbose:
         typer.echo("생성기 초기화 중...")
 
-    generator = BaselineGenerator(
-        model=model,
-        temperature=temperature,
-    )
+    llm_config = llm_config_from_env(model=model, temperature=temperature, max_tokens=32768)
+    generator = BaselineGenerator(llm_config=llm_config)
 
     # 실행
     if verbose:
@@ -299,11 +298,11 @@ def info() -> None:
     typer.echo("==================")
     typer.echo()
     typer.echo("Generates ADDIE instructional design outputs with a single LLM call.")
-    typer.echo("Supports: Upstage Solar, OpenRouter, OpenAI.")
+    typer.echo("Supports hosted and local backends through shared LLM config.")
     typer.echo()
     typer.echo("Features:")
     typer.echo("  - Single prompt based (no iteration)")
-    typer.echo("  - Multi-provider support")
+    typer.echo("  - Provider-neutral LLM support")
     typer.echo("  - Minimal complexity")
     typer.echo("  - Comparison baseline")
     typer.echo()

@@ -42,8 +42,21 @@ uv pip install -e .
 
 ## 환경 설정
 
+공통 모델 설정은 `--agent-model-*` CLI flags 또는 저장소 루트의 optional `.env`로 지정합니다. 모든 ADDIE 도구는
+`shared/llm` factory를 통해 같은 설정을 사용합니다.
+
 ```bash
-export UPSTAGE_API_KEY="your-api-key"
+# OpenRouter 예시
+AGENT_MODEL_PROVIDER=openrouter
+AGENT_MODEL_API_SPEC=openai_compatible
+AGENT_MODEL_NAME=openai/gpt-4o-mini
+AGENT_MODEL_API_KEY_ENV=OPENROUTER_API_KEY
+
+# 로컬 LM Studio 예시
+# AGENT_MODEL_PROVIDER=local-lmstudio
+# AGENT_MODEL_BASE_URL=http://localhost:1234/v1
+# AGENT_MODEL_NAME=local-model
+# AGENT_MODEL_API_KEY=not-needed
 ```
 
 ## 사용법

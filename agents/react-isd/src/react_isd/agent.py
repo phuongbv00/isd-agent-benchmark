@@ -5,13 +5,17 @@ ReAct-ISD Agent (v0.5.0 - 5 Phase Tools)
 각 도구가 표준 스키마 섹션을 직접 반환하므로 변환 로직이 없습니다.
 """
 
-import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Optional
 
-from langchain_openai import ChatOpenAI
+from shared.llm import (
+    LLMConfig,
+    configure_default_llm,
+    create_chat_model,
+    llm_config_from_legacy,
+)
 
 from react_isd.tools.phases import (
     run_analysis,
@@ -21,9 +25,6 @@ from react_isd.tools.phases import (
     run_evaluation,
 )
 
-
-UPSTAGE_BASE_URL = "https://api.upstage.ai/v1/solar"
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 UPSTAGE_DEFAULT_MODEL = "solar-mini"
 
 
@@ -36,31 +37,26 @@ class ReActISDAgent:
         temperature: float = 0.7,
         api_key: Optional[str] = None,
         provider: str = "upstage",
+        llm_config: Optional[LLMConfig] = None,
     ):
-        self.model_name = model
-        self.temperature = temperature
-        self.provider = provider
+        selected_model = model if llm_config is None or model != UPSTAGE_DEFAULT_MODEL else llm_config.model
+        self.llm_config = (
+            llm_config.copy_with(model=selected_model, temperature=temperature)
+            if llm_config is not None
+            else llm_config_from_legacy(
+                provider=provider,
+                model=selected_model,
+                api_key=api_key,
+                temperature=temperature,
+            )
+        )
 
-        if provider == "openrouter":
-            self.llm = ChatOpenAI(
-                model=model,
-                temperature=temperature,
-                api_key=api_key or os.getenv("OPENROUTER_API_KEY"),
-                base_url=OPENROUTER_BASE_URL,
-            )
-        elif provider == "upstage":
-            self.llm = ChatOpenAI(
-                model=model,
-                temperature=temperature,
-                api_key=api_key or os.getenv("UPSTAGE_API_KEY"),
-                base_url=UPSTAGE_BASE_URL,
-            )
-        else:
-            self.llm = ChatOpenAI(
-                model=model,
-                temperature=temperature,
-                api_key=api_key or os.getenv("OPENAI_API_KEY"),
-            )
+        configure_default_llm(self.llm_config)
+
+        self.model_name = self.llm_config.model
+        self.temperature = temperature
+        self.provider = self.llm_config.provider
+        self.llm = create_chat_model(self.llm_config)
 
     def run(self, scenario: dict) -> dict:
         """

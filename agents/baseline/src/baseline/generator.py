@@ -2,76 +2,22 @@
 Baseline ISD Generator
 
 Generates ADDIE outputs with a single LLM call.
-Supports multiple providers: Upstage, OpenRouter, OpenAI.
+Uses the shared provider-neutral LLM factory.
 """
 
 import json
-import os
 import re
 from datetime import datetime
 from typing import Any, Optional
 
-from openai import OpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from baseline.prompts import SYSTEM_PROMPT, build_user_prompt
-
-
-# API Settings
-UPSTAGE_BASE_URL = "https://api.upstage.ai/v1/solar"
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-
-# Default models per provider
-DEFAULT_MODELS = {
-    "upstage": "solar-pro3",  # Free until March 2026
-    "openrouter": "anthropic/claude-3.5-sonnet",
-    "openai": "gpt-4-turbo",
-}
-
-# Round-robin API key management for Upstage
-_upstage_api_keys = None
-_upstage_key_index = 0
-_upstage_key_lock = None
-
-def get_upstage_api_key():
-    """Get Upstage API key with round-robin rotation"""
-    global _upstage_api_keys, _upstage_key_index, _upstage_key_lock
-    import threading
-
-    if _upstage_key_lock is None:
-        _upstage_key_lock = threading.Lock()
-
-    if _upstage_api_keys is None:
-        # Collect all available Upstage API keys
-        keys = []
-        base_key = os.getenv("UPSTAGE_API_KEY")
-        if base_key:
-            keys.append(base_key)
-        key2 = os.getenv("UPSTAGE_API_KEY2")
-        if key2:
-            keys.append(key2)
-        key3 = os.getenv("UPSTAGE_API_KEY3")
-        if key3:
-            keys.append(key3)
-        # Also check comma-separated format
-        keys_str = os.getenv("UPSTAGE_API_KEYS")
-        if keys_str:
-            keys.extend([k.strip() for k in keys_str.split(",") if k.strip()])
-        _upstage_api_keys = keys if keys else [None]
-
-    with _upstage_key_lock:
-        key = _upstage_api_keys[_upstage_key_index % len(_upstage_api_keys)]
-        _upstage_key_index += 1
-        return key
-
-
-def get_default_model(provider: str = "upstage") -> str:
-    """Get default model for provider, or from environment variable"""
-    env_model = os.getenv("LLM_MODEL") or os.getenv("MODEL_NAME")
-    return env_model or DEFAULT_MODELS.get(provider, "solar-pro3")
+from shared.llm import LLMConfig, create_chat_model, llm_config_from_env, llm_config_from_legacy
 
 
 class BaselineGenerator:
-    """Single prompt ADDIE generator with multi-provider support"""
+    """Single prompt ADDIE generator with provider-neutral LLM support"""
 
     def __init__(
         self,
@@ -81,29 +27,42 @@ class BaselineGenerator:
         api_key: Optional[str] = None,
         provider: str = None,  # "upstage", "openrouter", or "openai"
         reasoning_budget: int = None,  # Thinking/reasoning token budget (OpenRouter)
+        llm_config: Optional[LLMConfig] = None,
     ):
-        # Auto-detect provider from environment if not specified
-        if provider is None:
-            provider = os.getenv("MODEL_PROVIDER", "upstage")
+        if llm_config is None:
+            llm_config = (
+                llm_config_from_legacy(
+                    provider=provider or "upstage",
+                    model=model,
+                    api_key=api_key,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    reasoning_budget=reasoning_budget,
+                )
+                if provider or model or api_key
+                else llm_config_from_env(
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    reasoning_budget=reasoning_budget,
+                )
+            )
+        else:
+            llm_config = llm_config.copy_with(
+                model=model or llm_config.model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                reasoning_budget=reasoning_budget,
+            )
 
-        self.provider = provider
-        self.model = model or get_default_model(provider)
+        self.llm_config = llm_config
+        self.provider = llm_config.provider
+        self.model = llm_config.model
         self.temperature = temperature
         self.max_tokens = max_tokens
-        self.reasoning_budget = reasoning_budget or int(os.getenv("REASONING_BUDGET", "0")) or None
-
-        if provider == "upstage":
-            self.client = OpenAI(
-                api_key=api_key or get_upstage_api_key(),
-                base_url=UPSTAGE_BASE_URL,
-            )
-        elif provider == "openrouter":
-            self.client = OpenAI(
-                api_key=api_key or os.getenv("OPENROUTER_API_KEY") or os.getenv("OPEN_ROUTER_API_KEY"),
-                base_url=OPENROUTER_BASE_URL,
-            )
-        else:  # openai
-            self.client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+        self.reasoning_budget = llm_config.reasoning_budget
+        self.llm = create_chat_model(llm_config)
+        if llm_config.api_spec in {"openai", "openai_compatible"}:
+            self.llm = self.llm.bind(response_format={"type": "json_object"})
 
     def generate(self, scenario: dict) -> dict:
         """
@@ -120,33 +79,15 @@ class BaselineGenerator:
         # 프롬프트 생성
         user_prompt = build_user_prompt(scenario)
 
-        # API 호출
-        api_kwargs = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            "response_format": {"type": "json_object"},  # Force JSON output
-        }
-
-        # Add reasoning budget for OpenRouter (extended thinking)
-        # Claude/Gemini: max_tokens, OpenAI: effort level
-        if self.reasoning_budget and self.provider == "openrouter":
-            if "openai/" in self.model or "gpt" in self.model.lower():
-                # OpenAI models use effort level instead of max_tokens
-                api_kwargs["extra_body"] = {"reasoning": {"effort": "low"}}
-            else:
-                # Claude/Gemini use max_tokens
-                api_kwargs["extra_body"] = {"reasoning": {"max_tokens": self.reasoning_budget}}
-
-        response = self.client.chat.completions.create(**api_kwargs)
+        response = self.llm.invoke([
+            SystemMessage(content=SYSTEM_PROMPT),
+            HumanMessage(content=user_prompt),
+        ])
 
         # 응답 파싱
-        content = response.choices[0].message.content
+        content = self._extract_content(response.content)
         addie_output = self._parse_response(content)
+        usage = self._extract_usage(response)
 
         # 메타데이터 생성
         end_time = datetime.now()
@@ -199,11 +140,11 @@ class BaselineGenerator:
             },
             "metadata": {
                 "model": self.model,
-                "total_tokens": response.usage.total_tokens if response.usage else 0,
-                "prompt_tokens": response.usage.prompt_tokens if response.usage else 0,
-                "completion_tokens": response.usage.completion_tokens if response.usage else 0,
+                "total_tokens": usage.get("total_tokens", 0),
+                "prompt_tokens": usage.get("prompt_tokens", 0),
+                "completion_tokens": usage.get("completion_tokens", 0),
                 "execution_time_seconds": execution_time,
-                "cost_usd": self._calculate_cost(response.usage),
+                "cost_usd": self._calculate_cost(usage),
                 "agent_version": "0.1.0",
                 "iterations": 1,
             },
@@ -237,6 +178,19 @@ class BaselineGenerator:
         # 파싱 실패 시 기본 구조 반환
         print("[DEBUG] 기본 출력 반환", file=sys.stderr)
         return self._create_default_output()
+
+    def _extract_content(self, content: Any) -> str:
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = []
+            for item in content:
+                if isinstance(item, dict):
+                    parts.append(str(item.get("text") or item.get("content") or ""))
+                else:
+                    parts.append(str(item))
+            return "\n".join(part for part in parts if part)
+        return str(content)
 
     def _ensure_required_fields(self, data: dict) -> dict:
         """필수 필드 누락 시 기본값 적용 (#71)"""
@@ -593,6 +547,36 @@ class BaselineGenerator:
         ]
         return tool_calls
 
+    def _extract_usage(self, response: Any) -> dict[str, int]:
+        """Normalize token usage from LangChain response metadata."""
+        usage = getattr(response, "usage_metadata", None) or {}
+        response_metadata = getattr(response, "response_metadata", {}) or {}
+        token_usage = response_metadata.get("token_usage") or {}
+
+        prompt_tokens = (
+            usage.get("input_tokens")
+            or usage.get("prompt_tokens")
+            or token_usage.get("prompt_tokens")
+            or 0
+        )
+        completion_tokens = (
+            usage.get("output_tokens")
+            or usage.get("completion_tokens")
+            or token_usage.get("completion_tokens")
+            or 0
+        )
+        total_tokens = (
+            usage.get("total_tokens")
+            or token_usage.get("total_tokens")
+            or prompt_tokens + completion_tokens
+        )
+
+        return {
+            "prompt_tokens": int(prompt_tokens or 0),
+            "completion_tokens": int(completion_tokens or 0),
+            "total_tokens": int(total_tokens or 0),
+        }
+
     def _calculate_cost(self, usage: Any) -> float:
         """API 호출 비용 계산 (USD)"""
         if not usage:
@@ -600,7 +584,14 @@ class BaselineGenerator:
 
         # GPT-4o 가격 (2024년 기준 근사값)
         # Input: $5/1M tokens, Output: $15/1M tokens
-        input_cost = (usage.prompt_tokens / 1_000_000) * 5
-        output_cost = (usage.completion_tokens / 1_000_000) * 15
+        if isinstance(usage, dict):
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+        else:
+            prompt_tokens = getattr(usage, "prompt_tokens", 0)
+            completion_tokens = getattr(usage, "completion_tokens", 0)
+
+        input_cost = (prompt_tokens / 1_000_000) * 5
+        output_cost = (completion_tokens / 1_000_000) * 15
 
         return round(input_cost + output_cost, 6)

@@ -58,10 +58,23 @@ react-isd info
 | `--trajectory, -t` | 궤적 저장 파일 (선택) |
 | `--verbose, -v` | 상세 출력 |
 
-## 환경 변수
+## LLM 설정
+
+공통 모델 설정은 `--agent-model-*` CLI flags 또는 저장소 루트의 optional `.env`로 지정합니다. ReAct 도구들은
+`shared/llm` factory를 통해 같은 provider-neutral 설정을 사용합니다.
 
 ```bash
-export OPENAI_API_KEY="your-api-key"
+# OpenRouter 예시
+AGENT_MODEL_PROVIDER=openrouter
+AGENT_MODEL_API_SPEC=openai_compatible
+AGENT_MODEL_NAME=anthropic/claude-opus-4.5
+AGENT_MODEL_API_KEY_ENV=OPENROUTER_API_KEY
+
+# 로컬 vLLM 예시
+# AGENT_MODEL_PROVIDER=local-vllm
+# AGENT_MODEL_BASE_URL=http://localhost:8000/v1
+# AGENT_MODEL_NAME=local-model
+# AGENT_MODEL_API_KEY=not-needed
 ```
 
 ## 구현 검증 (Verification & Alignment)
@@ -76,4 +89,3 @@ export OPENAI_API_KEY="your-api-key"
 ### 도메인 맞춤형 변형 (Adapted)
 - **순차적 프로세스 강제**: 일반적인 ReAct 에이전트와 달리, ADDIE 모델의 5단계(분석-설계-개발-실행-평가) 순서를 지키도록 프롬프트로 유도
 - **도구 전문화**: 검색 도구(Search) 대신 교수설계 각 단계에 특화된 11개의 전문 도구(analyze_learners, design_objectives 등)를 제공하여 품질 확보
-

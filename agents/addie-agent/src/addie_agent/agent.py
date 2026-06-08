@@ -5,12 +5,12 @@ ADDIE 모형의 선형적/순차적 프로세스를 LangGraph StateGraph로 구�
 [START] → [Analysis] → [Design] → [Development] → [Implementation] → [Evaluation] → [END]
 """
 
-import os
 from datetime import datetime
 from typing import Any, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langgraph.graph import StateGraph, END
+from shared.llm import LLMConfig, configure_default_llm, llm_config_from_legacy
 
 from addie_agent.state import (
     ADDIEState,
@@ -72,13 +72,23 @@ class ADDIEAgent:
         model: str = "solar-mini",
         temperature: float = 0.7,
         debug: bool = False,
+        llm_config: Optional[LLMConfig] = None,
     ):
-        self.model = model
+        selected_model = model if llm_config is None or model != "solar-mini" else llm_config.model
+        self.llm_config = (
+            llm_config.copy_with(model=selected_model, temperature=temperature)
+            if llm_config is not None
+            else llm_config_from_legacy(
+                provider="upstage",
+                model=selected_model,
+                temperature=temperature,
+            )
+        )
+        configure_default_llm(self.llm_config)
+
+        self.model = self.llm_config.model
         self.temperature = temperature
         self.debug = debug
-
-        # 환경 변수 설정
-        os.environ["ADDIE_MODEL"] = model
 
         # StateGraph 빌드
         self.graph = self._build_graph()

@@ -332,6 +332,13 @@ class EduPlannerAgent(BaseAgent):
         self._optimizer: Optional[OptimizerAgent] = None
         self._analyst: Optional[AnalystAgent] = None
 
+    def _agent_config(self, *, temperature: float, max_tokens: int) -> AgentConfig:
+        """하위 에이전트별 생성 파라미터만 조정하고 LLM provider/key는 공유합니다."""
+        return self.config.model_copy(update={
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        })
+
     @property
     def name(self) -> str:
         return "EduPlanner Agent"
@@ -344,21 +351,28 @@ class EduPlannerAgent(BaseAgent):
     def evaluator(self) -> EvaluatorAgent:
         """Evaluator Agent (지연 초기화)"""
         if self._evaluator is None:
-            self._evaluator = EvaluatorAgent()
+            self._evaluator = EvaluatorAgent(
+                config=self._agent_config(temperature=0.7, max_tokens=4096)
+            )
         return self._evaluator
 
     @property
     def optimizer(self) -> OptimizerAgent:
         """Optimizer Agent (지연 초기화)"""
         if self._optimizer is None:
-            self._optimizer = OptimizerAgent(debug=self.debug)
+            self._optimizer = OptimizerAgent(
+                config=self._agent_config(temperature=0.3, max_tokens=8192),
+                debug=self.debug,
+            )
         return self._optimizer
 
     @property
     def analyst(self) -> AnalystAgent:
         """Analyst Agent (지연 초기화)"""
         if self._analyst is None:
-            self._analyst = AnalystAgent()
+            self._analyst = AnalystAgent(
+                config=self._agent_config(temperature=0.7, max_tokens=4096)
+            )
         return self._analyst
 
     def run(self, scenario_input: ScenarioInput) -> AgentResult:

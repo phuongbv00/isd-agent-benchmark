@@ -7,9 +7,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic"
 """
 ISD Agent Benchmark 통합 테스트 스크립트
 
-3종 Agent(EduPlanner, Baseline-SolarPro2, ReAct-ISD)를
+여러 ISD Agent를
 여러 시나리오에 대해 실행하고 비교 평가합니다.
-Upstage Solar Pro2 API를 사용합니다.
+LLM backend는 shared.llm 설정으로 주입합니다.
 """
 
 import json
@@ -23,6 +23,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Any, Dict
+
+from shared.llm import LLMConfig, llm_config_from_env
 
 try:
     from tqdm import tqdm
@@ -39,71 +41,6 @@ sys.path.insert(0, str(_SCRIPT_DIR / "agents" / "react-isd" / "src"))
 sys.path.insert(0, str(_SCRIPT_DIR / "agents" / "addie-agent" / "src"))
 sys.path.insert(0, str(_SCRIPT_DIR / "agents" / "dick-carey-agent" / "src"))
 sys.path.insert(0, str(_SCRIPT_DIR / "agents" / "rpisd-agent" / "src"))
-
-
-class SolarKeyRotator:
-    """Solar Pro 3용 라운드 로빈 API 키 로테이터"""
-
-    def __init__(self):
-        self._lock = threading.Lock()
-        self._index = 0
-
-        # 사용 가능한 키 목록 구성
-        self._keys = []
-
-        # 1. OpenRouter (upstage/solar-pro-3:free)
-        openrouter_key = os.getenv("OPENROUTER_API_KEY")
-        if openrouter_key:
-            self._keys.append({
-                "provider": "openrouter",
-                "model": "upstage/solar-pro-3:free",
-                "api_key": openrouter_key,
-                "base_url": "https://openrouter.ai/api/v1",
-            })
-
-        # 2. Upstage Direct (UPSTAGE_API_KEY)
-        upstage_key = os.getenv("UPSTAGE_API_KEY")
-        if upstage_key:
-            self._keys.append({
-                "provider": "upstage",
-                "model": "solar-pro3",
-                "api_key": upstage_key,
-                "base_url": "https://api.upstage.ai/v1/solar",
-            })
-
-        # 3. Upstage Direct 2 (UPSTAGE_API_KEY2)
-        upstage_key2 = os.getenv("UPSTAGE_API_KEY2")
-        if upstage_key2:
-            self._keys.append({
-                "provider": "upstage2",
-                "model": "solar-pro3",
-                "api_key": upstage_key2,
-                "base_url": "https://api.upstage.ai/v1/solar",
-            })
-
-        if not self._keys:
-            raise ValueError("No API keys found for Solar Pro 3")
-
-        print(f"  [SolarKeyRotator] {len(self._keys)}개 키 로드됨: {[k['provider'] for k in self._keys]}")
-
-    def get_next(self) -> dict:
-        """라운드 로빈으로 다음 키 반환"""
-        with self._lock:
-            key_info = self._keys[self._index]
-            self._index = (self._index + 1) % len(self._keys)
-            return key_info
-
-
-# 전역 Solar 키 로테이터 (Solar 모델 사용 시에만 초기화)
-_solar_key_rotator: Optional[SolarKeyRotator] = None
-
-
-def get_solar_key_rotator() -> SolarKeyRotator:
-    """Solar 키 로테이터 싱글톤 반환"""
-    global _solar_key_rotator
-    if _solar_key_rotator is None:
-        _solar_key_rotator = SolarKeyRotator()
-    return _solar_key_rotator
 
 
 class BenchmarkProgressLogger:
@@ -308,12 +245,14 @@ RESULTS_DIR = PROJECT_ROOT / "results"
 VENV_BIN = PROJECT_ROOT / ".venv" / "bin"
 
 # 환경변수 설정 (Agent 실행용)
-def get_env_with_venv():
+def get_env_with_venv(extra_env: Optional[dict[str, str]] = None):
     """venv bin 경로가 포함된 환경변수 반환"""
     env = os.environ.copy()
     venv_path = str(VENV_BIN)
     current_path = env.get('PATH', '')
     env['PATH'] = f"{venv_path}:{current_path}"
+    if extra_env:
+        env.update({k: v for k, v in extra_env.items() if v is not None})
     return env
 
 
@@ -470,36 +409,58 @@ def check_agents_installed() -> dict[str, bool]:
     return agents
 
 
-def _get_model_config() -> tuple[str, str, Optional[str]]:
-    """모델 설정 반환. Solar Pro 3이면 키 로테이션 적용.
-
-    Returns:
-        (provider, model, api_key) - api_key는 Solar 로테이션 시에만 설정
-    """
-    provider = os.getenv("MODEL_PROVIDER", "openrouter")
-    model = os.getenv("MODEL_NAME", "anthropic/claude-opus-4.5")
-
-    # Solar Pro 3 모델 감지 (키 로테이션 적용)
-    is_solar = "solar" in model.lower()
-    if is_solar:
-        rotator = get_solar_key_rotator()
-        key_info = rotator.get_next()
-        # 환경변수 임시 설정 (에이전트들이 읽을 수 있도록)
-        os.environ["_ROTATED_API_KEY"] = key_info["api_key"]
-        os.environ["_ROTATED_BASE_URL"] = key_info["base_url"]
-        return key_info["provider"], key_info["model"], key_info["api_key"]
-
-    return provider, model, None
+def _resolve_llm_config(llm_config: Optional[LLMConfig] = None) -> LLMConfig:
+    return llm_config or llm_config_from_env()
 
 
-def _get_agent_runner(agent_id: str):
+def _build_judge_env(
+    *,
+    provider: Optional[str] = None,
+    providers: Optional[str] = None,
+    models: Optional[str] = None,
+    base_url: Optional[str] = None,
+    base_urls: Optional[str] = None,
+    api_key: Optional[str] = None,
+    api_keys: Optional[str] = None,
+    api_key_env: Optional[str] = None,
+    api_key_envs: Optional[str] = None,
+    credential_strategies: Optional[str] = None,
+) -> dict[str, str]:
+    """Build env overrides consumed by isd-evaluator judge config."""
+    env: dict[str, str] = {}
+    mapping = {
+        "JUDGE_MODEL_PROVIDER": provider,
+        "JUDGE_MODEL_PROVIDERS": providers,
+        "JUDGE_MODEL_NAMES": models,
+        "JUDGE_MODEL_BASE_URL": base_url,
+        "JUDGE_MODEL_BASE_URLS": base_urls,
+        "JUDGE_MODEL_API_KEY": api_key,
+        "JUDGE_MODEL_API_KEYS": api_keys,
+        "JUDGE_MODEL_API_KEY_ENV": api_key_env,
+        "JUDGE_MODEL_API_KEY_ENVS": api_key_envs,
+        "JUDGE_MODEL_CREDENTIAL_STRATEGIES": credential_strategies,
+    }
+    for key, value in mapping.items():
+        if value:
+            env[key] = value
+    return env
+
+
+def _judge_models_from_env(judge_env: Optional[dict[str, str]]) -> list[str]:
+    models = (judge_env or {}).get("JUDGE_MODEL_NAMES") or os.getenv("JUDGE_MODEL_NAMES")
+    if models:
+        return [part.strip() for part in models.split(",") if part.strip()]
+    return ["openai/gpt-4o-mini", "google/gemini-2.5-flash-lite"]
+
+
+def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
     """에이전트 ID에 해당하는 실행 함수 반환 (모듈 기반)"""
+    llm_config = _resolve_llm_config(llm_config)
 
     if agent_id == "baseline":
         from baseline.generator import BaselineGenerator
         def run_baseline(scenario: dict) -> dict:
-            provider, model, api_key = _get_model_config()
-            gen = BaselineGenerator(model=model, provider=provider, api_key=api_key)
+            gen = BaselineGenerator(llm_config=llm_config.copy_with(max_tokens=32768))
             return gen.generate(scenario)
         return run_baseline
 
@@ -508,8 +469,11 @@ def _get_agent_runner(agent_id: str):
         from eduplanner.agents.base import AgentConfig
         from eduplanner.models.schemas import ScenarioInput
         def run_eduplanner(scenario: dict) -> dict:
-            provider, model, api_key = _get_model_config()
-            config = AgentConfig(model=model, provider=provider)
+            config = AgentConfig(
+                model=llm_config.model,
+                provider=llm_config.provider,
+                llm_config=llm_config,
+            )
             agent = EduPlannerAgent(config=config, max_iterations=3, target_score=90.0)
             scenario_input = ScenarioInput(**scenario)
             result = agent.run(scenario_input)
@@ -523,32 +487,28 @@ def _get_agent_runner(agent_id: str):
     elif agent_id == "react-isd":
         from react_isd.agent import ReActISDAgent
         def run_react(scenario: dict) -> dict:
-            provider, model, api_key = _get_model_config()
-            agent = ReActISDAgent(model=model, provider=provider, api_key=api_key)
+            agent = ReActISDAgent(llm_config=llm_config)
             return agent.run(scenario)
         return run_react
 
     elif agent_id == "addie-agent":
         from addie_agent.agent import ADDIEAgent
         def run_addie(scenario: dict) -> dict:
-            provider, model, api_key = _get_model_config()
-            agent = ADDIEAgent(model=model)
+            agent = ADDIEAgent(llm_config=llm_config)
             return agent.run(scenario)
         return run_addie
 
     elif agent_id == "dick-carey-agent":
         from dick_carey_agent.agent import DickCareyAgent
         def run_dickcarey(scenario: dict) -> dict:
-            provider, model, api_key = _get_model_config()
-            agent = DickCareyAgent(model=model)
+            agent = DickCareyAgent(llm_config=llm_config)
             return agent.run(scenario)
         return run_dickcarey
 
     elif agent_id == "rpisd-agent":
         from rpisd_agent.agent import RPISDAgent
         def run_rpisd(scenario: dict) -> dict:
-            provider, model, api_key = _get_model_config()
-            agent = RPISDAgent(model=model)
+            agent = RPISDAgent(llm_config=llm_config)
             return agent.run(scenario)
         return run_rpisd
 
@@ -560,6 +520,7 @@ def _run_agent_task(
     agent_id: str,
     scenario_path: Path,
     output_dir: Path,
+    llm_config: Optional[LLMConfig] = None,
     semaphore: Optional[threading.Semaphore] = None,
 ) -> tuple[str, dict]:
     """개별 Agent 실행 태스크 (모듈 기반, 병렬 실행용)"""
@@ -581,7 +542,7 @@ def _run_agent_task(
 
             # 에이전트 실행 (모듈 기반)
             start_time = time.time()
-            runner = _get_agent_runner(agent_id)
+            runner = _get_agent_runner(agent_id, llm_config=llm_config)
             result = runner(scenario)
             elapsed = time.time() - start_time
 
@@ -646,6 +607,8 @@ def run_single_benchmark(
     parallel: bool = False,
     max_workers: int = 3,
     multi_judge: bool = True,
+    llm_config: Optional[LLMConfig] = None,
+    judge_env: Optional[dict[str, str]] = None,
 ) -> dict:
     """단일 시나리오에 대해 벤치마크 실행
 
@@ -681,7 +644,12 @@ def run_single_benchmark(
             futures = {}
             for idx, agent_id in enumerate(agents):
                 future = executor.submit(
-                    _run_agent_task, agent_id, scenario_path, output_dir, semaphore
+                    _run_agent_task,
+                    agent_id,
+                    scenario_path,
+                    output_dir,
+                    llm_config,
+                    semaphore,
                 )
                 futures[future] = agent_id
                 # Rate limit 대응: Agent 제출 간 딜레이
@@ -707,7 +675,12 @@ def run_single_benchmark(
         # 순차 실행 (기존 방식)
         for agent_id in agents:
             print(f"  {agent_id} 실행 중...", end=" ", flush=True)
-            _, agent_result = _run_agent_task(agent_id, scenario_path, output_dir)
+            _, agent_result = _run_agent_task(
+                agent_id,
+                scenario_path,
+                output_dir,
+                llm_config=llm_config,
+            )
 
             status = "완료" if agent_result["success"] else "실패"
             print(status)
@@ -733,7 +706,7 @@ def run_single_benchmark(
             "--agents", ",".join(successful_agents),
         ]
 
-        # Use multi-judge (5 LLMs) or single-judge
+        # Use multi-judge or single-judge evaluation
         if multi_judge:
             cmd.append("--multi-judge")
         else:
@@ -746,7 +719,7 @@ def run_single_benchmark(
             cmd,
             capture_output=True,
             text=True,
-            env=get_env_with_venv(),
+            env=get_env_with_venv(judge_env),
             # 타임아웃 없음 - LLM 평가는 시간이 오래 걸릴 수 있음
         )
 
@@ -776,6 +749,8 @@ def _run_scenario_task(
     parallel: bool,
     max_workers: int,
     multi_judge: bool = True,
+    llm_config: Optional[LLMConfig] = None,
+    judge_env: Optional[dict[str, str]] = None,
     semaphore: Optional[threading.Semaphore] = None,
 ) -> tuple[str, dict]:
     """Scenario execution task (for scenario-level parallelization)"""
@@ -792,6 +767,8 @@ def _run_scenario_task(
             parallel=parallel,
             max_workers=max_workers,
             multi_judge=multi_judge,
+            llm_config=llm_config,
+            judge_env=judge_env,
         )
         return scenario_id, result
     finally:
@@ -809,6 +786,8 @@ def run_full_benchmark(
     scenario_max_workers: int = 8,
     dataset: Optional[str] = None,
     multi_judge: bool = True,
+    llm_config: Optional[LLMConfig] = None,
+    judge_env: Optional[dict[str, str]] = None,
 ) -> dict:
     """전체 벤치마크 실행 (IDLD 데이터셋 구조)
 
@@ -829,6 +808,7 @@ def run_full_benchmark(
         variants = variants or ["idld_aligned", "context_variant"]
 
     agents = agents or ["eduplanner", "baseline", "react-isd", "addie-agent", "dick-carey-agent", "rpisd-agent"]
+    llm_config = _resolve_llm_config(llm_config)
 
     # 시나리오 수집 (먼저 수집하여 총 개수 파악)
     all_scenarios = get_all_scenarios(dataset=dataset)
@@ -838,7 +818,7 @@ def run_full_benchmark(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # 모델 이름에서 디렉토리용 safe name 생성 (예: anthropic/claude-opus-4.5 -> claude-opus-4.5)
-    model_name = os.getenv("MODEL_NAME", "default")
+    model_name = llm_config.model
     model_safe_name = model_name.split("/")[-1].replace(":", "-")  # Remove provider prefix and replace colons
 
     # dataset 모드일 때는 디렉토리 이름에 반영 (예: test_benchmark_claude-opus-4.5_20260122_...)
@@ -861,7 +841,7 @@ def run_full_benchmark(
     print(f"\n{'=' * 80}")
     print(f"  🚀 ISD Agent Benchmark 실행")
     print(f"{'=' * 80}")
-    print(f"  🤖 Model: {model_name} (provider: {os.getenv('MODEL_PROVIDER', 'openrouter')})")
+    print(f"  🤖 Model: {model_name} (provider: {llm_config.provider}, api_spec: {llm_config.api_spec})")
 
     if dataset:
         print(f"  📂 데이터셋 모드: {dataset.upper()}")
@@ -872,9 +852,10 @@ def run_full_benchmark(
     print(f"  Total scenarios: {total_scenarios}")
     print(f"  Parallel mode: {scenario_max_workers} scenarios x {max_workers} agents concurrently")
     if multi_judge:
-        print(f"  Evaluation: Multi-Judge (2 LLMs, 경량/빠름)")
-        print(f"    - openai/gpt-4o-mini (OPENROUTER_API_KEY)")
-        print(f"    - google/gemini-2.5-flash-lite (OPENROUTER_API_KEY)")
+        judge_models = _judge_models_from_env(judge_env)
+        print(f"  Evaluation: Multi-Judge ({len(judge_models)} judge models)")
+        for judge_model in judge_models:
+            print(f"    - {judge_model}")
     else:
         print(f"  Evaluation: Single-Judge")
     print(f"  Output: {run_dir}")
@@ -886,7 +867,9 @@ def run_full_benchmark(
         "output_dir": str(run_dir),
         "model": {
             "name": model_name,
-            "provider": os.getenv("MODEL_PROVIDER", "openrouter"),
+            "provider": llm_config.provider,
+            "api_spec": llm_config.api_spec,
+            "base_url": llm_config.base_url,
         },
         "config": {
             "variants": variants,
@@ -897,10 +880,12 @@ def run_full_benchmark(
             "scenario_parallel": scenario_parallel,
             "scenario_max_workers": scenario_max_workers,
             "multi_judge": multi_judge,
-            "judge_models": [
-                "openai/gpt-4o-mini",
-                "google/gemini-2.5-flash-lite",
-            ] if multi_judge else None,
+            "judge_models": _judge_models_from_env(judge_env) if multi_judge else None,
+            "judge_env": {
+                key: value
+                for key, value in (judge_env or {}).items()
+                if "API_KEY" not in key
+            } if judge_env else None,
         },
         "scenarios": {},
     }
@@ -957,6 +942,8 @@ def run_full_benchmark(
                     parallel=parallel,
                     max_workers=max_workers,
                     multi_judge=multi_judge,
+                    llm_config=llm_config,
+                    judge_env=judge_env,
                 )
 
                 elapsed = time.time() - start_time
@@ -1017,6 +1004,8 @@ def run_full_benchmark(
                     parallel=parallel,
                     max_workers=max_workers,
                     multi_judge=multi_judge,
+                    llm_config=llm_config,
+                    judge_env=judge_env,
                 )
 
                 elapsed = time.time() - start_time
@@ -1216,7 +1205,7 @@ def main():
         "--multi-judge",
         action="store_true",
         default=True,
-        help="Use multi-judge evaluation with 5 LLMs (default: True)",
+        help="Use multi-judge evaluation (default: True)",
     )
     parser.add_argument(
         "--single-judge",
@@ -1231,8 +1220,136 @@ def main():
         default="conservative",
         help="Rate limit mode: conservative (2x2=4), moderate (3x4=12), aggressive (6x8=48), turbo (6x16=96). Default: conservative",
     )
+    parser.add_argument(
+        "--agent-model-provider",
+        type=str,
+        default=None,
+        help="Agent model provider preset (openrouter, upstage, local-lmstudio, etc.)",
+    )
+    parser.add_argument(
+        "--agent-model-api-spec",
+        type=str,
+        choices=["openai_compatible", "openai", "anthropic"],
+        default=None,
+        help="Agent model API spec",
+    )
+    parser.add_argument(
+        "--agent-model-base-url",
+        type=str,
+        default=None,
+        help="Agent model OpenAI-compatible base URL",
+    )
+    parser.add_argument(
+        "--agent-model-name",
+        type=str,
+        default=None,
+        help="Agent model name",
+    )
+    parser.add_argument(
+        "--agent-model-api-key",
+        type=str,
+        default=None,
+        help="Agent model API key value",
+    )
+    parser.add_argument(
+        "--agent-model-api-key-env",
+        type=str,
+        default=None,
+        help="Environment variable containing the agent model API key",
+    )
+    parser.add_argument(
+        "--agent-model-api-key-envs",
+        type=str,
+        default=None,
+        help="Comma-separated agent model API key env vars for round-robin credentials",
+    )
+    parser.add_argument(
+        "--judge-model-provider",
+        type=str,
+        default=None,
+        help="Default judge model provider preset/label",
+    )
+    parser.add_argument(
+        "--judge-model-providers",
+        type=str,
+        default=None,
+        help="Comma-separated provider labels, aligned with --judge-model-names",
+    )
+    parser.add_argument(
+        "--judge-model-names",
+        type=str,
+        default=None,
+        help="Comma-separated judge model names",
+    )
+    parser.add_argument(
+        "--judge-model-base-url",
+        type=str,
+        default=None,
+        help="Default judge OpenAI-compatible base URL",
+    )
+    parser.add_argument(
+        "--judge-model-base-urls",
+        type=str,
+        default=None,
+        help="Comma-separated judge base URLs, aligned with --judge-model-names",
+    )
+    parser.add_argument(
+        "--judge-model-api-key",
+        type=str,
+        default=None,
+        help="Default judge API key value",
+    )
+    parser.add_argument(
+        "--judge-model-api-keys",
+        type=str,
+        default=None,
+        help="Comma-separated judge API key groups, with '|' for multiple keys per judge model",
+    )
+    parser.add_argument(
+        "--judge-model-api-key-env",
+        type=str,
+        default=None,
+        help="Environment variable containing the default judge API key",
+    )
+    parser.add_argument(
+        "--judge-model-api-key-envs",
+        type=str,
+        default=None,
+        help="Comma-separated judge API key env groups, with '|' for multiple env vars per judge model",
+    )
+    parser.add_argument(
+        "--judge-model-credential-strategies",
+        type=str,
+        default=None,
+        help="Comma-separated judge credential strategies, aligned with --judge-model-names",
+    )
 
     args = parser.parse_args()
+    llm_config = llm_config_from_env(
+        provider=args.agent_model_provider,
+        api_spec=args.agent_model_api_spec,
+        base_url=args.agent_model_base_url,
+        model=args.agent_model_name,
+        api_key=args.agent_model_api_key,
+        api_key_env=args.agent_model_api_key_env,
+        api_key_envs=tuple(
+            part.strip()
+            for part in ((args.agent_model_api_key_envs or "").split(","))
+            if part.strip()
+        ),
+    )
+    judge_env = _build_judge_env(
+        provider=args.judge_model_provider,
+        providers=args.judge_model_providers,
+        models=args.judge_model_names,
+        base_url=args.judge_model_base_url,
+        base_urls=args.judge_model_base_urls,
+        api_key=args.judge_model_api_key,
+        api_keys=args.judge_model_api_keys,
+        api_key_env=args.judge_model_api_key_env,
+        api_key_envs=args.judge_model_api_key_envs,
+        credential_strategies=args.judge_model_credential_strategies,
+    )
 
     # Rate limit 모드에 따른 설정 조정
     rate_limit_configs = {
@@ -1301,6 +1418,8 @@ def main():
             parallel=not args.no_parallel,
             max_workers=args.max_workers,
             multi_judge=use_multi_judge,
+            llm_config=llm_config,
+            judge_env=judge_env,
         )
 
         print(f"\nResults saved: {output_dir}")
@@ -1330,6 +1449,8 @@ def main():
         scenario_max_workers=args.scenario_max_workers,
         dataset=args.dataset,
         multi_judge=use_multi_judge,
+        llm_config=llm_config,
+        judge_env=judge_env,
     )
 
     # 요약 리포트 생성
