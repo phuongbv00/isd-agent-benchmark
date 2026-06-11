@@ -2,8 +2,8 @@
 cd "$(dirname "$0")/.."
 source .env 2>/dev/null || true
 
-# Test: 1 scenario, all 6 agents
-AGENTS="baseline,eduplanner,react-isd,addie-agent,dick-carey-agent,rpisd-agent"
+# Test: 1 scenario, all 7 agents
+AGENTS="baseline,eduplanner,react-isd,addie-agent,dick-carey-agent,rpisd-agent,alignmentgraph-isd"
 RATE_LIMIT="conservative"
 
 python run_benchmark.py \

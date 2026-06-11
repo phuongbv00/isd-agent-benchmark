@@ -367,6 +367,7 @@ def check_agents_installed() -> dict[str, bool]:
         "addie-agent": False,
         "dick-carey-agent": False,
         "rpisd-agent": False,
+        "alignmentgraph-isd": False,
     }
 
     # 모듈 import 테스트
@@ -385,6 +386,12 @@ def check_agents_installed() -> dict[str, bool]:
     try:
         from react_isd.agent import ReActISDAgent
         agents["react-isd"] = True
+    except ImportError:
+        pass
+
+    try:
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        agents["alignmentgraph-isd"] = True
     except ImportError:
         pass
 
@@ -490,6 +497,14 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
             agent = ReActISDAgent(llm_config=llm_config)
             return agent.run(scenario)
         return run_react
+
+    elif agent_id == "alignmentgraph-isd":
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        _ag_llm_config = llm_config.copy_with(max_tokens=16384) if llm_config else llm_config
+        def run_alignmentgraph_isd(scenario: dict) -> dict:
+            agent = AlignmentGraphISDAgent(llm_config=_ag_llm_config)
+            return agent.run(scenario)
+        return run_alignmentgraph_isd
 
     elif agent_id == "addie-agent":
         from addie_agent.agent import ADDIEAgent

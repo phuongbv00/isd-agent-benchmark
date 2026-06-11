@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "alignmentgraph-isd-agent"
+version = "0.1.0"
+description = "AlignmentGraph-ISD Agent - LangGraph-based multi-agent ADDIE instructional design"
+requires-python = ">=3.11"
+dependencies = [
+    "alignmentgraph-isd",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/alignmentgraph_isd_agent"]
