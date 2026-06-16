@@ -132,6 +132,134 @@ Benchmark scripts pass base URLs explicitly. Override `OPENROUTER_BASE_URL`,
 `UPSTAGE_BASE_URL`, `AGENT_MODEL_BASE_URL`, or `JUDGE_MODEL_BASE_URL` before
 running a script when targeting a proxy or local OpenAI-compatible endpoint.
 
+## Configuration Matrix
+
+Configuration is resolved in this order: command-line flags, environment
+variables loaded from the shell or `.env`, then defaults in code. The benchmark
+uses three configuration layers:
+
+| Layer | Scope | Typical use |
+|-------|-------|-------------|
+| `run_benchmark.py` CLI flags | One benchmark process | Override dataset, agents, model backend, judge backend, and parallelism for a run. |
+| `.env` / shell environment | Persistent defaults and secrets | Store API keys and reusable model defaults without passing every flag. |
+| `scripts/4_run_benchmark.sh` variables | Multi-model tmux wrapper | Launch several benchmark sessions, each with a different agent model slot. |
+
+### Benchmark Selection Flags
+
+| Flag | Meaning |
+|------|---------|
+| `--scenario PATH`, `-s PATH` | Run one scenario JSON file. Results are saved under `results/single_<timestamp>/`. |
+| `--dataset train\|test`, `-d train\|test` | Run the split dataset from `scenarios/train` or `scenarios/test`. Cannot be combined with `--variant`. |
+| `--variant idld_aligned,context_variant`, `-t ...` | Run existing variant folders. Cannot be combined with `--dataset`. |
+| `--agents baseline,eduplanner,...`, `-a ...` | Comma-separated agent IDs to run. |
+| `--verbose`, `-v` | Print additional execution and evaluation details. |
+| `--install` | Install agent and evaluator packages in editable mode. |
+| `--check` | Check whether agent modules can be imported. |
+
+Default agents are `eduplanner`, `baseline`, `react-isd`, `addie-agent`,
+`dick-carey-agent`, and `rpisd-agent`. `alignmentgraph-isd` is available but
+must be added explicitly with `--agents`.
+
+### Parallelism and Rate Limits
+
+| Flag | Meaning |
+|------|---------|
+| `--no-parallel` | Disable parallel agent execution inside each scenario. |
+| `--max-workers N`, `-w N` | Maximum number of agents running concurrently inside one scenario. |
+| `--no-scenario-parallel` | Disable scenario-level parallel execution. |
+| `--scenario-max-workers N` | Maximum number of scenarios running concurrently. |
+| `--rate-limit conservative\|moderate\|aggressive\|turbo`, `-r ...` | Apply a preset for worker counts and benchmark delay. |
+
+| Rate limit | Agent workers | Scenario workers | Delay |
+|------------|---------------|------------------|-------|
+| `conservative` | 2 | 2 | `2.0s` |
+| `moderate` | 3 | 4 | `0.5s` |
+| `aggressive` | 6 | 8 | `0.1s` |
+| `turbo` | 6 | 16 | `0.0s` |
+
+`--rate-limit` sets `BENCHMARK_DELAY` and overrides default worker counts unless
+`--max-workers` or `--scenario-max-workers` are passed explicitly.
+
+### Agent Model Matrix
+
+The agent model generates instructional-design outputs.
+
+| CLI flag | Environment variable | Meaning |
+|----------|----------------------|---------|
+| `--agent-model-provider` | `AGENT_MODEL_PROVIDER` | Provider preset such as `openrouter`, `openai`, `upstage`, `anthropic`, `local-ollama`, `local-lmstudio`, or `local-vllm`. |
+| `--agent-model-api-spec` | `AGENT_MODEL_API_SPEC` | API contract: `openai_compatible`, `openai`, or `anthropic`. |
+| `--agent-model-base-url` | `AGENT_MODEL_BASE_URL` | OpenAI-compatible endpoint URL. |
+| `--agent-model-name` | `AGENT_MODEL_NAME` | Model name sent to the backend. |
+| `--agent-model-api-key` | `AGENT_MODEL_API_KEY` | Direct API key value. Prefer env vars for reusable runs. |
+| `--agent-model-api-key-env` | `AGENT_MODEL_API_KEY_ENV` | Name of an environment variable containing one API key. |
+| `--agent-model-api-key-envs` | `AGENT_MODEL_API_KEY_ENVS` | Comma-separated API key env vars for multiple credentials. |
+
+Additional agent-model environment variables:
+
+| Environment variable | Meaning |
+|----------------------|---------|
+| `AGENT_MODEL_CREDENTIAL_STRATEGY` | Credential selection strategy, usually `first` or `round_robin`. |
+| `AGENT_MODEL_TEMPERATURE` | Generation temperature. Default is `0.7`. |
+| `AGENT_MODEL_MAX_TOKENS` | Default max tokens. Default is `4096`; some agents override this internally. |
+| `REASONING_BUDGET` | Optional reasoning budget for compatible backends. |
+
+### Judge Model Matrix
+
+Judge models evaluate agent outputs. They are configured separately from the
+agent model to reduce self-preference bias.
+
+| CLI flag | Environment variable | Meaning |
+|----------|----------------------|---------|
+| `--judge-model-provider` | `JUDGE_MODEL_PROVIDER` | Default judge provider preset or label. |
+| `--judge-model-providers` | `JUDGE_MODEL_PROVIDERS` | Comma-separated provider labels aligned with judge model names. |
+| `--judge-model-names` | `JUDGE_MODEL_NAMES` | Comma-separated judge model names. |
+| `--judge-model-base-url` | `JUDGE_MODEL_BASE_URL` | Default OpenAI-compatible judge endpoint. |
+| `--judge-model-base-urls` | `JUDGE_MODEL_BASE_URLS` | Comma-separated judge endpoints aligned with judge model names. |
+| `--judge-model-api-key` | `JUDGE_MODEL_API_KEY` | Default direct judge API key value. |
+| `--judge-model-api-keys` | `JUDGE_MODEL_API_KEYS` | Comma-separated judge key groups; use `|` for multiple keys in one model group. |
+| `--judge-model-api-key-env` | `JUDGE_MODEL_API_KEY_ENV` | Environment variable containing the default judge API key. |
+| `--judge-model-api-key-envs` | `JUDGE_MODEL_API_KEY_ENVS` | Comma-separated judge env-var groups; use `|` for multiple env vars in one model group. |
+| `--judge-model-credential-strategies` | `JUDGE_MODEL_CREDENTIAL_STRATEGIES` | Comma-separated credential strategies aligned with judge model names. |
+
+Evaluation uses multi-judge mode by default. Pass `--single-judge` to disable
+multi-judge evaluation.
+
+### Full Benchmark Wrapper Matrix
+
+`scripts/4_run_benchmark.sh` launches one tmux session per agent-model slot.
+
+| Wrapper variable | Default | Meaning |
+|------------------|---------|---------|
+| `AGENTS` | `baseline,eduplanner,react-isd,addie-agent,dick-carey-agent,rpisd-agent` | Agents passed to `run_benchmark.py`. |
+| `RATE_LIMIT` | `turbo` | Rate-limit mode passed to `--rate-limit`. |
+| `DATASET` | `test` | Dataset passed to `--dataset`. |
+| `AGENT_MODEL_SLOTS` | `gpt,gemini,solar` | Comma-separated slot labels. Each slot becomes one tmux session. |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Shared OpenRouter endpoint used by slot defaults. |
+| `UPSTAGE_BASE_URL` | `https://api.upstage.ai/v1/solar` | Shared Upstage endpoint used by slot defaults. |
+
+Each slot reads these variables, where `<SLOT>` is uppercased and `-` becomes
+`_`, for example `GPT_AGENT_MODEL_NAME`:
+
+| Slot variable pattern | Meaning |
+|-----------------------|---------|
+| `<SLOT>_AGENT_MODEL_PROVIDER` | Provider for this tmux session. |
+| `<SLOT>_AGENT_MODEL_BASE_URL` | Base URL for this tmux session. |
+| `<SLOT>_AGENT_MODEL_NAME` | Agent model for this tmux session. |
+| `<SLOT>_AGENT_MODEL_API_KEY_ENVS` | Comma-separated credential env vars for this tmux session. |
+
+### Other Environment Variables
+
+| Environment variable | Meaning |
+|----------------------|---------|
+| `OPENROUTER_API_KEY`, `UPSTAGE_API_KEY`, `UPSTAGE_API_KEY2`, `UPSTAGE_API_KEY3`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | Common secret variables referenced by `*_API_KEY_ENV` or `*_API_KEY_ENVS`. |
+| `BENCHMARK_DELAY` | Delay between submissions. Normally set by `--rate-limit`. |
+| `ISD_EVAL_PROGRESS` | Internal evaluator progress marker flag set by the benchmark runner. |
+| `HARNESS_ABLATION` | `alignmentgraph-isd` ablation preset: `full`, `no_rag`, `no_verifier`, `no_repair`, `single_agent`, or `linear_addie_only`. |
+
+Note: `SCENARIO_MAX_WORKERS` and `AGENT_MAX_WORKERS` appear in `.env.example`
+as optional notes, but `run_benchmark.py` currently reads worker counts from
+CLI flags and `--rate-limit`, not directly from those env vars.
+
 ## Dataset
 
 | Folder | Count | Description |

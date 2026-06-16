@@ -13,7 +13,7 @@ import os
 import statistics
 import threading
 from dataclasses import dataclass, field
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, List, Any, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 
@@ -475,6 +475,7 @@ class MultiJudgeEvaluator:
         scenario: Optional[dict] = None,
         trajectory: Optional[dict] = None,
         metadata: Optional[dict] = None,
+        on_judge_done: Optional[Callable[[JudgeResult], None]] = None,
     ) -> MultiJudgeResult:
         """
         Evaluate using all judges and aggregate results.
@@ -484,6 +485,8 @@ class MultiJudgeEvaluator:
             scenario: Original scenario
             trajectory: Agent trajectory
             metadata: Metadata
+            on_judge_done: Optional callback invoked with each JudgeResult as it
+                completes (used to report per-judge-call progress).
 
         Returns:
             MultiJudgeResult with median scores and agreement stats
@@ -513,11 +516,14 @@ class MultiJudgeEvaluator:
                         print(f"  [{judge.provider}] {judge.model}: "
                               f"ADDIE={result.normalized_score:.1f}" if result.normalized_score else f"  [{judge.provider}] Error")
                     except Exception as e:
-                        judge_results.append(JudgeResult(
+                        result = JudgeResult(
                             provider=judge.provider,
                             model=judge.model,
                             error=str(e),
-                        ))
+                        )
+                        judge_results.append(result)
+                    if on_judge_done is not None:
+                        on_judge_done(result)
         else:
             # Sequential execution
             for judge in self.judges:
@@ -527,6 +533,8 @@ class MultiJudgeEvaluator:
                 judge_results.append(result)
                 print(f"  [{judge.provider}] {judge.model}: "
                       f"ADDIE={result.normalized_score:.1f}" if result.normalized_score else f"  [{judge.provider}] Error")
+                if on_judge_done is not None:
+                    on_judge_done(result)
 
         return self._aggregate_results(judge_results)
 
@@ -605,6 +613,27 @@ class MultiJudgeEvaluator:
         """
         evaluations = []
 
+        # Progress markers (consumed by the benchmark runner) emit one line per
+        # completed judge-call so progress can be shown as N_agents x N_judges.
+        # The last field is the judge model name (not the provider).
+        progress_enabled = bool(os.getenv("ISD_EVAL_PROGRESS"))
+        total_units = len(results) * len(self.judges)
+        progress_counter = {"done": 0}
+        progress_lock = threading.Lock()
+
+        def make_emit(agent_id: str) -> Callable[[JudgeResult], None]:
+            def emit(jr: JudgeResult) -> None:
+                if not progress_enabled:
+                    return
+                with progress_lock:
+                    progress_counter["done"] += 1
+                    done = progress_counter["done"]
+                print(
+                    f"__EVAL_PROGRESS__\t{done}\t{total_units}\t{agent_id}\t{jr.model}",
+                    flush=True,
+                )
+            return emit
+
         for result in results:
             agent_id = result.get("agent_id", "unknown")
             print(f"\n[MultiJudge] Evaluating {agent_id}...")
@@ -614,6 +643,7 @@ class MultiJudgeEvaluator:
                 scenario=scenario,
                 trajectory=result.get("trajectory"),
                 metadata=result.get("metadata"),
+                on_judge_done=make_emit(agent_id),
             )
 
             evaluations.append({

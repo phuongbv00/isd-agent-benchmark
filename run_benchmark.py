@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-# 워닝 필터 (Python 3.14 + Pydantic V1 호환성 경고 숨김)
+# Warning filter (suppress Python 3.14 + Pydantic V1 compatibility warnings)
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="langchain_core")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
 
 """
-ISD Agent Benchmark 통합 테스트 스크립트
+ISD Agent Benchmark integration test script
 
-여러 ISD Agent를
-여러 시나리오에 대해 실행하고 비교 평가합니다.
-LLM backend는 shared.llm 설정으로 주입합니다.
+Runs multiple ISD Agents across multiple scenarios and compares them.
+The LLM backend is injected via the shared.llm configuration.
 """
 
 import json
@@ -33,7 +32,7 @@ except ImportError:
     TQDM_AVAILABLE = False
     tqdm = None
 
-# Agent 모듈 경로 추가
+# Add agent module paths
 _SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(_SCRIPT_DIR / "agents" / "baseline" / "src"))
 sys.path.insert(0, str(_SCRIPT_DIR / "agents" / "eduplanner" / "src"))
@@ -44,36 +43,45 @@ sys.path.insert(0, str(_SCRIPT_DIR / "agents" / "rpisd-agent" / "src"))
 
 
 class BenchmarkProgressLogger:
-    """벤치마크 진행 상황을 친절하게 출력하는 로거"""
+    """Friendly logger that prints benchmark progress."""
+
+    # Per-scenario pipeline steps (shown as a checklist)
+    PIPELINE_STEPS = ["Run agents", "Evaluate", "Done"]
 
     def __init__(self, total_scenarios: int, total_agents: int, log_file: Optional[Path] = None):
         self.total_scenarios = total_scenarios
         self.total_agents = total_agents
-        self.total_tasks = total_scenarios * total_agents  # 총 작업 수
+        self.total_tasks = total_scenarios * total_agents  # total work units
 
         self.completed_scenarios = 0
         self.completed_tasks = 0
         self.start_time = time.time()
-        self.scenario_times = []  # 시나리오별 소요시간 기록
+        self.scenario_times = []  # per-scenario elapsed times
 
         self.log_file = log_file
         self.lock = threading.Lock()
 
-        # 로그 파일 초기화
+        # Initialize log file
         if self.log_file:
             self._write_log_header()
 
+    def _append_log(self, text: str):
+        """Append a line to the log file (caller holds the lock)."""
+        if self.log_file:
+            with open(self.log_file, 'a', encoding='utf-8') as f:
+                f.write(text)
+
     def _write_log_header(self):
-        """로그 파일 헤더 작성"""
+        """Write the log file header."""
         header = f"""
 ================================================================================
-  ISD Agent Benchmark 실행 로그
-  시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+  ISD Agent Benchmark run log
+  Start time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 ================================================================================
 
-총 시나리오: {self.total_scenarios}개
-총 에이전트: {self.total_agents}개
-총 작업 수: {self.total_tasks}개 (시나리오 × 에이전트)
+Total scenarios: {self.total_scenarios}
+Total agents: {self.total_agents}
+Total tasks: {self.total_tasks} (scenarios x agents)
 
 ================================================================================
 """
@@ -83,27 +91,27 @@ class BenchmarkProgressLogger:
         print(header)
 
     def _estimate_remaining_time(self) -> str:
-        """남은 시간 예측"""
+        """Estimate the remaining time."""
         if not self.scenario_times:
-            return "계산 중..."
+            return "calculating..."
 
         avg_time = sum(self.scenario_times) / len(self.scenario_times)
         remaining_scenarios = self.total_scenarios - self.completed_scenarios
         remaining_seconds = avg_time * remaining_scenarios
 
         if remaining_seconds < 60:
-            return f"{int(remaining_seconds)}초"
+            return f"{int(remaining_seconds)}s"
         elif remaining_seconds < 3600:
-            return f"{int(remaining_seconds / 60)}분 {int(remaining_seconds % 60)}초"
+            return f"{int(remaining_seconds / 60)}m {int(remaining_seconds % 60)}s"
         else:
             hours = int(remaining_seconds / 3600)
             minutes = int((remaining_seconds % 3600) / 60)
-            return f"{hours}시간 {minutes}분"
+            return f"{hours}h {minutes}m"
 
     def _estimate_completion_time(self) -> str:
-        """예상 완료 시간"""
+        """Estimate the completion time."""
         if not self.scenario_times:
-            return "계산 중..."
+            return "calculating..."
 
         avg_time = sum(self.scenario_times) / len(self.scenario_times)
         remaining_scenarios = self.total_scenarios - self.completed_scenarios
@@ -113,7 +121,7 @@ class BenchmarkProgressLogger:
         return completion_time.strftime('%H:%M:%S')
 
     def _get_progress_bar(self, current: int, total: int, width: int = 30) -> str:
-        """진행 바 생성"""
+        """Build a progress bar."""
         if total == 0:
             return "░" * width
 
@@ -124,19 +132,67 @@ class BenchmarkProgressLogger:
         return f"{'█' * filled}{'░' * empty} {percentage:5.1f}%"
 
     def _format_elapsed_time(self) -> str:
-        """경과 시간 포맷"""
+        """Format the elapsed time."""
         elapsed = time.time() - self.start_time
         if elapsed < 60:
-            return f"{int(elapsed)}초"
+            return f"{int(elapsed)}s"
         elif elapsed < 3600:
-            return f"{int(elapsed / 60)}분 {int(elapsed % 60)}초"
+            return f"{int(elapsed / 60)}m {int(elapsed % 60)}s"
         else:
             hours = int(elapsed / 3600)
             minutes = int((elapsed % 3600) / 60)
-            return f"{hours}시간 {minutes}분"
+            return f"{hours}h {minutes}m"
+
+    def _render_steps(self, current_index: int, status: str) -> str:
+        """Render the per-scenario step checklist as a single line.
+
+        ✅ done step, ▶ current step, ⬜ pending step, ⏭ skipped step.
+        """
+        parts = []
+        for i, label in enumerate(self.PIPELINE_STEPS):
+            if i < current_index:
+                icon = "✅"
+            elif i == current_index:
+                icon = "⏭" if status == "skip" else ("✅" if status == "done" else "▶")
+            else:
+                icon = "⬜"
+            parts.append(f"{icon} {label}")
+        return "  ".join(parts)
+
+    def log_step(self, scenario_id: str, step_index: int, status: str):
+        """Log a per-scenario pipeline step.
+
+        status in {"start", "done", "skip"}.
+        """
+        total_steps = len(self.PIPELINE_STEPS)
+        label = self.PIPELINE_STEPS[step_index]
+        icon = {"start": "▶", "done": "✅", "skip": "⏭"}.get(status, "▶")
+        with self.lock:
+            checklist = self._render_steps(step_index, status)
+            print(f"[{scenario_id}] [{step_index + 1}/{total_steps}] {icon} {label}")
+            print(f"    └ {checklist}")
+            self._append_log(
+                f"[{datetime.now().strftime('%H:%M:%S')}] [{scenario_id}] "
+                f"step {step_index + 1}/{total_steps} {label}: {status}\n"
+            )
+
+    def log_eval_progress(self, scenario_id: str, done: int, total: int,
+                          agent_id: str = "", judge_model: str = ""):
+        """Log evaluate-phase progress as a percentage of judge-calls.
+
+        ``judge_model`` is the judge model name (e.g. ``google/gemini-2.5-flash-lite``).
+        """
+        with self.lock:
+            bar = self._get_progress_bar(done, total, width=20)
+            detail = f" – {agent_id} · {judge_model}" if agent_id else ""
+            print(f"[{scenario_id}]   Evaluate [{bar}] ({done}/{total} judge calls){detail}")
+            self._append_log(
+                f"[{datetime.now().strftime('%H:%M:%S')}] [{scenario_id}] "
+                f"evaluate {done}/{total} judge calls{detail}\n"
+            )
 
     def log_scenario_start(self, scenario_id: str, scenario_index: int):
-        """시나리오 시작 로그"""
+        """Log the start of a scenario."""
         with self.lock:
             progress_bar = self._get_progress_bar(scenario_index, self.total_scenarios)
             remaining = self._estimate_remaining_time()
@@ -144,57 +200,58 @@ class BenchmarkProgressLogger:
 
             log_msg = f"""
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 📊 진행 현황: [{progress_bar}]
+│ 📊 Progress: [{progress_bar}]
 │
-│ 🔄 현재 작업: [{scenario_index + 1}/{self.total_scenarios}] {scenario_id}
-│ ⏱️  경과 시간: {self._format_elapsed_time()}
-│ ⏳ 예상 남은 시간: {remaining}
-│ 🏁 예상 완료 시간: {completion}
+│ 🔄 Current: [{scenario_index + 1}/{self.total_scenarios}] {scenario_id}
+│ ⏱️  Elapsed: {self._format_elapsed_time()}
+│ ⏳ Est. remaining: {remaining}
+│ 🏁 Est. completion: {completion}
 │
-│ 남은 시나리오: {self.total_scenarios - scenario_index - 1}개
+│ Scenarios left: {self.total_scenarios - scenario_index - 1}
 └─────────────────────────────────────────────────────────────────────────────┘
 """
             print(log_msg)
-            if self.log_file:
-                with open(self.log_file, 'a', encoding='utf-8') as f:
-                    f.write(f"\n[{datetime.now().strftime('%H:%M:%S')}] 시작: {scenario_id} ({scenario_index + 1}/{self.total_scenarios})\n")
+            self._append_log(
+                f"\n[{datetime.now().strftime('%H:%M:%S')}] Start: {scenario_id} "
+                f"({scenario_index + 1}/{self.total_scenarios})\n"
+            )
 
-    def log_agent_progress(self, scenario_id: str, agent_id: str, agent_index: int,
-                           total_agents: int, status: str):
-        """에이전트 진행 로그"""
+    def log_agent_progress(self, scenario_id: str, agent_id: str, status: str):
+        """Log per-agent progress within a scenario.
+
+        Agents run concurrently, so a positional index would be misleading;
+        only the agent name and its status are shown.
+        """
         with self.lock:
             status_icon = "✅" if status == "success" else "❌" if status == "failed" else "🔄"
-            log_msg = f"    {status_icon} [{agent_index + 1}/{total_agents}] {agent_id}: {status}"
-            print(log_msg)
-
-            if self.log_file:
-                with open(self.log_file, 'a', encoding='utf-8') as f:
-                    f.write(f"  - {agent_id}: {status}\n")
+            print(f"[{scenario_id}]     {status_icon} {agent_id}: {status}")
+            self._append_log(f"  - {agent_id}: {status}\n")
 
     def log_scenario_complete(self, scenario_id: str, elapsed_seconds: float, success_count: int):
-        """시나리오 완료 로그"""
+        """Log the completion of a scenario."""
         with self.lock:
             self.completed_scenarios += 1
             self.scenario_times.append(elapsed_seconds)
 
             log_msg = f"""
     ────────────────────────────────────────────────────────────
-    ✅ 완료: {scenario_id}
-    ⏱️  소요 시간: {elapsed_seconds:.1f}초
-    📈 성공한 에이전트: {success_count}/{self.total_agents}
+    ✅ Done: {scenario_id}
+    ⏱️  Elapsed: {elapsed_seconds:.1f}s
+    📈 Successful agents: {success_count}/{self.total_agents}
     ────────────────────────────────────────────────────────────
 """
             print(log_msg)
 
-            if self.log_file:
-                with open(self.log_file, 'a', encoding='utf-8') as f:
-                    f.write(f"[{datetime.now().strftime('%H:%M:%S')}] 완료: {scenario_id} ({elapsed_seconds:.1f}초, 성공: {success_count})\n")
+            self._append_log(
+                f"[{datetime.now().strftime('%H:%M:%S')}] Done: {scenario_id} "
+                f"({elapsed_seconds:.1f}s, success: {success_count})\n"
+            )
 
     def log_final_summary(self, results: dict):
-        """최종 요약 로그"""
+        """Log the final summary."""
         total_elapsed = time.time() - self.start_time
 
-        # 통계 계산
+        # Compute statistics
         total_success = 0
         total_failed = 0
         for variant_results in results.get("scenarios", {}).values():
@@ -208,19 +265,19 @@ class BenchmarkProgressLogger:
         summary = f"""
 
 ================================================================================
-  🏁 벤치마크 완료!
+  🏁 Benchmark complete!
 ================================================================================
 
-📊 최종 결과
+📊 Final results
 ────────────────────────────────────────────────────────────────────────────────
-  총 시나리오:     {self.completed_scenarios}개
-  총 작업 수:      {total_success + total_failed}개
-  성공:           {total_success}개 ✅
-  실패:           {total_failed}개 ❌
-  성공률:         {(total_success / (total_success + total_failed) * 100) if (total_success + total_failed) > 0 else 0:.1f}%
+  Total scenarios:  {self.completed_scenarios}
+  Total tasks:      {total_success + total_failed}
+  Success:          {total_success} ✅
+  Failed:           {total_failed} ❌
+  Success rate:     {(total_success / (total_success + total_failed) * 100) if (total_success + total_failed) > 0 else 0:.1f}%
 
-⏱️  총 소요 시간: {self._format_elapsed_time()}
-📁 결과 저장 위치: {results.get('output_dir', 'N/A')}
+⏱️ Total elapsed: {self._format_elapsed_time()}
+📁 Results saved at: {results.get('output_dir', 'N/A')}
 
 ================================================================================
 """
@@ -230,23 +287,23 @@ class BenchmarkProgressLogger:
             with open(self.log_file, 'a', encoding='utf-8') as f:
                 f.write(summary)
 
-# .env 파일에서 환경변수 로드
+# Load environment variables from the .env file
 try:
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).parent / ".env")
 except ImportError:
-    pass  # dotenv가 없으면 건너뜀
+    pass  # Skip if dotenv is not available
 
 
-# 프로젝트 루트 경로 (isd-agent-bench-en 디렉토리)
+# Project root path (isd-agent-bench-en directory)
 PROJECT_ROOT = Path(__file__).parent
 SCENARIOS_DIR = PROJECT_ROOT / "scenarios"
 RESULTS_DIR = PROJECT_ROOT / "results"
 VENV_BIN = PROJECT_ROOT / ".venv" / "bin"
 
-# 환경변수 설정 (Agent 실행용)
+# Environment setup (for running agents)
 def get_env_with_venv(extra_env: Optional[dict[str, str]] = None):
-    """venv bin 경로가 포함된 환경변수 반환"""
+    """Return environment variables with the venv bin path prepended."""
     env = os.environ.copy()
     venv_path = str(VENV_BIN)
     current_path = env.get('PATH', '')
@@ -263,61 +320,61 @@ def get_all_scenarios(
     dataset: str | None = None,
 ) -> dict[str, list[Path]]:
     """
-    모든 시나리오 파일을 variant별로 수집 (IDLD 데이터셋 구조)
+    Collect all scenario files per variant (IDLD dataset structure).
 
-    데이터셋 구조 관계:
-    - dataset=None (기본): 기존 variant 디렉토리 사용 (idld_aligned, context_variant)
-    - dataset="train": 학습용 데이터셋 (scenarios/train/) - idld_aligned + context_variant에서 분리
-    - dataset="test": 평가용 데이터셋 (scenarios/test/) - Hold-out 평가용, 5% 비율
+    Dataset structure:
+    - dataset=None (default): use existing variant directories (idld_aligned, context_variant)
+    - dataset="train": training dataset (scenarios/train/) - split from idld_aligned + context_variant
+    - dataset="test": evaluation dataset (scenarios/test/) - hold-out evaluation, 5% ratio
 
     Args:
-        use_stratified_sampling: 층화 샘플링 사용 여부 (불균형 축 보정)
-        n_samples: 샘플링 시 추출할 시나리오 수 (None이면 전체)
-        sampling_strategy: 샘플링 전략 ("oversample", "undersample", "proportional")
-        dataset: 데이터셋 선택 ("train", "test", None=variant 모드)
+        use_stratified_sampling: Whether to use stratified sampling (correct imbalanced axes)
+        n_samples: Number of scenarios to sample (None means all)
+        sampling_strategy: Sampling strategy ("oversample", "undersample", "proportional")
+        dataset: Dataset selection ("train", "test", None=variant mode)
 
     Returns:
-        variant/dataset별 시나리오 파일 경로 딕셔너리
+        Dictionary of scenario file paths per variant/dataset
     """
-    # dataset 모드: train/test 디렉토리에서 직접 로드
+    # dataset mode: load directly from the train/test directory
     if dataset in ("train", "test"):
         dataset_dir = SCENARIOS_DIR / dataset
         if not dataset_dir.exists():
-            print(f"[경고] {dataset} 디렉토리가 존재하지 않습니다: {dataset_dir}")
+            print(f"[warning] {dataset} directory does not exist: {dataset_dir}")
             return {dataset: []}
 
         scenario_files = sorted(dataset_dir.glob("*.json"))
-        print(f"  [{dataset.upper()}] {len(scenario_files)}개 시나리오 로드됨")
+        print(f"  [{dataset.upper()}] loaded {len(scenario_files)} scenarios")
 
-        # 층화 샘플링 지원 (train 데이터셋에서만 의미 있음)
+        # Stratified sampling support (only meaningful for the train dataset)
         if use_stratified_sampling and n_samples and dataset == "train":
             try:
                 from scenarios.sampling_strategy import StratifiedScenarioSampler
                 sampler = StratifiedScenarioSampler(scenarios_dir=dataset_dir)
                 sampled = sampler.sample_with_paths(n_samples, strategy=sampling_strategy)
                 scenario_files = [path for path, _ in sampled]
-                print(f"  [층화 샘플링] {dataset}: {len(scenario_files)}개 선택 (전략: {sampling_strategy})")
+                print(f"  [stratified sampling] {dataset}: selected {len(scenario_files)} (strategy: {sampling_strategy})")
             except ImportError:
-                pass  # 샘플링 모듈 없으면 전체 사용
+                pass  # Use all if the sampling module is unavailable
 
         return {dataset: scenario_files}
 
-    # 기존 variant 모드: idld_aligned, context_variant 디렉토리 사용
+    # Existing variant mode: use idld_aligned, context_variant directories
     scenarios = {"idld_aligned": [], "context_variant": []}
 
     for variant in scenarios.keys():
         variant_dir = SCENARIOS_DIR / variant
         if variant_dir.exists():
             if use_stratified_sampling and variant == "idld_aligned" and n_samples:
-                # 층화 샘플링 적용 (불균형 축 보정)
+                # Apply stratified sampling (correct imbalanced axes)
                 try:
                     from scenarios.sampling_strategy import StratifiedScenarioSampler
                     sampler = StratifiedScenarioSampler(scenarios_dir=variant_dir)
                     sampled = sampler.sample_with_paths(n_samples, strategy=sampling_strategy)
                     scenarios[variant] = [path for path, _ in sampled]
-                    print(f"  [층화 샘플링] {variant}: {len(scenarios[variant])}개 선택 (전략: {sampling_strategy})")
+                    print(f"  [stratified sampling] {variant}: selected {len(scenarios[variant])} (strategy: {sampling_strategy})")
                 except ImportError:
-                    # 샘플링 모듈 없으면 기본 동작
+                    # Default behavior if the sampling module is unavailable
                     for scenario_file in sorted(variant_dir.glob("*.json")):
                         scenarios[variant].append(scenario_file)
             else:
@@ -328,9 +385,9 @@ def get_all_scenarios(
 
 
 def install_agents() -> bool:
-    """모든 Agent 패키지 설치"""
+    """Install all agent packages."""
     print("\n" + "=" * 60)
-    print("Agent 패키지 설치")
+    print("Installing agent packages")
     print("=" * 60)
 
     agents = [
@@ -344,22 +401,22 @@ def install_agents() -> bool:
     ]
 
     for agent_path in agents:
-        print(f"\n설치 중: {agent_path.name}")
+        print(f"\nInstalling: {agent_path.name}")
         result = subprocess.run(
             ["pip", "install", "-e", str(agent_path)],
             capture_output=True,
             text=True,
         )
         if result.returncode != 0:
-            print(f"  오류: {result.stderr}")
+            print(f"  Error: {result.stderr}")
             return False
-        print(f"  완료")
+        print(f"  Done")
 
     return True
 
 
 def check_agents_installed() -> dict[str, bool]:
-    """Agent 모듈 import 가능 여부 확인"""
+    """Check whether agent modules can be imported."""
     agents = {
         "eduplanner": False,
         "baseline": False,
@@ -370,7 +427,7 @@ def check_agents_installed() -> dict[str, bool]:
         "alignmentgraph-isd": False,
     }
 
-    # 모듈 import 테스트
+    # Module import test
     try:
         from baseline.generator import BaselineGenerator
         agents["baseline"] = True
@@ -461,7 +518,7 @@ def _judge_models_from_env(judge_env: Optional[dict[str, str]]) -> list[str]:
 
 
 def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
-    """에이전트 ID에 해당하는 실행 함수 반환 (모듈 기반)"""
+    """Return the run function for the given agent ID (module-based)."""
     llm_config = _resolve_llm_config(llm_config)
 
     if agent_id == "baseline":
@@ -538,7 +595,7 @@ def _run_agent_task(
     llm_config: Optional[LLMConfig] = None,
     semaphore: Optional[threading.Semaphore] = None,
 ) -> tuple[str, dict]:
-    """개별 Agent 실행 태스크 (모듈 기반, 병렬 실행용)"""
+    """Individual agent execution task (module-based, for parallel execution)."""
     if semaphore:
         semaphore.acquire()
 
@@ -547,26 +604,26 @@ def _run_agent_task(
         trajectory_path = output_dir / f"{agent_id}_trajectory.json"
         log_path = output_dir / f"{agent_id}_log.txt"
 
-        # 출력 디렉토리 생성
+        # Create the output directory
         output_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            # 시나리오 로드
+            # Load the scenario
             with open(scenario_path, "r", encoding="utf-8") as f:
                 scenario = json.load(f)
 
-            # 에이전트 실행 (모듈 기반)
+            # Run the agent (module-based)
             start_time = time.time()
             runner = _get_agent_runner(agent_id, llm_config=llm_config)
             result = runner(scenario)
             elapsed = time.time() - start_time
 
-            # ADDIE 출력 저장
+            # Save the ADDIE output
             addie_output = result.get("addie_output", result)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(addie_output, f, ensure_ascii=False, indent=2, default=str)
 
-            # Trajectory 저장
+            # Save the trajectory
             trajectory_data = {
                 "scenario_id": scenario.get("scenario_id", "unknown"),
                 "agent_id": agent_id,
@@ -577,9 +634,9 @@ def _run_agent_task(
             with open(trajectory_path, "w", encoding="utf-8") as f:
                 json.dump(trajectory_data, f, ensure_ascii=False, indent=2, default=str)
 
-            # 로그 저장
+            # Save the log
             with open(log_path, "w", encoding="utf-8") as f:
-                f.write(f"=== {agent_id} 실행 로그 ===\n")
+                f.write(f"=== {agent_id} execution log ===\n")
                 f.write(f"Scenario: {scenario_path}\n")
                 f.write(f"Elapsed: {elapsed:.2f}s\n")
                 f.write(f"Status: SUCCESS\n")
@@ -596,7 +653,7 @@ def _run_agent_task(
             tb = traceback.format_exc()
 
             with open(log_path, "w", encoding="utf-8") as f:
-                f.write(f"=== {agent_id} 실행 로그 ===\n")
+                f.write(f"=== {agent_id} execution log ===\n")
                 f.write(f"Scenario: {scenario_path}\n")
                 f.write(f"Status: FAILED\n")
                 f.write(f"Error: {error_msg}\n\n")
@@ -614,6 +671,72 @@ def _run_agent_task(
             semaphore.release()
 
 
+class _EvalResult:
+    """Lightweight stand-in for subprocess.CompletedProcess from streaming."""
+
+    def __init__(self, returncode: int, stdout: str, stderr: str):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def _run_evaluation_streaming(
+    cmd: list[str],
+    env: dict[str, str],
+    logger: Optional["BenchmarkProgressLogger"],
+    scenario_id: str,
+) -> _EvalResult:
+    """Run the evaluator subprocess, streaming stdout to parse progress markers.
+
+    Lines starting with ``__EVAL_PROGRESS__`` are turned into evaluate-phase
+    progress updates; all other stdout lines are captured and returned so the
+    caller behaves like the previous ``subprocess.run`` call.
+    """
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+        # No timeout - LLM evaluation can take a long time.
+    )
+
+    # Drain stderr in a background thread so the child never blocks on a full
+    # stderr pipe while this parent is busy reading stdout (which would deadlock).
+    captured_stderr: list[str] = []
+
+    def _drain_stderr() -> None:
+        if proc.stderr is None:
+            return
+        for err_line in proc.stderr:
+            captured_stderr.append(err_line)
+
+    stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+    stderr_thread.start()
+
+    captured_stdout: list[str] = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        if line.startswith("__EVAL_PROGRESS__"):
+            parts = line.rstrip("\n").split("\t")
+            # __EVAL_PROGRESS__ <done> <total> <agent_id> <judge_model>
+            if len(parts) >= 3 and logger is not None:
+                try:
+                    done = int(parts[1])
+                    total = int(parts[2])
+                    agent_id = parts[3] if len(parts) > 3 else ""
+                    judge_model = parts[4] if len(parts) > 4 else ""
+                    logger.log_eval_progress(scenario_id, done, total, agent_id, judge_model)
+                except (ValueError, IndexError):
+                    captured_stdout.append(line)
+            continue
+        captured_stdout.append(line)
+
+    returncode = proc.wait()
+    stderr_thread.join()
+    return _EvalResult(returncode, "".join(captured_stdout), "".join(captured_stderr))
+
+
 def run_single_benchmark(
     scenario_path: Path,
     output_dir: Path,
@@ -624,23 +747,28 @@ def run_single_benchmark(
     multi_judge: bool = True,
     llm_config: Optional[LLMConfig] = None,
     judge_env: Optional[dict[str, str]] = None,
+    logger: Optional["BenchmarkProgressLogger"] = None,
+    scenario_id: Optional[str] = None,
 ) -> dict:
-    """단일 시나리오에 대해 벤치마크 실행
+    """Run the benchmark for a single scenario.
 
     Args:
-        scenario_path: 시나리오 파일 경로
-        output_dir: 출력 디렉토리
-        agents: 실행할 Agent 목록
-        verbose: 상세 출력 여부
-        parallel: Agent 병렬 실행 여부
-        max_workers: 최대 동시 실행 수
+        scenario_path: Path to the scenario file
+        output_dir: Output directory
+        agents: List of agents to run
+        verbose: Verbose output
+        parallel: Run agents in parallel
+        max_workers: Maximum number of concurrent agents
+        logger: Optional progress logger for step/agent/eval progress
+        scenario_id: Scenario identifier (defaults to the file stem)
     """
     agents = agents or ["eduplanner", "baseline", "react-isd", "addie-agent", "dick-carey-agent", "rpisd-agent"]
+    sid = scenario_id or scenario_path.stem
 
-    print(f"\n시나리오: {scenario_path.name}")
+    print(f"\nScenario: {scenario_path.name}")
     print("-" * 40)
 
-    # 출력 디렉토리 생성
+    # Create the output directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
     results = {
@@ -649,15 +777,19 @@ def run_single_benchmark(
         "timestamp": datetime.now().isoformat(),
     }
 
+    # Step 1: Run agents
+    if logger:
+        logger.log_step(sid, 0, "start")
+
     if parallel and len(agents) > 1:
-        # 병렬 실행: ThreadPoolExecutor + Semaphore
+        # Parallel execution: ThreadPoolExecutor + Semaphore
         effective_workers = max_workers
-        print(f"  [병렬 모드] {len(agents)}개 Agent 동시 실행 (max_workers={effective_workers})")
+        print(f"  [parallel mode] running {len(agents)} agents concurrently (max_workers={effective_workers})")
         semaphore = threading.Semaphore(effective_workers)
 
         with ThreadPoolExecutor(max_workers=len(agents)) as executor:
             futures = {}
-            for idx, agent_id in enumerate(agents):
+            for agent_id in agents:
                 future = executor.submit(
                     _run_agent_task,
                     agent_id,
@@ -667,29 +799,35 @@ def run_single_benchmark(
                     semaphore,
                 )
                 futures[future] = agent_id
-                # Rate limit 대응: Agent 제출 간 딜레이
+                # Rate limit handling: delay between agent submissions
                 time.sleep(float(os.getenv("BENCHMARK_DELAY", "2.0")))
 
             for future in as_completed(futures):
                 agent_id = futures[future]
                 try:
                     _, agent_result = future.result()
-                    status = "완료" if agent_result["success"] else "실패"
-                    print(f"  {agent_id}: {status}")
                     results["agents"][agent_id] = agent_result
+                    if logger:
+                        logger.log_agent_progress(
+                            sid, agent_id,
+                            "success" if agent_result["success"] else "failed",
+                        )
+                    else:
+                        print(f"  {agent_id}: {'Done' if agent_result['success'] else 'Failed'}")
 
                     if verbose and not agent_result["success"]:
                         print(f"    stderr: {agent_result.get('stderr', '')[:200]}")
                 except Exception as e:
-                    print(f"  {agent_id}: 예외 발생")
+                    print(f"  {agent_id}: exception raised")
                     results["agents"][agent_id] = {
                         "success": False,
                         "error": str(e),
                     }
     else:
-        # 순차 실행 (기존 방식)
+        # Sequential execution
         for agent_id in agents:
-            print(f"  {agent_id} 실행 중...", end=" ", flush=True)
+            if not logger:
+                print(f"  running {agent_id}...", end=" ", flush=True)
             _, agent_result = _run_agent_task(
                 agent_id,
                 scenario_path,
@@ -697,21 +835,32 @@ def run_single_benchmark(
                 llm_config=llm_config,
             )
 
-            status = "완료" if agent_result["success"] else "실패"
-            print(status)
             results["agents"][agent_id] = agent_result
+            if logger:
+                logger.log_agent_progress(
+                    sid, agent_id,
+                    "success" if agent_result["success"] else "failed",
+                )
+            else:
+                print("Done" if agent_result["success"] else "Failed")
 
             if verbose and not agent_result["success"]:
                 print(f"    stderr: {agent_result.get('stderr', '')[:200]}")
 
-            # Rate limit 대응: Agent 간 딜레이
+            # Rate limit handling: delay between agents
             time.sleep(float(os.getenv("BENCHMARK_DELAY", "2.0")))
 
-    # 평가 실행
+    if logger:
+        logger.log_step(sid, 0, "done")
+
+    # Step 2: Evaluate
     successful_agents = [a for a, r in results["agents"].items() if r.get("success")]
 
     if len(successful_agents) >= 2:
-        print(f"  Evaluating...", end=" ", flush=True)
+        if logger:
+            logger.log_step(sid, 1, "start")
+        else:
+            print(f"  Evaluating...", end=" ", flush=True)
 
         cmd = [
             "isd-evaluator",
@@ -730,28 +879,39 @@ def run_single_benchmark(
         if verbose:
             cmd.append("--verbose")
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            env=get_env_with_venv(judge_env),
-            # 타임아웃 없음 - LLM 평가는 시간이 오래 걸릴 수 있음
-        )
+        # Enable structured progress markers from the evaluator subprocess.
+        eval_env = get_env_with_venv(judge_env)
+        eval_env["ISD_EVAL_PROGRESS"] = "1"
+
+        result = _run_evaluation_streaming(cmd, eval_env, logger, sid)
 
         if result.returncode == 0:
-            print("완료")
+            if logger:
+                logger.log_step(sid, 1, "done")
+            else:
+                print("Done")
 
-            # 평가 결과 로드
+            # Load the evaluation result
             report_path = output_dir / "comparison_report.json"
             if report_path.exists():
                 with open(report_path, "r", encoding="utf-8") as f:
                     results["evaluation"] = json.load(f)
         else:
-            print("실패")
+            if logger:
+                logger.log_step(sid, 1, "done")
+            else:
+                print("Failed")
             results["evaluation_error"] = result.stderr[:500] if result.stderr else "Unknown error"
     else:
-        print(f"  평가 생략 (성공한 Agent: {len(successful_agents)}개)")
+        if logger:
+            logger.log_step(sid, 1, "skip")
+        else:
+            print(f"  Skipping evaluation (successful agents: {len(successful_agents)})")
         results["evaluation_skipped"] = True
+
+    # Step 3: Done
+    if logger:
+        logger.log_step(sid, 2, "done")
 
     return results
 
@@ -767,6 +927,7 @@ def _run_scenario_task(
     llm_config: Optional[LLMConfig] = None,
     judge_env: Optional[dict[str, str]] = None,
     semaphore: Optional[threading.Semaphore] = None,
+    logger: Optional["BenchmarkProgressLogger"] = None,
 ) -> tuple[str, dict]:
     """Scenario execution task (for scenario-level parallelization)"""
     if semaphore:
@@ -784,6 +945,8 @@ def _run_scenario_task(
             multi_judge=multi_judge,
             llm_config=llm_config,
             judge_env=judge_env,
+            logger=logger,
+            scenario_id=scenario_id,
         )
         return scenario_id, result
     finally:
@@ -804,49 +967,49 @@ def run_full_benchmark(
     llm_config: Optional[LLMConfig] = None,
     judge_env: Optional[dict[str, str]] = None,
 ) -> dict:
-    """전체 벤치마크 실행 (IDLD 데이터셋 구조)
+    """Run the full benchmark (IDLD dataset structure).
 
     Args:
-        variants: 실행할 variant 목록 (dataset=None일 때만 사용)
-        agents: 실행할 Agent 목록
-        verbose: 상세 출력 여부
-        parallel: Agent 레벨 병렬 실행 여부 (기본: True)
-        max_workers: Agent 동시 실행 수 (기본: 6)
-        scenario_parallel: 시나리오 레벨 병렬 실행 여부 (기본: True)
-        scenario_max_workers: 시나리오 동시 실행 수 (기본: 8)
-        dataset: 데이터셋 선택 ("train", "test", None=variant 모드)
+        variants: List of variants to run (used only when dataset=None)
+        agents: List of agents to run
+        verbose: Verbose output
+        parallel: Whether to run agents in parallel (default: True)
+        max_workers: Number of concurrent agents (default: 6)
+        scenario_parallel: Whether to run scenarios in parallel (default: True)
+        scenario_max_workers: Number of concurrent scenarios (default: 8)
+        dataset: Dataset selection ("train", "test", None=variant mode)
     """
-    # dataset 모드일 때는 variants 무시
+    # Ignore variants when in dataset mode
     if dataset:
-        variants = [dataset]  # dataset을 variant처럼 처리
+        variants = [dataset]  # Treat the dataset like a variant
     else:
         variants = variants or ["idld_aligned", "context_variant"]
 
     agents = agents or ["eduplanner", "baseline", "react-isd", "addie-agent", "dick-carey-agent", "rpisd-agent"]
     llm_config = _resolve_llm_config(llm_config)
 
-    # 시나리오 수집 (먼저 수집하여 총 개수 파악)
+    # Collect scenarios first to know the total count
     all_scenarios = get_all_scenarios(dataset=dataset)
     total_scenarios = sum(len(s) for s in all_scenarios.values())
 
-    # 타임스탬프
+    # Timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # 모델 이름에서 디렉토리용 safe name 생성 (예: anthropic/claude-opus-4.5 -> claude-opus-4.5)
+    # Build a directory-safe model name (e.g. anthropic/claude-opus-4.5 -> claude-opus-4.5)
     model_name = llm_config.model
     model_safe_name = model_name.split("/")[-1].replace(":", "-")  # Remove provider prefix and replace colons
 
-    # dataset 모드일 때는 디렉토리 이름에 반영 (예: test_benchmark_claude-opus-4.5_20260122_...)
+    # Reflect dataset mode in the directory name (e.g. test_benchmark_claude-opus-4.5_20260122_...)
     if dataset:
         run_dir = RESULTS_DIR / f"{dataset}_benchmark_{model_safe_name}_{timestamp}"
     else:
         run_dir = RESULTS_DIR / f"benchmark_{model_safe_name}_{timestamp}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    # 로그 파일 경로
+    # Log file path
     log_file = run_dir / "benchmark_progress.log"
 
-    # 로거 초기화
+    # Initialize the logger
     logger = BenchmarkProgressLogger(
         total_scenarios=total_scenarios,
         total_agents=len(agents),
@@ -854,14 +1017,14 @@ def run_full_benchmark(
     )
 
     print(f"\n{'=' * 80}")
-    print(f"  🚀 ISD Agent Benchmark 실행")
+    print(f"  🚀 ISD Agent Benchmark run")
     print(f"{'=' * 80}")
     print(f"  🤖 Model: {model_name} (provider: {llm_config.provider}, api_spec: {llm_config.api_spec})")
 
     if dataset:
-        print(f"  📂 데이터셋 모드: {dataset.upper()}")
+        print(f"  📂 Dataset mode: {dataset.upper()}")
     else:
-        print(f"  📂 Variant 모드: {', '.join(variants)}")
+        print(f"  📂 Variant mode: {', '.join(variants)}")
 
     print(f"  Agents ({len(agents)}): {', '.join(agents)}")
     print(f"  Total scenarios: {total_scenarios}")
@@ -907,20 +1070,20 @@ def run_full_benchmark(
 
     scenario_index = 0
 
-    # 각 variant별 시나리오 실행
+    # Run scenarios for each variant
     for variant in variants:
         scenarios = all_scenarios.get(variant, [])
         if not scenarios:
-            print(f"\n[{variant}] 시나리오 없음")
+            print(f"\n[{variant}] no scenarios")
             continue
 
         print(f"\n{'─' * 80}")
-        print(f"  📁 [{variant.upper()}] {len(scenarios)}개 시나리오 시작")
+        print(f"  📁 [{variant.upper()}] starting {len(scenarios)} scenarios")
         print(f"{'─' * 80}")
 
         results["scenarios"][variant] = {}
 
-        # tqdm 진행률 표시 설정
+        # tqdm progress bar setup
         scenario_iter = scenarios
         if TQDM_AVAILABLE:
             scenario_iter = tqdm(
@@ -932,7 +1095,7 @@ def run_full_benchmark(
             )
 
         if scenario_parallel and len(scenarios) > 1:
-            # 시나리오 레벨 병렬 실행 (rate limit 대응: 워커 수 제한)
+            # Scenario-level parallel execution (rate limit handling: cap worker count)
             effective_workers = scenario_max_workers
             semaphore = threading.Semaphore(effective_workers)
             completed_count = 0
@@ -944,7 +1107,7 @@ def run_full_benchmark(
                 scenario_id = scenario_path.stem
                 start_time = time.time()
 
-                # Rate limit 대응: 시작 전 딜레이
+                # Rate limit handling: delay before starting
                 time.sleep(float(os.getenv("BENCHMARK_DELAY", "2.0")))
 
                 logger.log_scenario_start(scenario_id, idx)
@@ -959,6 +1122,8 @@ def run_full_benchmark(
                     multi_judge=multi_judge,
                     llm_config=llm_config,
                     judge_env=judge_env,
+                    logger=logger,
+                    scenario_id=scenario_id,
                 )
 
                 elapsed = time.time() - start_time
@@ -984,7 +1149,7 @@ def run_full_benchmark(
                         scenario_index + idx,
                     )
                     futures[future] = scenario_path.stem
-                    # Rate limit 대응: 제출 간 딜레이
+                    # Rate limit handling: delay between submissions
                     time.sleep(float(os.getenv("BENCHMARK_DELAY", "2.0")))
 
                 for future in as_completed(futures):
@@ -993,7 +1158,7 @@ def run_full_benchmark(
                         _, scenario_result = future.result()
                         results["scenarios"][variant][scenario_id] = scenario_result
                     except Exception as e:
-                        print(f"  ❌ {scenario_id}: 예외 발생 - {e}")
+                        print(f"  ❌ {scenario_id}: exception raised - {e}")
                         results["scenarios"][variant][scenario_id] = {
                             "scenario": scenario_id,
                             "error": str(e),
@@ -1021,6 +1186,8 @@ def run_full_benchmark(
                     multi_judge=multi_judge,
                     llm_config=llm_config,
                     judge_env=judge_env,
+                    logger=logger,
+                    scenario_id=scenario_id,
                 )
 
                 elapsed = time.time() - start_time
@@ -1029,38 +1196,38 @@ def run_full_benchmark(
 
                 results["scenarios"][variant][scenario_id] = scenario_result
 
-                # Rate limit 대응: 시나리오 간 딜레이
+                # Rate limit handling: delay between scenarios
                 time.sleep(float(os.getenv("BENCHMARK_DELAY", "2.0")))
 
             scenario_index += len(scenarios)
 
-    # 전체 결과 저장
+    # Save the full results
     summary_path = run_dir / "benchmark_summary.json"
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2, default=str)
 
-    # 최종 요약 로그
+    # Final summary log
     logger.log_final_summary(results)
 
     return results
 
 
 def generate_summary_report(results: dict, output_path: Path) -> None:
-    """전체 결과 요약 리포트 생성"""
+    """Generate a summary report of the full results."""
     lines = [
-        "# ISD Agent Benchmark 결과 요약",
+        "# ISD Agent Benchmark results summary",
         "",
-        f"실행 시간: {results['timestamp']}",
+        f"Run time: {results['timestamp']}",
         "",
-        "## 설정",
+        "## Configuration",
         f"- Variant: {', '.join(results['config']['variants'])}",
         f"- Agent: {', '.join(results['config']['agents'])}",
         "",
-        "## 결과 요약",
+        "## Results summary",
         "",
     ]
 
-    # 집계
+    # Aggregation
     total_scenarios = 0
     agent_stats = {}
 
@@ -1079,40 +1246,40 @@ def generate_summary_report(results: dict, output_path: Path) -> None:
 
                 if agent_result.get("success"):
                     agent_stats[agent_id]["success"] += 1
-                    status = "성공"
+                    status = "success"
                 else:
                     agent_stats[agent_id]["failed"] += 1
-                    status = f"실패: {agent_result.get('error', 'Unknown')[:50]}"
+                    status = f"failed: {agent_result.get('error', 'Unknown')[:50]}"
 
                 lines.append(f"- {agent_id}: {status}")
 
-            # 평가 결과
+            # Evaluation results
             if "evaluation" in scenario_result:
                 eval_data = scenario_result["evaluation"]
                 lines.append("")
-                lines.append("**평가 점수:**")
+                lines.append("**Evaluation scores:**")
 
-                # Comparison rankings에서 점수 추출 (ranking 순서대로 표시)
+                # Extract scores from comparison rankings (in ranking order)
                 comparison = eval_data.get("comparison", {})
                 rankings = comparison.get("rankings", [])
-                
-                # 순위순 정렬 보장
+
+                # Ensure ranking order
                 rankings.sort(key=lambda x: x.get("rank", 999))
-                
+
                 for rank_info in rankings:
                     agent_id = rank_info.get("agent_id", "unknown")
                     total = rank_info.get("total_score", 0)
                     process = rank_info.get("process_score")
-                    
+
                     score_str = f"{total:.1f}/100"
                     if process is not None:
-                         score_str += f" (과정: {process:.1f})"
-                         
+                         score_str += f" (process: {process:.1f})"
+
                     lines.append(f"- {agent_id}: {score_str}")
 
-                # 에러 등으로 rankings가 없는 경우 대비
+                # Fallback when rankings are missing (e.g. due to errors)
                 if not rankings and "agents" in eval_data:
-                     # 기존 로직 (fallback)
+                     # Legacy logic (fallback)
                      for agent_score in eval_data.get("agents", []):
                         agent_id = agent_score.get("agent_id", "unknown")
                         total = agent_score.get("total", 0)
@@ -1120,11 +1287,11 @@ def generate_summary_report(results: dict, output_path: Path) -> None:
 
             lines.append("")
 
-    # Agent 통계
-    lines.append("## Agent 통계")
+    # Agent statistics
+    lines.append("## Agent statistics")
     lines.append("")
-    lines.append("| Agent | 성공 | 실패 | 성공률 |")
-    lines.append("|-------|------|------|--------|")
+    lines.append("| Agent | Success | Failed | Success rate |")
+    lines.append("|-------|---------|--------|--------------|")
 
     for agent_id, stats in agent_stats.items():
         total = stats["success"] + stats["failed"]
@@ -1133,36 +1300,36 @@ def generate_summary_report(results: dict, output_path: Path) -> None:
 
     lines.append("")
     lines.append("---")
-    lines.append(f"총 시나리오: {total_scenarios}개")
+    lines.append(f"Total scenarios: {total_scenarios}")
 
-    # 저장
+    # Save
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
 
 def main():
-    """메인 엔트리포인트"""
+    """Main entry point."""
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="ISD Agent Benchmark 실행"
+        description="Run the ISD Agent Benchmark"
     )
     parser.add_argument(
         "--install",
         action="store_true",
-        help="Agent 패키지 설치",
+        help="Install agent packages",
     )
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Agent 설치 상태 확인",
+        help="Check agent installation status",
     )
     parser.add_argument(
         "--variant",
         "-t",
         type=str,
         default=None,
-        help="실행할 variant (쉼표 구분, 예: idld_aligned,context_variant). --dataset과 함께 사용 불가",
+        help="Variant to run (comma-separated, e.g. idld_aligned,context_variant). Cannot be used with --dataset",
     )
     parser.add_argument(
         "--dataset",
@@ -1170,45 +1337,45 @@ def main():
         type=str,
         choices=["train", "test"],
         default=None,
-        help="데이터셋 선택 (train: 학습용, test: 평가용). --variant와 함께 사용 불가",
+        help="Dataset selection (train: training, test: evaluation). Cannot be used with --variant",
     )
     parser.add_argument(
         "--agents",
         "-a",
         type=str,
         default=None,
-        help="실행할 Agent (쉼표 구분)",
+        help="Agents to run (comma-separated)",
     )
     parser.add_argument(
         "--scenario",
         "-s",
         type=str,
         default=None,
-        help="특정 시나리오 파일 경로",
+        help="Path to a specific scenario file",
     )
     parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
-        help="상세 출력",
+        help="Verbose output",
     )
-    # 병렬 실행 옵션 (기본값: 최대 병렬화)
+    # Parallel execution options (default: maximum parallelism)
     parser.add_argument(
         "--no-parallel",
         action="store_true",
-        help="Agent 병렬 실행 비활성화 (기본: 병렬 실행)",
+        help="Disable agent parallel execution (default: parallel)",
     )
     parser.add_argument(
         "--max-workers",
         "-w",
         type=int,
         default=6,
-        help="Agent 동시 실행 수 (기본값: 6, 모든 에이전트 동시)",
+        help="Number of concurrent agents (default: 6, all agents at once)",
     )
     parser.add_argument(
         "--no-scenario-parallel",
         action="store_true",
-        help="시나리오 레벨 병렬 실행 비활성화 (기본: 병렬 실행)",
+        help="Disable scenario-level parallel execution (default: parallel)",
     )
     parser.add_argument(
         "--scenario-max-workers",
@@ -1366,7 +1533,7 @@ def main():
         credential_strategies=args.judge_model_credential_strategies,
     )
 
-    # Rate limit 모드에 따른 설정 조정
+    # Adjust settings based on the rate limit mode
     rate_limit_configs = {
         "conservative": {"max_workers": 2, "scenario_max_workers": 2, "delay": 2.0},
         "moderate": {"max_workers": 3, "scenario_max_workers": 4, "delay": 0.5},
@@ -1375,23 +1542,23 @@ def main():
     }
     rate_config = rate_limit_configs[args.rate_limit]
 
-    # 명시적으로 설정하지 않았으면 rate_limit 모드 값 사용
+    # Use rate_limit mode values unless explicitly overridden
     if args.max_workers == 6:  # default value
         args.max_workers = rate_config["max_workers"]
     if args.scenario_max_workers == 8:  # default value
         args.scenario_max_workers = rate_config["scenario_max_workers"]
 
-    # 전역 딜레이 설정
+    # Set the global delay
     os.environ["BENCHMARK_DELAY"] = str(rate_config["delay"])
 
-    # 설치
+    # Install
     if args.install:
         success = install_agents()
         sys.exit(0 if success else 1)
 
-    # 설치 확인
+    # Check installation
     if args.check:
-        print("\nAgent 설치 상태:")
+        print("\nAgent installation status:")
         print("-" * 40)
         status = check_agents_installed()
         for agent, installed in status.items():
@@ -1400,23 +1567,23 @@ def main():
 
         all_installed = all(status.values())
         if not all_installed:
-            print("\n일부 Agent가 설치되지 않았습니다.")
-            print("--install 옵션으로 설치하세요.")
+            print("\nSome agents are not installed.")
+            print("Install them with the --install option.")
         sys.exit(0 if all_installed else 1)
 
-    # 모듈 import 가능 여부 확인
+    # Check whether modules can be imported
     status = check_agents_installed()
     if not all(status.values()):
         missing = [agent for agent, installed in status.items() if not installed]
-        print(f"\n⚠️  Agent 모듈 import 실패: {', '.join(missing)}")
-        print("sys.path 또는 의존성을 확인하세요.")
+        print(f"\n⚠️  Failed to import agent modules: {', '.join(missing)}")
+        print("Check sys.path or dependencies.")
         sys.exit(1)
 
-    # 단일 시나리오 실행
+    # Single-scenario run
     if args.scenario:
         scenario_path = Path(args.scenario)
         if not scenario_path.exists():
-            print(f"오류: 시나리오 파일을 찾을 수 없습니다: {scenario_path}")
+            print(f"Error: scenario file not found: {scenario_path}")
             sys.exit(1)
 
         output_dir = RESULTS_DIR / f"single_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -1424,6 +1591,10 @@ def main():
 
         # Determine multi-judge setting
         use_multi_judge = args.multi_judge and not args.single_judge
+
+        # Lightweight logger so a single run also shows the step checklist + eval %
+        total_agents = len(agents) if agents else 6
+        single_logger = BenchmarkProgressLogger(total_scenarios=1, total_agents=total_agents)
 
         result = run_single_benchmark(
             scenario_path=scenario_path,
@@ -1435,19 +1606,21 @@ def main():
             multi_judge=use_multi_judge,
             llm_config=llm_config,
             judge_env=judge_env,
+            logger=single_logger,
+            scenario_id=scenario_path.stem,
         )
 
         print(f"\nResults saved: {output_dir}")
         sys.exit(0)
 
-    # --dataset과 --variant 동시 사용 방지
+    # Prevent using --dataset and --variant together
     if args.dataset and args.variant:
-        print("오류: --dataset과 --variant는 동시에 사용할 수 없습니다.")
-        print("  --dataset: train/test 데이터셋 모드 (평가용)")
-        print("  --variant: 기존 variant 모드 (idld_aligned, context_variant)")
+        print("Error: --dataset and --variant cannot be used together.")
+        print("  --dataset: train/test dataset mode (for evaluation)")
+        print("  --variant: existing variant mode (idld_aligned, context_variant)")
         sys.exit(1)
 
-    # 전체 벤치마크 실행
+    # Run the full benchmark
     variants = args.variant.split(",") if args.variant else None
     agents = args.agents.split(",") if args.agents else None
 
@@ -1468,12 +1641,12 @@ def main():
         judge_env=judge_env,
     )
 
-    # 요약 리포트 생성
+    # Generate the summary report
     timestamp = results["timestamp"]
     output_dir = results.get("output_dir", RESULTS_DIR / f"benchmark_{timestamp}")
     summary_path = Path(output_dir) / "SUMMARY.md"
     generate_summary_report(results, summary_path)
-    print(f"요약 리포트: {summary_path}")
+    print(f"Summary report: {summary_path}")
 
 
 if __name__ == "__main__":
