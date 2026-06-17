@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-2871",
+  "variant_type": "idld_aligned",
+  "title": "Online Safety Training for Proper Use of Sit-Stand Workstations",
+  "context": {
+    "prior_knowledge": "Basic understanding of office work environments",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Providing interactive online learning environments using digital devices for professionals.",
+    "institution_type": "Graduate school",
+    "learner_age": "40s and above",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can explain correct posture settings for body parts when using sit-stand workstations with 80% accuracy.",
+    "Learners can list three or more health risks of prolonged sedentary work and propose prevention strategies.",
+    "Learners can establish and implement two or more sit-stand transition strategies tailored to individual work environments."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Video scenario",
+      "Interactive guide PDF",
+      "Behavior change checklist",
+      "Case Study Database"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Science"
+}

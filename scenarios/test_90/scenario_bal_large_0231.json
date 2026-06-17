@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-LARGE-0231",
+  "variant_type": "balance_large_scale",
+  "title": "[Large-Scale] MOOC Learning Engagement Strategies and Self-Regulated Learning Design",
+  "context": {
+    "prior_knowledge": "Basic mathematical knowledge and experience with online learning",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "For undergraduate students in medical/legal/technical professions, conducting project-based assessments in real-time online classes using personal devices (BYOD)",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can establish and execute weekly learning plans by applying self-regulated learning strategies on the MOOC platform.",
+    "Through collaborative problem-solving activities, learners maintain real-time interaction with peers and instructors at an 80%+ participation rate.",
+    "Learners achieve a 90%+ completion rate in project assignments utilizing gamification elements."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "MOOC Platform Access Permissions",
+      "Real-time collaboration tools (Miro, Jamboard, etc.)",
+      "Project Evaluation Checklist",
+      "Digital Badging System"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Mathematics"
+}

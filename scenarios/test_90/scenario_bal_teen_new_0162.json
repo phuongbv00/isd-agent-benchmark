@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-TEEN-NEW-0162",
+  "variant_type": "balance_teen_filtered",
+  "title": "[K-12] Measurement of Product Development Process Complexity and NASA-TLX-Based Workload Analysis",
+  "context": {
+    "prior_knowledge": "Basic understanding of product development processes, engineering problem-solving methodologies, and foundational VR simulation usage experience",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Simulation/VR-based",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practice-centered education using a smartphone-based VR environment. Aims to improve product development efficiency by measuring cognitive load during complex problem-solving processes.",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "High school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "The NASA-TLX scale can be used to quantitatively measure task workload at each stage of product development.",
+    "Learners can explain methods for analyzing the complexity of the product development process in a simulation environment.",
+    "Based on designer cognitive load data, learners can propose optimization strategies for the product development process."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile VR Device",
+      "NASA-TLX Measurement Software",
+      "Product Development Simulation Scenario Package"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Science"
+}

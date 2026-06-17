@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-LARGE2-0077",
+  "variant_type": "balance_large_scale_v2",
+  "title": "Large-Scale Multimedia Learning Preference Analysis-Based Instructional Design for Continuing Engineering Education (CEE)",
+  "context": {
+    "prior_knowledge": "Intermediate Expertise in Engineering Fields",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Course for strengthening engineering continuing education (CEE) design competencies in a digital device-provided environment.",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "40s and above",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Advanced"
+  },
+  "learning_goals": [
+    "Explain three or more effective multimedia integration strategies when designing continuing engineering education (CEE)",
+    "Utilize two or more tools to analyze target engineers' learning preferences (linguistic-visual cognitive styles, learning strategies, multimedia preferences)",
+    "Learners can design customized CEE (Competency-Based Education) curricula at least once, considering the independence of prior knowledge and learning preferences."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Multimedia Authoring Software",
+      "Learning Preference Diagnostic Survey Tool",
+      "Engineering CEE Case Database (Civil and Environmental Engineering)"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Business/HR/Admin Support"
+}

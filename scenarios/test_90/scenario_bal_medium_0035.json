@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-MEDIUM-0035",
+  "variant_type": "balance_medium_scale",
+  "title": "Learner Identity and Permission Management Simulation: Strengthening Social Sector Practitioner Competencies",
+  "context": {
+    "prior_knowledge": "Basic experience with digital platforms and understanding of educational technology tools",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Simulation/VR-based",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Scenario-based practical training in smartphone-centric limited-technology environments to provide learning experiences similar to real job situations",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 30s",
+    "learner_education": "Middle school",
+    "learner_role": "Professional (medical/legal/technical)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Through scenario-based VR simulations, learners can explain learner identity integration processes in three or more stages.",
+    "Learners can identify two or more permission management issues arising during external service integration and propose solutions.",
+    "In a simulated account creation environment, learners can practice procedures for securely handling remote learner authentication data."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile VR Device Rental Set",
+      "Scenario-Based Learning Module",
+      "Learner Activity Tracking Spreadsheet"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Service/Customer Support"
+}

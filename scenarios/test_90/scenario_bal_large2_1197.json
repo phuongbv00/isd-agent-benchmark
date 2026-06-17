@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-LARGE2-1197",
+  "variant_type": "balance_large_scale_v2",
+  "title": "[Large-scale] Human-Machine Collaborative Learning Design in Metaverse-based Environments",
+  "context": {
+    "prior_knowledge": "Basic digital device operation skills and online learning experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Metaverse-based learning program for non-degree-seeking adult learners in social sciences, operated in mobile environments. Focuses on project-based learning combining peer collaboration and AI tool utilization",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 30s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can collaborate with AI assistants in metaverse environments to design social problem-solving projects.",
+    "Learners perform at least three real-time collaborative scenarios with peer learners using digital avatars.",
+    "Learners create at least one piece of creative content (e.g., 3D models, virtual posters) using metaverse tools."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Metaverse platform license",
+      "AI Collaboration Toolkit",
+      "Mobile-Compatible 3D Authoring Tool"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "AI"
+}

@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-6196-V",
+  "variant_type": "context_variant",
+  "title": "Healthcare Practical Competency Enhancement: FANET Secure Routing Protocol Design and Optimization",
+  "context": {
+    "prior_knowledge": "Comprehension of core concepts and intermediate-level application skills",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical competency enhancement program for medical/nursing field practitioners",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "In their 30s",
+    "learner_education": "High school",
+    "learner_role": "Professional (medical/legal/technical)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "The design principles of FL (Federated Learning) and blockchain-based FANET secure routing protocols can be explained",
+    "Network security enhancement strategies utilizing CF-mMIMO and STAR-RIS technologies can be proposed",
+    "Routing path optimization methods satisfying QoS requirements (latency, hop count) can be applied through cross-layer design"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Clinical Simulation Equipment",
+      "Electronic Medical Record (EMR)",
+      "Medical Protocol Guide"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "evaluation_requirement": "총괄평가 중심",
+    "assessment_type": "Summative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Medical/Nursing"
+}

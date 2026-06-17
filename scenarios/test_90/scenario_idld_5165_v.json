@@ -1,0 +1,38 @@
+{
+  "scenario_id": "IDLD-5165-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Leadership Practical Competencies: Advanced Project Management Practice Course: Construct-Aligned Short-Term",
+  "context": {
+    "prior_knowledge": "Basic project management terminology and work experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Blended learning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical Competency Enhancement Program for Corporate Management/HR Professionals",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "In their 30s",
+    "learner_education": "University",
+    "learner_role": "Professional (medical/legal/technical)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Integrate ≥3 risk management elements when establishing project plans based on PMI standard processes",
+    "Compare Agile/Waterfall methodologies and justify appropriate approaches for given scenarios",
+    "Conduct virtual project meetings using mobile team collaboration tools (e.g., Trello, Slack) in mobile environments",
+    "Develop and share personal project management competency plans based on formative assessment feedback"
+  ],
+  "constraints": {
+    "budget": "low",
+    "resources": [
+      "Business Simulation Tool",
+      "HR Management System",
+      "Business Analytics Tool"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "evaluation_requirement": "형성평가 중심",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Business/HR/Admin Support"
+}

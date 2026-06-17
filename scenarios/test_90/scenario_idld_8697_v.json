@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-8697-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Curriculum Development Practical Competencies: Project-Based Critical Thinking Development in Online Environments",
+  "context": {
+    "prior_knowledge": "Basic Academic Writing and Discussion Skills",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Instructional design competency enhancement program for professionals in education/teaching/learning fields",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "High school",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can write five or more critical analysis comments on an online discussion platform.",
+    "Learners can revise project deliverables three or more times incorporating peer feedback.",
+    "Learners can manage team project schedules with 80% or higher adherence using a SCRUM board-based collaboration tool."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS platform",
+      "Authoring Tool",
+      "Instructional Design Template"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "evaluation_requirement": "프로젝트 기반 평가",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Education (Teaching & Learning)"
+}

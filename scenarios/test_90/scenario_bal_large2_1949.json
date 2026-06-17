@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-LARGE2-1949",
+  "variant_type": "balance_large_scale_v2",
+  "title": "[Large-Scale] Instructional Design for Developing College Students' Thinking Skills Through Collaborative Practice",
+  "context": {
+    "prior_knowledge": "Basic learning skills and digital tool proficiency",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Blended learning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "The process by which learners develop critical thinking and creative problem-solving skills through collaborative activities with peers within a Community of Practice (CoP)",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Pre-service/In-service teacher",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can analyze complex problems and apply critical thinking strategies through collaborative discussions across diverse academic contexts",
+    "Learners enhance creative problem-solving skills through digital content creation activities incorporating peer feedback",
+    "Learners develop a self-directed learning plan in a 2-week blended learning environment, including a weekly schedule with ≥3 sessions and SMART-based learning goals, participate ≥2 times weekly in an online community of practice (discussion board 1 session, study group 1 session), and submit activity logs (summary of participation and reflection ≥200 characters)."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Online Collaboration Tools (Google Workspace, etc.)",
+      "Digital content creation software",
+      "Learning Management System (LMS)"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Education (Teaching & Learning)"
+}

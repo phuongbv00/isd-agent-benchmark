@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-4807-V",
+  "variant_type": "context_variant",
+  "title": "App Development Practical Competency Enhancement: Aphasia Community Group (CAG) Facilitation Skill Training",
+  "context": {
+    "prior_knowledge": "Fundamental speech-language therapy skills and experience facilitating group activities",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Blended learning",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Practical Competency Enhancement Program for IT/Software Development Professionals",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "In their 20s",
+    "learner_education": "High school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can explain three or more communication strategies required for facilitating CAG (Collaborative Action Groups).",
+    "Learners can simulate the design of activities that reflect the psychosocial needs of aphasia patient groups",
+    "Learners can produce a CAG operations manual utilizing multimodal delivery methods"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "IDE and development tools",
+      "Version control system (Git)",
+      "Cloud-based development environment"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Software Development/IT"
+}

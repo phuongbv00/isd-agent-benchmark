@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-3006-V",
+  "variant_type": "context_variant",
+  "title": "Design and Implementation Project for International Partnership Strategies in SMEs",
+  "context": {
+    "prior_knowledge": "Grasp of International Business Fundamentals and SME Management Experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Focuses on strengthening the capability to develop international partnership strategies through real-world case analysis. Constructs a collaborative learning environment using personal digital devices.",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 30s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can explain strategic approaches for the three key elements of international partnership formation: internal stakeholder roles, planning/opportunity management, and organizational learning.",
+    "Learners can develop regionally optimized (manufacturing/service-based) international partnership models based on case studies.",
+    "Learners can create actionable partnership roadmaps under resource constraints through team projects."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "International Partnership Success/Failure Case Database",
+      "Interview Analysis Template",
+      "Collaboration Tools (e.g., ZOOM/MIRO)"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Software Development/IT"
+}

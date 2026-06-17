@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-TEEN-0590",
+  "variant_type": "balance_teen_k12",
+  "title": "Designing Video-Based Teaching Methods for Pre-Service Teachers [K-12]",
+  "context": {
+    "prior_knowledge": "Basic pedagogical theories and fundamental classroom management knowledge",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Need for content structured optimally for smartphone-based learning environments",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "Middle school",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can analyze video case studies to derive three instructional strategies applicable to classroom situations.",
+    "Learners can develop a video-based lesson design plan (with three or more stages) tailored to a given lesson scenario.",
+    "Learners can select appropriate video material utilization strategies according to the rule-example/example-rule model."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS platform",
+      "Mobile-Optimized Video Materials",
+      "Interactive worksheets",
+      "Peer Assessment Tool"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Social Studies"
+}

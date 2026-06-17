@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-5918-V",
+  "variant_type": "context_variant",
+  "title": "Constructivist and Imagination-Based Virtual Learning Environment (VLE) Design: Application in Mathematics Education",
+  "context": {
+    "prior_knowledge": "Completion of advanced courses and extensive practical experience in specialized fields",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Simulation/VR-based",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Designing a mathematics learning environment that integrates constructivism and imaginative education in a VR/simulation setting using personal devices (BYOD).",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 20s",
+    "learner_education": "High school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Advanced"
+  },
+  "learning_goals": [
+    "Learners can visually and interactively explore mathematical concepts in VR-based simulations.",
+    "Learners develop mathematical problem-solving strategies through collaboration with peers using a constructivist approach.",
+    "Learners transform three real-world workplace problems into mathematical models (equations, graphs, statistical analysis) using imagination-based educational techniques (brainstorming, analogical thinking) and write a project report proposing solutions."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "VR Headset",
+      "BYOD-compatible simulation platform",
+      "Collaborative Tools (e.g., Padlet)",
+      "Digital textbooks in various formats"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Mathematics"
+}

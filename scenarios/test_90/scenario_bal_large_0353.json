@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-LARGE-0353",
+  "variant_type": "balance_large_scale",
+  "title": "[Large-Scale] Metadata-Based Reflection and Evaluation Workshop for Strengthening Teacher Instructional Design Competencies",
+  "context": {
+    "prior_knowledge": "Fundamental science curriculum knowledge and lesson design experience",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Blended learning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Learners are instructors responsible for university science curriculum classes, aiming for effective blended learning design, delivery, and evaluation. They can access metadata tagging and visualization tools using personal devices.",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "40s and above",
+    "learner_education": "High school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "When designing 5th-week science lessons, learners can structure explicit/implicit intentions using metadata tagging.",
+    "Learners can analyze and reflect on lesson progression patterns through visualization tools.",
+    "Based on peer feedback, learners can identify areas for improvement in lesson design."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Metadata Tagging Template",
+      "Visual Analytics Software",
+      "Science Subject Standard Curriculum Sample",
+      "Reflective Practice Guide"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Science"
+}

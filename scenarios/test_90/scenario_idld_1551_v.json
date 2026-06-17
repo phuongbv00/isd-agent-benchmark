@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-1551-V",
+  "variant_type": "context_variant",
+  "title": "Problem-Solving-Based Social Studies Curriculum for Personalized Learning Support",
+  "context": {
+    "prior_knowledge": "Basic Social Science Concepts and Fundamental Digital Device Utilization Skills",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Blended learning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Designing blended learning models feasible in smartphone-centric limited technological environments",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "University",
+    "learner_role": "Pre-service/In-service teacher",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can analyze real-world social problem scenarios, extract core concepts, and diagram interconnections between concepts.",
+    "Learners can select personalized learning materials reflecting their cognitive schemas with over 80% accuracy during problem-solving processes.",
+    "Learners can improve their problem-solving strategies 3+ times through peer assessment and formative evaluation."
+  ],
+  "constraints": {
+    "budget": "low",
+    "resources": [
+      "Mobile-Compatible LMS (Learning Management System)",
+      "Social Issue Problem-Solving Worksheet PDFs",
+      "Concept Mapping Template",
+      "QR Code Quizzes for Formative Assessment"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Social Studies"
+}

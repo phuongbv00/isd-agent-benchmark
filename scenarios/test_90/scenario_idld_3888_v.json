@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-3888-V",
+  "variant_type": "context_variant",
+  "title": "Gamification-Based Science Inquiry Instructional Design to Enhance Digital Technology Accessibility",
+  "context": {
+    "prior_knowledge": "Basic science education theory, scientific inquiry methods (observation, hypothesis formulation, experimental design), and experience with digital tools",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Simulation/VR-based",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Program for pre-service teachers to develop science education design competencies for learners with diverse disabilities. Project-based learning combining VR simulations and gamification elements in BYOD environments. Special emphasis on integrating scientific analysis skills and evidence-gathering processes into accessible design.",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Explain methods to design gamification elements (game mechanics, visual feedback, problem-solving structures) aligned with accessibility principles and scientific inquiry processes.",
+    "Integrate accessibility features considering various disability types (visual, auditory, cognitive) into VR-based science simulations to support experimental observation and hypothesis verification.",
+    "Collaboratively prototype a gamified science education module for learners with disabilities and validate it using variable control and evidence-based evaluation methods."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "VR Equipment (3 Sets)",
+      "Gamification Design Template",
+      "Accessibility Checklist",
+      "Universal Design Guidelines"
+    ],
+    "accessibility": "WCAG 2.1 AA 기준 준수",
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Science"
+}

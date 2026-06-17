@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-0692",
+  "variant_type": "idld_aligned",
+  "title": "Evaluation and Improvement Strategies for the Effectiveness of Online Classes in Health Professions",
+  "context": {
+    "prior_knowledge": "Basic Healthcare Knowledge and Online Learning Experience",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Development and application of a non-real-time class effectiveness evaluation tool in a smartphone-centric limited technological environment.",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 20s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Participants can analyze interactivity, assessment systems, and ethical considerations in online healthcare professional courses using rubrics.",
+    "Participants can write diagnostic reports on instructional effectiveness through learning data collection and qualitative evaluation.",
+    "Based on diagnostic results, participants can propose improvements for optimizing lessons in smartphone environments."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile-Friendly Learning Management System (LMS)",
+      "Instructional effectiveness assessment rubric template",
+      "Case-based project materials"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Social Studies"
+}

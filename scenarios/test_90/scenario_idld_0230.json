@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-0230",
+  "variant_type": "idld_aligned",
+  "title": "Physics Concept Reconstruction Education Using Epistemic Game-Based Video Games",
+  "context": {
+    "prior_knowledge": "High school-level physics fundamentals (Newtonian mechanics, equations of motion)",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Blended learning",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Science education methodology-linked program for pre-service teachers, including experimental activities using digital devices and educational game platforms",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Through epistemic goal-setting, learners can accurately explain the interactions of physical variables (angle, velocity, distance) in the Angry Birds game with over 80% accuracy.",
+    "Learners can write argumentative essays critically evaluating mass-velocity misconceptions by analyzing in-game experimental data.",
+    "Learners can develop instructional plans that design game-based inquiry activities in collaborative/non-collaborative learning environments."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Angry Birds Educational Edition License",
+      "Motion Capture Software for Kinematic Analysis",
+      "LMS (Learning Management System)"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Science"
+}

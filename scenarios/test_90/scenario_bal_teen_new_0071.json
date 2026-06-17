@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-TEEN-NEW-0071",
+  "variant_type": "balance_teen_filtered",
+  "title": "[K-12] Improving Awareness of Hereditary Breast and Ovarian Cancer Syndrome (HBOC) Risk: Utilizing Self-Assessment Tools",
+  "context": {
+    "prior_knowledge": "Foundational genetics concepts and general understanding of cancer risk factors",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Conducting smartphone-based learning in resource-constrained technological environments. A curriculum aimed at enhancing social health literacy.",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "Middle school",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can accurately explain three major risk factors of HBOC (Hereditary Breast and Ovarian Cancer).",
+    "Learners can analyze personal HBOC risk levels using provided self-assessment tools.",
+    "Learners can perform procedures to connect with appropriate genetic counseling services if identified as high-risk for HBOC."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile-Compatible Self-Assessment Checklist",
+      "Family History Documentation Template",
+      "Regional Resource Database for Genetic Counseling"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Service/Customer Support"
+}

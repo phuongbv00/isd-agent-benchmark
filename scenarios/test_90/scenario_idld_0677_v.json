@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-0677-V",
+  "variant_type": "context_variant",
+  "title": "Enhancing Visual Literacy Through Infographic Creation and Evaluation",
+  "context": {
+    "prior_knowledge": "Requirement of intermediate theoretical background and practical experience",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "A course strengthening visual communication skills through infographic creation and evaluation in offline environments with provided digital devices",
+    "institution_type": "Graduate school",
+    "learner_age": "In their 20s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can effectively integrate visual components (text, images, layout) by planning and producing infographics on social issues.",
+    "Learners can analyze peers' infographic works and suggest improvements by applying a modular assessment framework.",
+    "Learners can enhance the visual clarity and information delivery efficiency of infographics by 20% or more based on formative assessment feedback."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Design Software (Canva, Adobe Spark, etc.)",
+      "Visual Literacy Assessment Rubric",
+      "Social Issues Case Database"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "evaluation_requirement": "형성평가 중심",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Social Studies"
+}

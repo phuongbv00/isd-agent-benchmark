@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-4934",
+  "variant_type": "idld_aligned",
+  "title": "Online Intensive Workshop on Product Design Utilizing Real-Time Video Interviews",
+  "context": {
+    "prior_knowledge": "Foundational product design theory and practical work experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Blended learning",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Short-term, practice-oriented course for current practitioners focusing intensively on core elements of product design (user experience, prototyping, evaluation methods) in an online environment",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "In their 30s",
+    "learner_education": "High school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can explain core concepts of each stage in the product design process through real-time video interviews.",
+    "Learners collaborate with team members using online collaboration tools to design product prototypes and engage in iterative feedback exchanges.",
+    "Learners self-diagnose their design outcomes and propose improvement plans through formative assessment."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Video Conferencing Platform",
+      "Design Collaboration Tools (e.g., Figma, Miro)",
+      "3D Modeling Software Trial Version",
+      "Product Design Case Database"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Mathematics"
+}

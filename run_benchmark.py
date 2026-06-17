@@ -332,23 +332,25 @@ def get_all_scenarios(
 
     Dataset structure:
     - dataset=None (default): use existing variant directories (idld_aligned, context_variant)
-    - dataset="train": training dataset (scenarios/train/) - split from idld_aligned + context_variant
-    - dataset="test": evaluation dataset (scenarios/test/) - hold-out evaluation, 5% ratio
+    - dataset="<name>": load scenarios/<name>/ directly, e.g. train, test, test_90
 
     Args:
         use_stratified_sampling: Whether to use stratified sampling (correct imbalanced axes)
         n_samples: Number of scenarios to sample (None means all)
         sampling_strategy: Sampling strategy ("oversample", "undersample", "proportional")
-        dataset: Dataset selection ("train", "test", None=variant mode)
+        dataset: Dataset directory name under scenarios/ (None=variant mode)
 
     Returns:
         Dictionary of scenario file paths per variant/dataset
     """
-    # dataset mode: load directly from the train/test directory
-    if dataset in ("train", "test"):
+    # dataset mode: load directly from a named scenarios/<dataset> directory
+    if dataset:
         dataset_dir = SCENARIOS_DIR / dataset
         if not dataset_dir.exists():
             print(f"[warning] {dataset} directory does not exist: {dataset_dir}")
+            return {dataset: []}
+        if not dataset_dir.is_dir():
+            print(f"[warning] {dataset} is not a directory: {dataset_dir}")
             return {dataset: []}
 
         scenario_files = sorted(dataset_dir.glob("*.json"))
@@ -1343,9 +1345,8 @@ def main():
         "--dataset",
         "-d",
         type=str,
-        choices=["train", "test"],
         default=None,
-        help="Dataset selection (train: training, test: evaluation). Cannot be used with --variant",
+        help="Dataset directory under scenarios/ (e.g. train, test, test_90). Cannot be used with --variant",
     )
     parser.add_argument(
         "--agents",
@@ -1624,7 +1625,7 @@ def main():
     # Prevent using --dataset and --variant together
     if args.dataset and args.variant:
         print("Error: --dataset and --variant cannot be used together.")
-        print("  --dataset: train/test dataset mode (for evaluation)")
+        print("  --dataset: named scenarios/<dataset> directory mode (e.g. train, test, test_90)")
         print("  --variant: existing variant mode (idld_aligned, context_variant)")
         sys.exit(1)
 

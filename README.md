@@ -149,7 +149,7 @@ uses three configuration layers:
 | Flag | Meaning |
 |------|---------|
 | `--scenario PATH`, `-s PATH` | Run one scenario JSON file. Results are saved under `results/single_<timestamp>/`. |
-| `--dataset train\|test`, `-d train\|test` | Run the split dataset from `scenarios/train` or `scenarios/test`. Cannot be combined with `--variant`. |
+| `--dataset NAME`, `-d NAME` | Run a named dataset directory under `scenarios/`, e.g. `train`, `test`, or `test_90`. Cannot be combined with `--variant`. |
 | `--variant idld_aligned,context_variant`, `-t ...` | Run existing variant folders. Cannot be combined with `--dataset`. |
 | `--agents baseline,eduplanner,...`, `-a ...` | Comma-separated agent IDs to run. |
 | `--verbose`, `-v` | Print additional execution and evaluation details. |

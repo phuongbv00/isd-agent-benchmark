@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-1509-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening E-Learning Practical Competencies: Customized Mathematical Information Literacy Education Program for Office Workers",
+  "context": {
+    "prior_knowledge": "Understanding Basic Statistics and Research Methodology",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Instructional design competency enhancement program for professionals in education/teaching/learning fields",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "40s and above",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can select credible mathematics-related resources from academic databases with 80% accuracy.",
+    "Learners can fully comply with APA citation guidelines (100%) using plagiarism detection tools when writing research papers.",
+    "Learners can use mathematical tools on personal devices to create and interpret data visualization materials."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS platform",
+      "Authoring Tool",
+      "Instructional Design Template"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "evaluation_requirement": "총괄평가 중심",
+    "assessment_type": "Summative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Education (Teaching & Learning)"
+}

@@ -1,0 +1,38 @@
+{
+  "scenario_id": "IDLD-2404-V",
+  "variant_type": "context_variant",
+  "title": "Design Thinking-Based Language Problem-Solving Competency Enhancement Project",
+  "context": {
+    "prior_knowledge": "Advanced-level specialized knowledge in the field and extensive practical experience",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "An environment enabling collaboration via smartphone apps and mobile-friendly content distribution.",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Advanced"
+  },
+  "learning_goals": [
+    "Learners can resolve complex language problem situations using a 5-stage design thinking process (Empathize-Define-Ideate-Prototype-Test)",
+    "Learners can collaboratively propose creative solutions to real-world language-related social issues (e.g., information confusion, value conflicts)",
+    "Learners can perform self-directed reflection and feedback at least three times during language problem-solving processes and derive improvement plans"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Smartphone-Compatible Collaboration Tools (Padlet, Google Docs Mobile Version)",
+      "Language Problem Case Database (Social Issue-Based)",
+      "Design Thinking Worksheet (PDF)",
+      "Offline Feedback Session Materials"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "evaluation_requirement": "형성평가 중심",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Language"
+}

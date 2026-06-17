@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-LARGE2-0117",
+  "variant_type": "balance_large_scale_v2",
+  "title": "[Large-Scale] Simulation-Based Instructional Design for Developing AI Literacy Formative Assessment Tools",
+  "context": {
+    "prior_knowledge": "Foundational digital literacy and completion of secondary-level mathematics education",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Simulation/VR-based",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Enhanced mathematical problem-solving activities using VR simulations in smartphone-centric, limited-technology environments.",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can explain three or more fundamental principles of AI technology and their educational applications",
+    "Learners can diagnose their AI literacy across four dimensions (affective/behavioral/cognitive/ethical) using a survey-based self-assessment tool",
+    "Learners can apply AI-based math problem-solving strategies in a VR simulation environment and write a self-reflection report"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile VR Device Rental",
+      "AI Literacy Survey Template",
+      "Mathematics Problem Bank Database"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "AI"
+}

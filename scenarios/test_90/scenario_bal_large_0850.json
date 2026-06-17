@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-LARGE-0850",
+  "variant_type": "balance_large_scale",
+  "title": "Large-Scale Workshop Integrating Multimedia Production and Instructional Design for Elementary Social Studies Education",
+  "context": {
+    "prior_knowledge": "Possession of basic instructional design and digital content creation experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "An intensive course where elementary school teachers learn multimedia production and instructional design techniques applicable to actual classroom settings through case studies",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "In their 30s",
+    "learner_education": "Elementary",
+    "learner_role": "Pre-service/In-service teacher",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Explain at least three stages of the multimedia content production process required in elementary social studies curricula.",
+    "Derive at least five interaction elements between instructional design and multimedia production by analyzing case studies.",
+    "Produce a video solution plan applicable to real classroom scenarios in a collaborative learning environment."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Case Study Workbook",
+      "Digital Filming Equipment",
+      "Computer with Installed Video Editing Software License",
+      "Instructional Design Template Set"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Social Studies"
+}

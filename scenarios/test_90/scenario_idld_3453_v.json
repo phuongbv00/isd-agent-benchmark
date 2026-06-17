@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-3453-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Web Development Practical Competencies: Science Learning Design Process Through Ethical Design Thinking",
+  "context": {
+    "prior_knowledge": "Requirement of intermediate theoretical background and practical experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical Competency Enhancement Program for IT/Software Development Professionals",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 20s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can explain a science experiment design process utilizing the 5-stage design thinking framework (Empathize-Define-Ideate-Prototype-Test)",
+    "Learners can assess societal impacts in scientific problem-solving processes by applying ethical design principles",
+    "Learners can collaboratively develop science education content prototypes with peers using online collaboration tools and incorporate feedback"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "IDE and development tools",
+      "Version control system (Git)",
+      "Cloud-based development environment"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "evaluation_requirement": "프로젝트 기반 평가",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Software Development/IT"
+}

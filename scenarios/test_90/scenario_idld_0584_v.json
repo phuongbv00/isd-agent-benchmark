@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-0584-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening programming practical skills: Teacher collaborative learning design through Online Lesson Study (OLS)",
+  "context": {
+    "prior_knowledge": "Requirement of intermediate theoretical background and practical experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical Competency Enhancement Program for IT/Software Development Professionals",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "High school",
+    "learner_role": "Pre-service/In-service teacher",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Participants can explain collaborative learning processes using OLS stages and digital tools (Zoom, Google Drive).",
+    "Participants design knowledge-sharing and collaborative problem-solving strategies with teachers from other institutions based on boundary-crossing theory.",
+    "Participants create OLS-based research lesson plans for STEM-integrated classes in mobile environments."
+  ],
+  "constraints": {
+    "budget": "low",
+    "resources": [
+      "IDE and development tools",
+      "Version control system (Git)",
+      "Cloud-based development environment"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Software Development/IT"
+}

@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-8746",
+  "variant_type": "idld_aligned",
+  "title": "Strengthening Science Educators' Hypothesis-Building Strategies and Reflective Practice Competencies",
+  "context": {
+    "prior_knowledge": "Understanding foundational theories in science and basic principles of instructional design",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Smartphone-based learning environment, strengthening practical competencies through project-based assessments.",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners will be able to apply three or more uncertainty management strategies in the instructional design process for scientific problem-solving.",
+    "Learners will be able to correct 80% or more of the errors that occurred during the design decision-making process using reflection-in-action.",
+    "Learners will be able to develop at least one instructional design prototype using smartphone-based tools even in resource-limited technical environments."
+  ],
+  "constraints": {
+    "budget": "low",
+    "resources": [
+      "Smartphone-Based Collaboration Tool",
+      "Open-source instructional design template",
+      "Digital note-taking application"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Science"
+}

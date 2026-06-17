@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-LARGE-0556",
+  "variant_type": "balance_large_scale",
+  "title": "Mobile Microlearning Course for Strengthening Clinical Pharmacy Practice Competencies (Large-Scale)",
+  "context": {
+    "prior_knowledge": "Understanding of basic pharmaceutical theory and clinical practice fundamentals",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Aims to integrate practical skill-based learning with theoretical knowledge using digital devices",
+    "institution_type": "Graduate school",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Students analyze five or more virtual patient cases per week over six months to develop clinical judgment competencies for major diseases",
+    "Simulate 30+ clinical skills (e.g., drug interaction assessment, treatment planning) via mobile platforms and achieve over 80% proficiency",
+    "Advance clinical competencies by at least two stages (novice → advanced beginner) through self-assessment based on the Dreyfus model"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mock electronic health record (EHR) system",
+      "Clinical pharmaceutical decision-making algorithm library",
+      "Mobile app with real-time feedback functionality"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Mathematics"
+}

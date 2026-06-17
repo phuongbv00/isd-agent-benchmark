@@ -1,0 +1,38 @@
+{
+  "scenario_id": "IDLD-2086-V",
+  "variant_type": "context_variant",
+  "title": "Exploring the Effectiveness of Universal Design for Learning (UDL): Science Education Application Cases",
+  "context": {
+    "prior_knowledge": "Intermediate-level subject-matter expertise and problem-solving abilities",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Design and efficacy validation of science education courses applying UDL principles in smartphone-centric limited-technology environments.",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Student",
+    "domain_expertise": "Advanced"
+  },
+  "learning_goals": [
+    "Apply UDL’s three core principles (engagement, representation, action & expression) to science education content",
+    "Develop UDL-based science assessment tools that accommodate diverse learning styles",
+    "Create educational materials aligned with UDL principles even in resource-constrained technological environments",
+    "Compare and analyze the effectiveness of UDL implementation cases versus traditional instructional methods"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS platform",
+      "Mobile-Optimized Authoring Tools",
+      "Science Concept Visualization Resource Library"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "evaluation_requirement": "총괄평가 중심",
+    "assessment_type": "Summative assessment-focused"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Software Development/IT"
+}

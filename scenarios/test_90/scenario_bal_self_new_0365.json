@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-SELF-NEW-0365",
+  "variant_type": "balance_self_filtered",
+  "title": "[Self-Directed] Motor Skill Acquisition: Ecological Dynamics-Based Adaptive Training Program",
+  "context": {
+    "prior_knowledge": "Fundamental understanding of exercise physiology and biomechanics",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Competency enhancement program for social sports instruction targeting current practitioners",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 30s",
+    "learner_education": "University",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can explain core principles of the ecological dynamics framework and present three or more applicable examples for actual motor skill training.",
+    "Learners achieve over 80% performance accuracy by practicing motor skill adjustment strategies in response to fluid environmental changes through mobile learning modules.",
+    "Learners can perform individual movement pattern analysis based on formative assessment feedback and develop two or more improved technical execution plans."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile-compatible exercise analysis apps",
+      "Wearable devices with accelerometer sensors",
+      "Interactive 3D exercise model library"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Social Studies"
+}

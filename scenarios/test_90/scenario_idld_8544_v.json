@@ -1,0 +1,38 @@
+{
+  "scenario_id": "IDLD-8544-V",
+  "variant_type": "context_variant",
+  "title": "Business Practical Competency Enhancement: IMS Learning Design-Based eLearning System Design and Implementation",
+  "context": {
+    "prior_knowledge": "Completion of advanced courses and extensive practical experience in specialized fields",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical Competency Enhancement Program for Corporate Management/HR Professionals",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "40s and above",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Advanced"
+  },
+  "learning_goals": [
+    "Learners can explain at least three core components of the IMS Learning Design standard.",
+    "Learners can design an e-learning system applying a three-tier Service-Oriented Architecture (SOA) model.",
+    "Learners can apply methods to separate learning design from web services via BPEL process execution in real-world cases.",
+    "Learners can document mathematical problem-solving processes with over 80% accuracy through project-based assessment."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Business Simulation Tool",
+      "HR Management System",
+      "Business Analytics Tool"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "evaluation_requirement": "형성평가 중심",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Business/HR/Admin Support"
+}

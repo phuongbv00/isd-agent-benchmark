@@ -9,17 +9,6 @@ AGENTS="${AGENTS:-baseline,eduplanner,react-isd,addie-agent,dick-carey-agent,rpi
 RATE_LIMIT="${RATE_LIMIT:-turbo}"
 DATASET="${DATASET:-test}"
 
-OPENROUTER_BASE_URL="${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}"
-UPSTAGE_BASE_URL="${UPSTAGE_BASE_URL:-https://api.upstage.ai/v1/solar}"
-
-# ---------------------------------------------------------------------------
-# Judge model config
-# ---------------------------------------------------------------------------
-JUDGE_MODEL_PROVIDER="${JUDGE_MODEL_PROVIDER:-openrouter}"
-JUDGE_MODEL_BASE_URL="${JUDGE_MODEL_BASE_URL:-$OPENROUTER_BASE_URL}"
-JUDGE_MODEL_NAMES="${JUDGE_MODEL_NAMES:-openai/gpt-4o-mini,google/gemini-2.5-flash-lite}"
-JUDGE_MODEL_API_KEY_ENV="${JUDGE_MODEL_API_KEY_ENV:-OPENROUTER_API_KEY}"
-
 # ---------------------------------------------------------------------------
 # Agent model slots — comma-separated session labels. Each slot reads:
 #   <SLOT>_AGENT_MODEL_PROVIDER
@@ -32,22 +21,6 @@ JUDGE_MODEL_API_KEY_ENV="${JUDGE_MODEL_API_KEY_ENV:-OPENROUTER_API_KEY}"
 AGENT_MODEL_SLOTS="${AGENT_MODEL_SLOTS:-gpt,gemini,solar}"
 # Normalize to whitespace-separated for word-split loops below.
 _AGENT_MODEL_SLOTS_LIST="${AGENT_MODEL_SLOTS//,/ }"
-
-# Built-in slot defaults (overridable per slot)
-GPT_AGENT_MODEL_PROVIDER="${GPT_AGENT_MODEL_PROVIDER:-openrouter}"
-GPT_AGENT_MODEL_BASE_URL="${GPT_AGENT_MODEL_BASE_URL:-$OPENROUTER_BASE_URL}"
-GPT_AGENT_MODEL_NAME="${GPT_AGENT_MODEL_NAME:-openai/gpt-5-mini}"
-GPT_AGENT_MODEL_API_KEY_ENVS="${GPT_AGENT_MODEL_API_KEY_ENVS:-OPENROUTER_API_KEY}"
-
-GEMINI_AGENT_MODEL_PROVIDER="${GEMINI_AGENT_MODEL_PROVIDER:-openrouter}"
-GEMINI_AGENT_MODEL_BASE_URL="${GEMINI_AGENT_MODEL_BASE_URL:-$OPENROUTER_BASE_URL}"
-GEMINI_AGENT_MODEL_NAME="${GEMINI_AGENT_MODEL_NAME:-google/gemini-3-flash-preview}"
-GEMINI_AGENT_MODEL_API_KEY_ENVS="${GEMINI_AGENT_MODEL_API_KEY_ENVS:-OPENROUTER_API_KEY}"
-
-SOLAR_AGENT_MODEL_PROVIDER="${SOLAR_AGENT_MODEL_PROVIDER:-upstage}"
-SOLAR_AGENT_MODEL_BASE_URL="${SOLAR_AGENT_MODEL_BASE_URL:-$UPSTAGE_BASE_URL}"
-SOLAR_AGENT_MODEL_NAME="${SOLAR_AGENT_MODEL_NAME:-solar-pro3}"
-SOLAR_AGENT_MODEL_API_KEY_ENVS="${SOLAR_AGENT_MODEL_API_KEY_ENVS:-UPSTAGE_API_KEY,UPSTAGE_API_KEY2,UPSTAGE_API_KEY3}"
 
 slot_upper() {
     echo "$1" | tr '[:lower:]-' '[:upper:]_'
@@ -81,12 +54,12 @@ mkdir -p "$LOG_DIR"
 NUM_SLOTS=$(echo "$_AGENT_MODEL_SLOTS_LIST" | wc -w | tr -d ' ')
 
 echo "=============================================="
-echo "  ${NUM_SLOTS}개 모델 tmux 병렬 실행"
+echo "  Running ${NUM_SLOTS} models in parallel via tmux"
 echo "  Dataset: $DATASET"
 echo "  Rate Limit: $RATE_LIMIT"
 echo "  Model config: --agent-model-* and --judge-model-* flags"
 echo "  Judge models: $JUDGE_MODEL_NAMES (provider=$JUDGE_MODEL_PROVIDER, base=$JUDGE_MODEL_BASE_URL)"
-echo "  로그 디렉토리: $LOG_DIR"
+echo "  Log directory: $LOG_DIR"
 echo ""
 echo "  Agent model slots:"
 for slot in $_AGENT_MODEL_SLOTS_LIST; do
@@ -126,32 +99,28 @@ for slot in $_AGENT_MODEL_SLOTS_LIST; do
     --agent-model-base-url ${!base_url_var} \
     --agent-model-name ${!name_var} \
     --agent-model-api-key-envs ${!key_envs_var} \
-    --judge-model-provider $JUDGE_MODEL_PROVIDER \
-    --judge-model-base-url $JUDGE_MODEL_BASE_URL \
-    --judge-model-names $JUDGE_MODEL_NAMES \
-    --judge-model-api-key-env $JUDGE_MODEL_API_KEY_ENV \
-    2>&1 | tee $log_file; echo '완료!'; read"
+    2>&1 | tee $log_file; echo 'Done!'; read"
 done
 
 echo ""
 echo "=============================================="
-echo "  ${NUM_SLOTS}개 tmux 세션 실행 중!"
+echo "  ${NUM_SLOTS} tmux sessions running!"
 echo "=============================================="
 echo ""
-echo "📺 세션 목록:"
+echo "📺 Session list:"
 tmux ls
 echo ""
-echo "📊 실시간 확인 (attach):"
+echo "📊 Live view (attach):"
 for slot in $_AGENT_MODEL_SLOTS_LIST; do
     echo "  tmux attach -t bench-${slot}"
 done
 echo ""
-echo "📁 로그 파일 (실시간 저장):"
+echo "📁 Log files (saved live):"
 for slot in $_AGENT_MODEL_SLOTS_LIST; do
     echo "  tail -f $LOG_DIR/${slot}.log"
 done
 echo ""
-echo "⌨️  세션에서 나가기: Ctrl+B, D"
+echo "⌨️ Detach from a session: Ctrl+B, D"
 echo ""
-echo "🛑 전체 중지:"
+echo "🛑 Stop everything:"
 echo "  tmux kill-server"

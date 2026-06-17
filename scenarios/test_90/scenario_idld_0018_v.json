@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-0018-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening AI Practical Competencies: Mobile Learning-Based Mathematical Problem-Solving Project Design",
+  "context": {
+    "prior_knowledge": "Intermediate-level knowledge and practical experience in the relevant field",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Advanced AI/machine learning technical course for AI/ML practitioners",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "High school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can solve interactive mathematics problems provided on a mobile platform with 80% or higher accuracy",
+    "Learners can produce prototypes of mathematics educational content by applying mobile learning design principles based on the FRAME model",
+    "Learners achieve a 90% or higher completion rate for PBL assignments by utilizing peer feedback and instructor support systems, considering Transactional Distance Theory"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Python/Jupyter Environment",
+      "GPU Cloud Server",
+      "AI Framework"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "evaluation_requirement": "총괄평가 중심",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "AI"
+}

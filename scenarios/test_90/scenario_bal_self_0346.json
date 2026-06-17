@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-SELF-0346",
+  "variant_type": "balance_self_directed",
+  "title": "[Self-Directed] e-Learning Course for Enhancing Practical Mathematics Competencies for Working Professionals",
+  "context": {
+    "prior_knowledge": "Basic arithmetic operations and fundamental mathematical concepts relevant to workplace tasks",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Emphasizes problem-solving competencies for mathematical challenges arising in daily tasks to improve workplace efficiency for practicing professionals",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 30s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can perform ratio calculations and statistical interpretations required for financial report analysis at a 90% accuracy level",
+    "Learners can design and execute budgeting and resource allocation optimization projects using real-world business data",
+    "Learners can accurately interpret technical documents encountered in work settings by applying unit conversion and engineering notation"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Online Learning Management System (LMS)",
+      "Mobile-Responsive Content",
+      "Virtual Collaboration Tools",
+      "Real-World Work Data Samples"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Mathematics"
+}

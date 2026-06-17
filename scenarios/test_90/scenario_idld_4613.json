@@ -1,0 +1,38 @@
+{
+  "scenario_id": "IDLD-4613",
+  "variant_type": "idld_aligned",
+  "title": "Flipped Learning-Based English Speaking Anxiety Reduction Program",
+  "context": {
+    "prior_knowledge": "Possession of basic English communication skills",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Targeting mathematics field managers/leaders, aiming to reduce English-speaking anxiety required in work environments",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "40s and above",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners reduce their English speaking anxiety index (based on AESPQ) by 30% or more through 12 weeks of flipped learning",
+    "Learners complete pre-learning videos (15 minutes) and quizzes (10 items) twice weekly with 80% or higher completion rates",
+    "Learners participate in peer feedback at least three times weekly during live video sessions",
+    "Learners submit weekly 1:1 voice recording assignments achieving 70% or higher accuracy in pronunciation/intonation"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS platform",
+      "Video Conferencing Tool",
+      "Voice Recording Solution",
+      "AI Pronunciation Assessment Tool"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Mathematics"
+}

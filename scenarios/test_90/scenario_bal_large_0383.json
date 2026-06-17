@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-LARGE-0383",
+  "variant_type": "balance_large_scale",
+  "title": "[Large-Scale] RME Microlearning for Improving Statistics-Based Mathematical Communication Skills",
+  "context": {
+    "prior_knowledge": "Basic statistical concepts (mean, distribution, graph interpretation) and fundamental mobile device usage skills",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Activity-centered design using mobile apps in BYOD environments, linking statistical concepts to real job scenarios for job-seeking students in vocational training institutions",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 20s",
+    "learner_education": "Middle school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners will draft a logical report explaining work scenarios by analyzing statistical data.",
+    "Learners will provide constructive feedback based on the RME (Realistic Mathematics Education) approach to peers’ statistical interpretations with at least 80% accuracy.",
+    "Learners will use mobile apps to represent real-world problems (sales trends, customer satisfaction, etc.) as statistical models and generate visualizations."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile-Compatible Statistical Tools (e.g., Desmos, Google Data Studio)",
+      "Real-World Statistical Scenario Database",
+      "Mobile Quiz Platform (e.g., Kahoot!)",
+      "RME-Based Activity Worksheet (PDF)"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Service/Customer Support"
+}

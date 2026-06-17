@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-LARGE2-1160",
+  "variant_type": "balance_large_scale_v2",
+  "title": "[Large-Scale] English Learning Style Diagnosis Process Customized for Adult Learners",
+  "context": {
+    "prior_knowledge": "Intermediate or higher English communication skills and experience in mathematical problem-solving",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Designed to derive customized learning strategies tailored to the job characteristics of corporate managers/leaders, structured for short-duration focused learning in mobile environments.",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "40s and above",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can complete an LSI-based survey within three days to generate their English learning style profile.",
+    "Learners can develop three or more personalized learning strategies based on diagnostic results.",
+    "Learners can identify their preferred learning style (visual/auditory/kinesthetic) in mathematical problem-solving with 80% accuracy."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile-Compatible Learning Style Survey Platform",
+      "AI-Powered Custom Learning Strategy Generator",
+      "Mathematical Problem-Solving Scenario Database"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Business/HR/Admin Support"
+}

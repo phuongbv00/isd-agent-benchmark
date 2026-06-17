@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-TEEN-NEW-0279",
+  "variant_type": "balance_teen_filtered",
+  "title": "Integrated Instructional Design of Digital Storytelling and Block Play to Enhance Early Childhood Creativity (K-12)",
+  "context": {
+    "prior_knowledge": "Instructional design theory fundamentals and digital tool integration experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Developing program design capabilities for a creativity enhancement program linked to mathematical concepts for early childhood education professionals",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "High school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Three instructional design frameworks combining digital storytelling and block play can be proposed",
+    "Strategies to enhance young children’s creativity and learning attitudes can be designed by applying the STEAM approach",
+    "Ten 5-minute microlearning scenarios executable in mobile environments can be developed"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Smartphone-compatible digital authoring tools",
+      "Block play educational manipulative image library",
+      "Early childhood development stage guidelines"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Mathematics"
+}

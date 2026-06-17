@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-3469-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Instructional Competencies: Long-Term Physical Education Teacher Professional Development Focused on Life Skills",
+  "context": {
+    "prior_knowledge": "Completion of advanced courses and extensive practical experience in specialized fields",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Competency enhancement program for professionals in education/teaching/learning fields",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "In their 30s",
+    "learner_education": "Elementary",
+    "learner_role": "Student",
+    "domain_expertise": "Advanced"
+  },
+  "learning_goals": [
+    "Apply and refine a physical education lesson design framework for integrating life skills three or more times.",
+    "Develop two or more creative lesson models through PBL activities with peer teachers.",
+    "Share educational practice cases at least twice monthly using online collaboration tools (e.g., chat rooms).",
+    "Revise and improve lesson execution strategies four or more times based on reflective journals."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS platform",
+      "Authoring Tool",
+      "Instructional Design Template"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Education (Teaching & Learning)"
+}

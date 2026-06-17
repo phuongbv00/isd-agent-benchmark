@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-6067-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Healthcare Practical Competencies: Mastering Causal Expressions for Adult English Learners: Usage-Based",
+  "context": {
+    "prior_knowledge": "Completion of intermediate-level courses in related fields or equivalent experience",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Practical competency enhancement program for medical/nursing field practitioners",
+    "institution_type": "Vocational training institution",
+    "learner_age": "40s and above",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Professional (medical/legal/technical)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can use over 15 causal expressions utilizing MAKE, HAVE, and LET appropriately in context",
+    "Learners can express causal relationships with over 80% accuracy in CEFR B1-level writing and spoken discourse",
+    "Learners can generate 10+ sentences using English-specific causal structures without native language interference"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Clinical Simulation Equipment",
+      "Electronic Medical Record (EMR)",
+      "Medical Protocol Guide"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Medical/Nursing"
+}

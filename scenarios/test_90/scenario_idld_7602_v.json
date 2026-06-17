@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-7602-V",
+  "variant_type": "context_variant",
+  "title": "Design and Optimization of Metamaterial-Based IoT Sensor Systems",
+  "context": {
+    "prior_knowledge": "Basic understanding of mathematics (calculus, linear algebra) and programming fundamentals",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Project-centered education to enhance practitioners' capabilities in designing low-cost IoT sensor systems",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "In their 30s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "One can mathematically model the physical properties of metamaterial sensors and the principles of signal reflection",
+    "A system can be designed to achieve over 90% accuracy in reconstructing environmental distributions using deep learning-based optimization algorithms",
+    "A mathematical approach can be applied for optimizing the placement of distributed sensor networks"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Simulation Software",
+      "Metamaterial Design Tool",
+      "Wireless Communication Modeling Library"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "evaluation_requirement": "총괄평가 중심",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "AI"
+}

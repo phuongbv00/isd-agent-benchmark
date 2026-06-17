@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-5607-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Programming Practical Competencies: Metacognitive Expedition Team: Learning Social Issues Through VR Simulation",
+  "context": {
+    "prior_knowledge": "Foundational social studies knowledge and digital device proficiency",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Simulation/VR-based",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Practical Competency Enhancement Program for IT/Software Development Professionals",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "Middle school",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can reflect on their learning processes by applying metacognitive journaling techniques with over 80% accuracy",
+    "Learners can adaptively utilize over three metacognitive strategies (e.g., planning-monitoring-evaluation) while solving social issues in VR simulations",
+    "Learners can improve metacognitive activities based on peer feedback to achieve over 70% competency in final projects"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "IDE and development tools",
+      "Version control system (Git)",
+      "Cloud-based development environment"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "evaluation_requirement": "프로젝트 기반 평가",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Software Development/IT"
+}

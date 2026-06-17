@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-5995",
+  "variant_type": "idld_aligned",
+  "title": "Professional Care Behavior Competency Enhancement Program for Pharmaceutical Managers",
+  "context": {
+    "prior_knowledge": "Foundational Knowledge in Medication Management and Basic Patient Counseling Competencies",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Case-based mobile learning course for pharmaceutical/ hospital managers to improve patient-centered care behaviors, structured in 15-minute modules within a BYOD environment.",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "40s and above",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can identify professional caring behavior elements in patient case scenarios with at least 80% accuracy",
+    "Learners can apply at least three professional caring skills (empathic listening, situational judgment, therapeutic communication) in simulated patient counseling role-plays",
+    "Learners can achieve at least a 15% score improvement in the Professional Caring Behaviour Survey (PCBS) compared to baseline"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile Learning Platform",
+      "Case-Based Scenario Database",
+      "Video Role-Play Resources",
+      "Real-time feedback system"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Science"
+}

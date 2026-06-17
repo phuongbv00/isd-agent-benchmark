@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-LARGE2-0268",
+  "variant_type": "balance_large_scale_v2",
+  "title": "Large-Scale Federated Learning Design and Optimization in Wireless Edge Environments: Case Studies in Language Data Processing",
+  "context": {
+    "prior_knowledge": "Basic machine learning, fundamental wireless communication concepts, Python programming experience, and introductory NLP principles",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Blended learning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Students simultaneously engage in theoretical learning and hands-on practice with personal devices, demonstrating practical skills through project-based assessments. Simulates wireless edge computing environments centered on language domain cases, focusing on text data preprocessing and distributed learning optimization challenges.",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "High school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Students can explain the operational principles and two-tier hierarchical structure of federated learning in wireless edge environments from a language data processing perspective.",
+    "Learners can mathematically model the trade-off between communication costs and learning performance as an optimization problem and propose accuracy improvement methods for language models.",
+    "Students can implement hierarchical clustering methods to design a federated learning system that reflects the importance of language data across devices."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Jupyter Notebook Environment",
+      "Wireless Communication Simulation Tool",
+      "Distributed Computing Framework"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Language"
+}

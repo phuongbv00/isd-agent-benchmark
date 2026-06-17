@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-6302-V",
+  "variant_type": "context_variant",
+  "title": "Enhancing Instructional Design Competencies: Constructivist Pedagogical Workshops Integrating Design Thinking and Writing",
+  "context": {
+    "prior_knowledge": "Comprehension of core concepts and intermediate-level application skills",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Instructional design competency enhancement program for professionals in education/teaching/learning fields",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "In their 30s",
+    "learner_education": "High school",
+    "learner_role": "Professional (medical/legal/technical)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can apply at least three writing techniques (design journaling, reflective essays, peer review) to practical tasks.",
+    "Learners can analyze problems occurring at each stage of the design process through technical writing and propose improvement strategies.",
+    "Learners can perform collaborative writing to refine scientific design solutions through peer feedback."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS platform",
+      "Authoring Tool",
+      "Instructional Design Template"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "evaluation_requirement": "프로젝트 기반 평가",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Education (Teaching & Learning)"
+}

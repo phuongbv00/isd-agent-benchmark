@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-TEEN-0846",
+  "variant_type": "balance_teen_k12",
+  "title": "[K-12] Self-Monitoring-Based Online Education for Improving Korean Pronunciation",
+  "context": {
+    "prior_knowledge": "Understanding of Hangul (Korean alphabet) phonemic system and basic pronunciation principles",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Blended learning combining real-time lectures and online assignments, utilizing digital devices",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "Middle school",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can pronounce Korean syllables by applying lateralization and nasalization rules at syllable boundaries with over 80% accuracy.",
+    "Learners independently monitor their pronunciation using recording and voice analysis tools and perform three or more correction cycles.",
+    "Learners achieve a 25% or greater improvement in pronunciation intelligibility metrics based on pre- and post-assessment comparisons."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Speech Analysis Software",
+      "Pronunciation Rule Visualization Materials",
+      "Automated Pronunciation Evaluation System",
+      "Word/Sentence Pronunciation Practice Dataset"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Language"
+}

@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-4427-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Practical Competencies in Business Strategy: Emotional Intelligence Development - Game-Based Role-Playing for Real-World Training",
+  "context": {
+    "prior_knowledge": "Basic digital device usage skills and workplace interpersonal experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical competency enhancement program for corporate management/HR/administrative staff",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "40s and above",
+    "learner_education": "High school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Analyze peers' non-verbal cues using three or more emotion identification strategies.",
+    "Apply self-emotion regulation techniques in two or more conflict scenarios through role-playing games.",
+    "Learners develop empathetic communication strategies that consider cultural differences through team-based projects."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Business Simulation Tool",
+      "HR Management System",
+      "Business Analytics Tool"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "evaluation_requirement": "총괄평가 중심",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Business/HR/Admin Support"
+}

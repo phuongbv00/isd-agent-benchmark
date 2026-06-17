@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-3157-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening e-Learning Practical Competencies: Mobile Microlearning for Enhancing Mathematical Reasoning and Proof Skills",
+  "context": {
+    "prior_knowledge": "Elementary algebra and geometry knowledge, along with logical reasoning experience",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Instructional design competency enhancement program for professionals in education/teaching/learning fields",
+    "institution_type": "Graduate school",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can construct proofs comprehensively through a 4-stage sequential approach: subject knowledge → strategic knowledge → methodological knowledge → integrated problem-solving",
+    "Learners can identify and correct logical flaws in over 70% of proof tasks by integrating composite resources (knowledge elements + strategies + methods) via a simultaneous approach",
+    "Learners can design argument structures within 3 minutes using 5 situation-specific evidence templates provided in a mobile environment."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS platform",
+      "Authoring Tool",
+      "Instructional Design Template"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Education (Teaching & Learning)"
+}

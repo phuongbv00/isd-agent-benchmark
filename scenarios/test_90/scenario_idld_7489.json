@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-7489",
+  "variant_type": "idld_aligned",
+  "title": "Digital Simulation-Based Training for Enhancing Medical Leadership Competencies",
+  "context": {
+    "prior_knowledge": "Basic understanding of healthcare systems and leadership experience",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Simulation/VR-based",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Enhancing situational response and decision-making capabilities using digital technology for medical administrators/leaders within enterprises.",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "40s and above",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "In medical crisis scenarios, learners can perform appropriate decision-making with over 90% accuracy using VR simulations.",
+    "Through digital learning tools, team leadership competencies are assessed, with over 80% of participants receiving positive evaluations in peer feedback",
+    "Applying simulation-based learning outcomes to real work environments improves work efficiency by 20% within three months"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "VR Headset Rental System",
+      "Mobile-Compatible Simulation Software",
+      "Customized Medical Scenario Database"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Social Studies"
+}

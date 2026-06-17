@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-1707",
+  "variant_type": "idld_aligned",
+  "title": "Ultrasound-Based Anatomy Practical Inquiry Project",
+  "context": {
+    "prior_knowledge": "Basic human anatomy knowledge and fundamental ultrasound device operation",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Ultrasound image analysis and discussions via smartphones for practice-based projects, with team-based inquiry activities focused on thoracic/abdominal anatomical structures",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "Middle school",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Students can accurately describe the three-dimensional positional relationships of major thoracic and abdominal organs using ultrasound imaging",
+    "Students can collaborate to analyze and organize ultrasound practical data for submission in A3 report format",
+    "Based on anatomical knowledge acquired during practicals, students can propose diagnostic reasoning processes for virtual patient cases"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Portable Ultrasound Equipment (1 per group)",
+      "Smartphone Ultrasound Image Analysis App",
+      "Human Body Model (Thoracic/Abdominal)",
+      "A3 Project Report Template"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Social Studies"
+}

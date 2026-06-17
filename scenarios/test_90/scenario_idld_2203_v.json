@@ -1,0 +1,38 @@
+{
+  "scenario_id": "IDLD-2203-V",
+  "variant_type": "context_variant",
+  "title": "Designing Digital-Based Flexible Learning Pathways: Strengthening Self-Regulated Learning Competencies",
+  "context": {
+    "prior_knowledge": "Fundamental Digital Tool Competency and Basic Grasp of Social Studies Curriculum Content",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Corporate-commissioned training course for in-service elementary teachers to enhance social studies lesson design competencies. Implements personalized learning activities using personal devices in BYOD environments",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "In their 30s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can design personalized learning pathways by applying self-regulated learning strategies on digital platforms.",
+    "Learners can select and combine subject-specific learning modules (history, culture, environment, etc.) in social studies classes to develop optimal teaching-learning scenarios.",
+    "Learners enhance their self-regulated learning competencies by revising and supplementing their learning plans based on formative assessment feedback."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS platform",
+      "Digital Learning Modules (50+ units)",
+      "Learning Analytics Tools",
+      "Individual learning portfolio templates"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "evaluation_requirement": "프로젝트 기반 평가",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Social Studies"
+}

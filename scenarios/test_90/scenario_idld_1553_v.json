@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-1553-V",
+  "variant_type": "context_variant",
+  "title": "Cross-Cultural Learning in Technical and Professional Communication (TPC): Service Learning Design Based on Mobile Microlearning",
+  "context": {
+    "prior_knowledge": "Understanding of Technical Documentation and Design Methodologies, Intermediate-Level Expertise in Mathematical Concepts",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "A mobile-based service learning program for corporate managers/leaders to strengthen intercultural communication competencies in the mathematics domain",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "40s and above",
+    "learner_education": "University",
+    "learner_role": "Professional (medical/legal/technical)",
+    "domain_expertise": "Advanced"
+  },
+  "learning_goals": [
+    "Learners can design mathematics-related technical documents using three or more approaches that consider intercultural differences",
+    "Through service learning, learners can execute two or more culturally adaptive communication strategies required in real corporate environments",
+    "Learners can improve communication deliverables two or more times based on feedback formed in a mobile microlearning platform"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile Learning Management System (LMS)",
+      "Cross-Cultural Communication Case Database",
+      "Mathematics Domain-Specific Terminology Dictionary"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "evaluation_requirement": "총괄평가 중심",
+    "assessment_type": "Summative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Service/Customer Support"
+}

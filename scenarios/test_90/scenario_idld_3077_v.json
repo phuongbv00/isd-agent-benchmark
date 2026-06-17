@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-3077-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Healthcare Practical Competencies: Reliability Analysis and Active Learning Design: Advanced Numerical Analysis Techniques",
+  "context": {
+    "prior_knowledge": "Foundational numerical analysis, probability theory, basic engineering mathematics concepts, and programming (Python/Matlab) experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical competency enhancement program for medical/nursing field practitioners",
+    "institution_type": "Graduate school",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Development of a reliability analysis framework considering uncertainties in the Kriegering model",
+    "Optimization of experimental design (DoE) using active learning techniques based on GLM-CM",
+    "Acquisition of the ability to evaluate the accuracy-efficiency balance of surrogate models for engineering problems"
+  ],
+  "constraints": {
+    "budget": "low",
+    "resources": [
+      "Clinical Simulation Equipment",
+      "Electronic Medical Record (EMR)",
+      "Medical Protocol Guide"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Medical/Nursing"
+}
