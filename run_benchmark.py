@@ -143,21 +143,6 @@ Total tasks: {self.total_tasks} (scenarios x agents)
             minutes = int((elapsed % 3600) / 60)
             return f"{hours}h {minutes}m"
 
-    def _render_steps(self, current_index: int, status: str) -> str:
-        """Render the per-scenario step checklist as a single line.
-
-        ✅ done step, ▶ current step, ⬜ pending step, ⏭ skipped step.
-        """
-        parts = []
-        for i, label in enumerate(self.PIPELINE_STEPS):
-            if i < current_index:
-                icon = "✅"
-            elif i == current_index:
-                icon = "⏭" if status == "skip" else ("✅" if status == "done" else "▶")
-            else:
-                icon = "⬜"
-            parts.append(f"{icon} {label}")
-        return "  ".join(parts)
 
     def log_step(self, scenario_id: str, step_index: int, status: str):
         """Log a per-scenario pipeline step.
@@ -168,9 +153,7 @@ Total tasks: {self.total_tasks} (scenarios x agents)
         label = self.PIPELINE_STEPS[step_index]
         icon = {"start": "▶", "done": "✅", "skip": "⏭"}.get(status, "▶")
         with self.lock:
-            checklist = self._render_steps(step_index, status)
             print(f"[{scenario_id}] [{step_index + 1}/{total_steps}] {icon} {label}")
-            print(f"    └ {checklist}")
             self._append_log(
                 f"[{datetime.now().strftime('%H:%M:%S')}] [{scenario_id}] "
                 f"step {step_index + 1}/{total_steps} {label}: {status}\n"

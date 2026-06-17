@@ -4,6 +4,7 @@ from typing import Any
 
 from alignmentgraph_isd.config import AblationConfig, ChatModelFactory, HarnessRunConfig
 from alignmentgraph_isd.orchestrator import MetaAgent
+from alignmentgraph_isd.schema import DesignBrief
 
 
 def _llm_factory_from_benchmark_config(llm_config: Any) -> ChatModelFactory | None:
@@ -21,6 +22,20 @@ def _llm_factory_from_benchmark_config(llm_config: Any) -> ChatModelFactory | No
     return factory
 
 
+def _scenario_to_design_brief(scenario: dict | DesignBrief) -> DesignBrief:
+    """Bridge the benchmark's "scenario" vocabulary to the package's design brief contract.
+
+    The benchmark's ``scenario_id`` becomes the design brief ``id``. All other
+    fields share the same names, so this is the one place the two vocabularies meet.
+    """
+    if isinstance(scenario, DesignBrief):
+        return scenario
+    data = dict(scenario)
+    if "id" not in data and "scenario_id" in data:
+        data["id"] = data["scenario_id"]
+    return DesignBrief(**data)
+
+
 class AlignmentGraphISDAgent:
     def __init__(
         self,
@@ -34,5 +49,5 @@ class AlignmentGraphISDAgent:
             llm_factory=llm_factory or _llm_factory_from_benchmark_config(llm_config),
         )
 
-    def run(self, scenario: dict) -> dict:
-        return MetaAgent(self.config).run(scenario)
+    def run(self, scenario: dict | DesignBrief) -> dict:
+        return MetaAgent(self.config).run(_scenario_to_design_brief(scenario))
