@@ -233,18 +233,26 @@ Total tasks: {self.total_tasks} (scenarios x agents)
             self.completed_scenarios += 1
             self.scenario_times.append(elapsed_seconds)
 
+            # Running count of completed scenarios (accurate even under parallelism)
+            done = self.completed_scenarios
+            total = self.total_scenarios
+            overall_bar = self._get_progress_bar(done, total, width=20)
+            remaining = self._estimate_remaining_time()
+
             log_msg = f"""
     ────────────────────────────────────────────────────────────
     ✅ Done: {scenario_id}
-    ⏱️  Elapsed: {elapsed_seconds:.1f}s
+    ⏱️ Elapsed: {elapsed_seconds:.1f}s
     📈 Successful agents: {success_count}/{self.total_agents}
+    📊 Scenarios completed: [{overall_bar}] {done}/{total}  (est. remaining: {remaining})
     ────────────────────────────────────────────────────────────
 """
             print(log_msg)
 
             self._append_log(
                 f"[{datetime.now().strftime('%H:%M:%S')}] Done: {scenario_id} "
-                f"({elapsed_seconds:.1f}s, success: {success_count})\n"
+                f"({elapsed_seconds:.1f}s, success: {success_count}) "
+                f"[{done}/{total} scenarios completed]\n"
             )
 
     def log_final_summary(self, results: dict):
