@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-2076-V",
+  "variant_type": "context_variant",
+  "title": "Enhancing Clinical Practical Skills: Understanding Math Concepts for Students with Special Educational Needs: LT-IE",
+  "context": {
+    "prior_knowledge": "Completion of advanced studies and experience in executing high-level projects",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical competency enhancement program for medical/nursing field practitioners",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Advanced"
+  },
+  "learning_goals": [
+    "Learners can accurately explain 70% or more of numerical operation concepts according to their individualized LT-IEP (Learning Technology-Individualized Education Plan).",
+    "Learners can apply mathematical reasoning skills required for solving real-life problems at a complexity level of three or more through project-based tasks.",
+    "Learners implement ≥3 visual representations (graphs, tables, animations) of mathematical concepts in medical/nursing fields (dose calculation, drug concentration conversion) using smartphone-based tools (Desmos, GeoGebra) and achieve ≥80% accuracy through peer assessment and instructor feedback."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Clinical Simulation Equipment",
+      "Electronic Medical Record (EMR)",
+      "Medical Protocol Guide"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "evaluation_requirement": "총괄평가 중심",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Medical/Nursing"
+}

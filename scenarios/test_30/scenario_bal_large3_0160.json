@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-LARGE3-0160",
+  "variant_type": "balance_large_scale_v3",
+  "title": "Technology-Pedagogical Competency Enhancement Program for Pre-Service Science Teachers",
+  "context": {
+    "prior_knowledge": "Basic scientific knowledge and general educational theory comprehension",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Conducted in a smartphone-centric, limited-technology environment, involving pre-service teachers who are current professionals with intermediate-level science subject-matter expertise.",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 30s",
+    "learner_education": "High school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners enhance their competency in designing science lessons using technological tools by over 80%.",
+    "Learners develop and implement science teaching-learning activities integrating digital resources at least three times.",
+    "Learners improve their self-efficacy in technological-pedagogical integration by over 30% compared to pre-assessment."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Smartphone",
+      "Basic Educational App",
+      "Online Collaboration Tools",
+      "Science Education Content Library"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Science"
+}

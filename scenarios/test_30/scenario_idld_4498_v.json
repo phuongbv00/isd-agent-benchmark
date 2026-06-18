@@ -1,0 +1,38 @@
+{
+  "scenario_id": "IDLD-4498-V",
+  "variant_type": "context_variant",
+  "title": "Small-Scale Buffalo Farm Management System Design and Operational Training Education",
+  "context": {
+    "prior_knowledge": "Understanding of basic agricultural terminology and fundamental smartphone operation skills",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Language-Integrated Project-Based Learning: Analyzing Thai Smallholder Farming Cases to Explore Solutions for Local Agricultural Challenges",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "Elementary",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can write a prototype design document for a buffalo management app for smallholder farmers by applying the ADDIE model",
+    "Learners can convert and explain buffalo breeding cycle management items (feed, vaccination, reproduction) into a digital record system",
+    "Propose at least three user-centered interface design principles that reflect the needs of local farmers"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "30 Smartphones",
+      "Whiteboard",
+      "Case Study Resource Compilation",
+      "Pen/paper prototyping kits"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "evaluation_requirement": "프로젝트 기반 평가",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Language"
+}

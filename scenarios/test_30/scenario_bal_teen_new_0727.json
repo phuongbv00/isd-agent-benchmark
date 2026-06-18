@@ -1,0 +1,38 @@
+{
+  "scenario_id": "BAL-TEEN-NEW-0727",
+  "variant_type": "balance_teen_filtered",
+  "title": "[K-12] Digital Resource Quality Management Practices for Adult Learners",
+  "context": {
+    "prior_knowledge": "Practical experience in science and ability to use basic digital tools",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Digital resource quality verification and improvement project in a BYOD environment.",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "High school",
+    "learner_role": "Pre-service/In-service teacher",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Explain five criteria for evaluating functionality and reliability of digital materials based on adult learning theory",
+    "Propose instructional content design strategies for science education incorporating Kolb’s Learning Cycle and Gagné’s Model",
+    "Create a digital material quality checklist reflecting sub-characteristics (usability, maintainability, portability) of the ISO/IEC 9126 standard",
+    "Select one science education digital material per team, perform quality diagnostics, and submit improvement proposals in a project report"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Digital science education sample materials",
+      "Quality evaluation template",
+      "Collaborative tools (laptop/tablet)",
+      "ISO/IEC 9126 summary guide"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Science"
+}

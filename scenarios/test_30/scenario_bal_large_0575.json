@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-LARGE-0575",
+  "variant_type": "balance_large_scale",
+  "title": "[Large-scale] Shadow Curriculum Design and Application in Medical Education: Mobile Microlearning-Based Intensive Short-Term Course",
+  "context": {
+    "prior_knowledge": "Foundational Medical Education Experience or Relevant Professional Background",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Informal learning support program for working professionals, offering strategies to enhance academic achievement outside formal educational courses",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "In their 30s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Advanced"
+  },
+  "learning_goals": [
+    "Develop a shadow curriculum module by applying the ADDIE model-based instructional design process",
+    "Plan and produce 10-minute microlearning content in a mobile environment",
+    "Learners can analyze formative assessment data to propose curriculum improvement plans"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS platform",
+      "Mobile content creation tools",
+      "Survey System"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Medical/Nursing"
+}

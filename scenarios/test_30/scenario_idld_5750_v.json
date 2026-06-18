@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-5750-V",
+  "variant_type": "context_variant",
+  "title": "Customer Service Practical Skills Enhancement: Triple E Framework for Technology-Integrated Educational Assessment",
+  "context": {
+    "prior_knowledge": "Basic Proficiency in Technical Tools and Comprehension of Secondary Education Environments",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Customer service competency enhancement program for service/customer-facing role practitioners",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 30s",
+    "learner_education": "Middle school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "They can apply the three core elements of the Triple E Framework (engagement, learning enhancement, and authentic technology use) to instructional design",
+    "They can analyze the effectiveness of technology-integrated classes using mixed research methods (quantitative/qualitative evaluation)",
+    "They can design and apply formative assessment rubrics using digital tools to derive educational improvement strategies"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Customer Relationship Management (CRM) System",
+      "Customer Interaction Simulator",
+      "Service Manual"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "evaluation_requirement": "형성평가 중심",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Service/Customer Support"
+}

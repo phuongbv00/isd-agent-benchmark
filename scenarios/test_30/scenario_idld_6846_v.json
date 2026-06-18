@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-6846-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Software Development Practical Skills: Online Flipped Learning-Based Inquiry Community Building for Pre-Service Teachers",
+  "context": {
+    "prior_knowledge": "Basic flipped learning concepts, inquiry-based learning experience, and foundational math pedagogy",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical Competency Enhancement Program for IT/Software Development Professionals",
+    "institution_type": "Graduate school",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Professional (medical/legal/technical)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can design math projects utilizing the three elements of communities of inquiry (teaching/ social/cognitive presence) in online flipped learning environments",
+    "Learners can improve project-based assessment outputs to meet criteria through peer feedback",
+    "Learners can analyze flipped learning content and evaluate its connectivity with community of inquiry variables"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "IDE and development tools",
+      "Version control system (Git)",
+      "Cloud-based development environment"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "evaluation_requirement": "프로젝트 기반 평가",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Software Development/IT"
+}

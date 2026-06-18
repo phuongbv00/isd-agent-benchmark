@@ -1530,7 +1530,7 @@ def main():
         "conservative": {"max_workers": 2, "scenario_max_workers": 2, "delay": 2.0},
         "moderate": {"max_workers": 3, "scenario_max_workers": 4, "delay": 0.5},
         "aggressive": {"max_workers": 6, "scenario_max_workers": 8, "delay": 0.1},
-        "turbo": {"max_workers": 6, "scenario_max_workers": 16, "delay": 0.0},
+        "turbo": {"max_workers": 7, "scenario_max_workers": 15, "delay": 0.0},
     }
     rate_config = rate_limit_configs[args.rate_limit]
 

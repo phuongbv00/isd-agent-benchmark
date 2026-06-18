@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-7478-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Business Strategy Competencies: Mobile-Based Gain Instructional Design Model for Health Education Curriculum",
+  "context": {
+    "prior_knowledge": "Possession of foundational medical knowledge and practical experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Blended learning",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Practical Competency Enhancement Program for Corporate Management/HR Professionals",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "In their 30s",
+    "learner_education": "Middle school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can perform five core health procedures (e.g., first aid, infection control) with 90% accuracy via mobile modules.",
+    "Learners can remember and utilize mobile content designed according to the nine stages of the Gagné model (e.g., gaining attention, presenting objectives) at over 80% retention after two months.",
+    "Learners can achieve a course satisfaction rating of 4.5/5 or higher in blended learning environments."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Business Simulation Tool",
+      "HR Management System",
+      "Business Analytics Tool"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "evaluation_requirement": "형성평가 중심",
+    "assessment_type": "Summative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Business/HR/Admin Support"
+}

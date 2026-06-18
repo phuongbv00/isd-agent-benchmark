@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-7144-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Practical AI Competencies: Activity-Based Short-Term Learning Mechanisms for Enhancing Mathematical Concept Mastery",
+  "context": {
+    "prior_knowledge": "Basic Arithmetic Operations and Understanding of Algebraic Expressions",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Blended learning",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Advanced AI/machine learning technical course for AI/ML practitioners",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 20s",
+    "learner_education": "High school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can reconstruct the essence of function concepts through mathematical activities and apply them to real-world problems.",
+    "Learners can explain the process of forming abstract concepts using spatial reasoning during geometric problem exploration.",
+    "Learners can derive the logical structure of data analysis procedures through mathematical modeling activities using digital tools."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Python/Jupyter Environment",
+      "GPU Cloud Server",
+      "AI framework (TensorFlow/PyTorch)"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "evaluation_requirement": "프로젝트 기반 평가",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "AI"
+}

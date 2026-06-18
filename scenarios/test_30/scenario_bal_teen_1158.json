@@ -1,0 +1,38 @@
+{
+  "scenario_id": "BAL-TEEN-1158",
+  "variant_type": "balance_teen_k12",
+  "title": "[K-12] Language Creativity Enhancement Program Through Generative AI-Supported Fictional Generative Reading Strategies",
+  "context": {
+    "prior_knowledge": "Basic grammar and reading comprehension skills, with experience in simple creative writing",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Emphasizing group collaboration activities and project-based assessment through smartphone-based AI tools",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "Middle school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Students can expand fiction stories over 1,500 characters using generative AI tools",
+    "Learners can present at least three creative variations of characters and plot developments through collaborative reading strategies",
+    "Participants can improve language fluency (vocabulary, sentence structure diversity) by over 30% compared to pre-assessment by incorporating AI-generated content"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Smartphone (1 device per student)",
+      "Tablet PC (5 devices per classroom)",
+      "Wi-Fi Router",
+      "Printable Supplemental Worksheets",
+      "Open-Source AI Creation Tools (e.g., PIXAI, NovelAI Lite Version)"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "AI"
+}
