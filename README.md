@@ -254,7 +254,7 @@ Each slot reads these variables, where `<SLOT>` is uppercased and `-` becomes
 | `OPENROUTER_API_KEY`, `UPSTAGE_API_KEY`, `UPSTAGE_API_KEY2`, `UPSTAGE_API_KEY3`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | Common secret variables referenced by `*_API_KEY_ENV` or `*_API_KEY_ENVS`. |
 | `BENCHMARK_DELAY` | Delay between submissions. Normally set by `--rate-limit`. |
 | `ISD_EVAL_PROGRESS` | Internal evaluator progress marker flag set by the benchmark runner. |
-| `HARNESS_ABLATION` | `alignmentgraph-isd` ablation preset: `full`, `no_rag`, `no_verifier`, `no_repair`, `single_agent`, or `linear_addie_only`. |
+| `HARNESS_ABLATION` | `alignmentgraph-isd` ablation preset: `full` / `no_rag` (benchmark default; RAG off), `no_verifier`, `no_repair`, `single_agent`, `linear_addie_only`. RAG (external corpus) is a case-study-only add-on (`case_study` preset), never used on the benchmark. |
 
 Note: `SCENARIO_MAX_WORKERS` and `AGENT_MAX_WORKERS` appear in `.env.example`
 as optional notes, but `run_benchmark.py` currently reads worker counts from
