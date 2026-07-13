@@ -408,6 +408,13 @@ def install_agents() -> bool:
     return True
 
 
+AG_ABLATION_VARIANTS = {
+    "alignmentgraph-isd": "full",
+    "alignmentgraph-isd-wo-ma": "wo_ma",
+    "alignmentgraph-isd-wo-qc": "wo_qc",
+}
+
+
 def check_agents_installed() -> dict[str, bool]:
     """Check whether agent modules can be imported."""
     agents = {
@@ -417,7 +424,7 @@ def check_agents_installed() -> dict[str, bool]:
         "addie-agent": False,
         "dick-carey-agent": False,
         "rpisd-agent": False,
-        "alignmentgraph-isd": False,
+        **{agent_id: False for agent_id in AG_ABLATION_VARIANTS},
     }
 
     # Module import test
@@ -441,7 +448,8 @@ def check_agents_installed() -> dict[str, bool]:
 
     try:
         from alignmentgraph_isd_agent import AlignmentGraphISDAgent
-        agents["alignmentgraph-isd"] = True
+        for agent_id in AG_ABLATION_VARIANTS:
+            agents[agent_id] = True
     except ImportError:
         pass
 
@@ -548,11 +556,12 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
             return agent.run(scenario)
         return run_react
 
-    elif agent_id == "alignmentgraph-isd":
+    elif agent_id in AG_ABLATION_VARIANTS:
         from alignmentgraph_isd_agent import AlignmentGraphISDAgent
         _ag_llm_config = llm_config.copy_with(max_tokens=16384) if llm_config else llm_config
+        _ag_ablation_key = AG_ABLATION_VARIANTS[agent_id]
         def run_alignmentgraph_isd(scenario: dict) -> dict:
-            agent = AlignmentGraphISDAgent(llm_config=_ag_llm_config)
+            agent = AlignmentGraphISDAgent(llm_config=_ag_llm_config, ablation_key=_ag_ablation_key)
             return agent.run(scenario)
         return run_alignmentgraph_isd
 

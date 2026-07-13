@@ -2,9 +2,8 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from alignmentgraph_isd import DesignBrief, MetaAgent
 from alignmentgraph_isd.config import AblationConfig, ChatModelFactory, HarnessRunConfig
-from alignmentgraph_isd.orchestrator import MetaAgent
-from alignmentgraph_isd.schema import DesignBrief
 
 
 def _llm_factory_from_benchmark_config(llm_config: Any) -> ChatModelFactory | None:
@@ -44,10 +43,15 @@ class AlignmentGraphISDAgent:
         llm_factory: ChatModelFactory | None = None,
     ) -> None:
         key = ablation_key or os.environ.get("HARNESS_ABLATION", "full")
+        self.ablation_key = key
         self.config = HarnessRunConfig(
             ablation=AblationConfig.from_key(key),
             llm_factory=llm_factory or _llm_factory_from_benchmark_config(llm_config),
         )
 
     def run(self, scenario: dict | DesignBrief) -> dict:
-        return MetaAgent(self.config).run(_scenario_to_design_brief(scenario))
+        result = MetaAgent(self.config).run(_scenario_to_design_brief(scenario))
+        metadata = result.setdefault("metadata", {})
+        if isinstance(metadata, dict):
+            metadata.setdefault("ablation", self.ablation_key)
+        return result
