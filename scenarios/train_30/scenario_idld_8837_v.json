@@ -1,0 +1,38 @@
+{
+  "scenario_id": "IDLD-8837-V",
+  "variant_type": "context_variant",
+  "title": "Counseling Education for Digital Financial Decision-Making: IT-Supported Process-Based Approach",
+  "context": {
+    "prior_knowledge": "Fundamental understanding of financial products and digital device usage skills",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Learners must acquire systematic decision-making processes using IT tools to overcome cognitive limitations in financial product selection",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "40s and above",
+    "learner_education": "Middle school",
+    "learner_role": "Professional (medical/legal/technical)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can analyze at least three core risk factors using IT tools when comparing financial products.",
+    "After the training, over 80% of learners can construct optimal portfolios using decision-making simulation tools.",
+    "Learners can explain the trained decision-making process in real-world financial counseling scenarios in three or more steps."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Financial Product Database-Integrated Simulation Tool",
+      "Video Lecture Production Equipment",
+      "Online Collaboration Platform (e.g., Zoom, Google Workspace)",
+      "Virtual Financial Scenario Template"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "evaluation_requirement": "프로젝트 기반 평가",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Service/Customer Support"
+}

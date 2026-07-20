@@ -1,0 +1,38 @@
+{
+  "scenario_id": "BAL-LARGE2-1525",
+  "variant_type": "balance_large_scale_v2",
+  "title": "[Large-scale] PHM Diagnostic Technology Design: System Design Utilizing Domain Adaptation and Data Augmentation",
+  "context": {
+    "prior_knowledge": "Understanding of basic statistics and machine learning concepts",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical, case study-based training for professionals (medical/legal/technical), with content optimized for smartphone-based learning environments.",
+    "institution_type": "Graduate school",
+    "learner_age": "In their 30s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can explain quantitative approaches to PHM diagnostic technology and apply them to system design.",
+    "Diagnostic models can be improved by utilizing domain adaptation and designable data augmentation techniques.",
+    "Deep learning algorithms can be applied to estimate system design solutions with small-scale datasets.",
+    "The process of deriving enhanced system reliability probabilities compared to initial designs can be analyzed through case studies."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Zoom Account",
+      "Mobile-Compatible Learning Materials",
+      "Python-Based Open-Source Tool",
+      "Modelica-Based Simulation Example"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Summative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "AI"
+}

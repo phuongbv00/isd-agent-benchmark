@@ -254,7 +254,7 @@ Each slot reads these variables, where `<SLOT>` is uppercased and `-` becomes
 | `OPENROUTER_API_KEY`, `UPSTAGE_API_KEY`, `UPSTAGE_API_KEY2`, `UPSTAGE_API_KEY3`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | Common secret variables referenced by `*_API_KEY_ENV` or `*_API_KEY_ENVS`. |
 | `BENCHMARK_DELAY` | Delay between submissions. Normally set by `--rate-limit`. |
 | `ISD_EVAL_PROGRESS` | Internal evaluator progress marker flag set by the benchmark runner. |
-| `HARNESS_ABLATION` | `alignmentgraph-isd` ablation preset: `full` / `no_rag` (benchmark default; RAG off), `no_verifier`, `no_repair`, `single_agent`, `linear_addie_only`. RAG (external corpus) is a case-study-only add-on (`case_study` preset), never used on the benchmark. |
+| `HARNESS_ABLATION` | `alignmentgraph-isd` ablation preset. The 3-rung RQ2 ladder: `full` (multi-agent + graph coordination), `wo_graph` (multi-agent, no graph coordination), `single_agent`/`wo_ma` (no decomposition). `wo_qc` is a debug-only preset (QC entirely off), not part of the RQ2 ladder. RAG (external corpus) is a case-study-only add-on (`case_study` preset), never used on the benchmark. |
 
 Note: `SCENARIO_MAX_WORKERS` and `AGENT_MAX_WORKERS` appear in `.env.example`
 as optional notes, but `run_benchmark.py` currently reads worker counts from

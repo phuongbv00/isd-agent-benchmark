@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-5267",
+  "variant_type": "idld_aligned",
+  "title": "Language Instruction Design Workshop Utilizing Digital Games",
+  "context": {
+    "prior_knowledge": "Basic proficiency in digital tools and comprehension of foundational language education concepts",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Practice-oriented classroom environment utilizing digital devices and game development tools",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 20s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Design and develop at least one type of digital game-based language learning content tailored to learners' proficiency levels",
+    "Apply the service-learning model to analyze educational requirements needed by actual language learners",
+    "Through iterative instructional design (ID), evaluate and improve the linkage between game mechanics and language learning objectives"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "15 tablet PCs",
+      "Game development software license",
+      "Language Learning Template Materials",
+      "Assessment Rubric"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Language"
+}

@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-MEDIUM-0560",
+  "variant_type": "balance_medium_scale",
+  "title": "Robot Control System Design and Disturbance Control Methodology",
+  "context": {
+    "prior_knowledge": "Foundations of robotics, basic control theory concepts, and programming skills (Python/MATLAB)",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Blended learning",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "A course where preservice teachers explore practical applications of robotic control systems and cultivate the ability to design disturbance control algorithms.",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "In their 20s",
+    "learner_education": "Middle school",
+    "learner_role": "Pre-service/In-service teacher",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Analyze dynamic and static performance requirements of robotic manipulators and establish disturbance control strategies",
+    "Implement a hybrid control system combining Sliding Mode Control (SMC) and Active Disturbance Rejection Control (ADRC) techniques in simulation environments",
+    "Improve control performance by applying disturbance estimation using an Extended State Observer (ESO) and neural network-based parameter optimization methodologies"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Robot Simulation Software",
+      "MATLAB/Simulink license",
+      "6-DOF Virtual Robot Model",
+      "Control Theory Textbook"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "AI"
+}

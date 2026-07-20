@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-4535",
+  "variant_type": "idld_aligned",
+  "title": "Mobile Microlearning Course for Enhancing Online Teaching Education Effectiveness",
+  "context": {
+    "prior_knowledge": "Basic Instructional Theories and Experience in Using Online Learning Platforms",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Learners are university students or job seekers aiming to enhance practical competencies in online education design and implementation. Project-based assessments evaluate their ability to apply skills in real educational settings.",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Develop five-week microlearning modules by applying core principles of online instructional design (interaction design, content structuring, assessment methods)",
+    "Create activity materials that enhance learner engagement by over 20% using digital tools (quiz makers, video editors, LMS)",
+    "Present case studies of improved existing lecture materials by applying iterative instructional design processes reflecting learner feedback"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile-Compatible LMS (Learning Management System)",
+      "Design Thinking Template",
+      "Online Education Case Database",
+      "Digital Content Authoring Tools"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Social Studies"
+}

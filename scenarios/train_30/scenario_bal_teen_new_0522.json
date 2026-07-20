@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-TEEN-NEW-0522",
+  "variant_type": "balance_teen_filtered",
+  "title": "[K-12] Knowledge Structure-Based Mathematics Teaching Method Design Workshop",
+  "context": {
+    "prior_knowledge": "Understanding Basic Mathematical Concepts and Fundamental Principles of Instructional Design",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Project-based instructional design to enhance adult learners’ practical application competencies",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "Elementary",
+    "learner_role": "Pre-service/In-service teacher",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can analyze the tacitness and learnability of various mathematical concepts",
+    "Learners can select teaching methods (e.g., problem-solving, service-learning projects) appropriate to knowledge structures",
+    "Learners can complete instructional design applicable to real educational settings through project-based assessment"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mathematics education case database",
+      "Knowledge structure mapping worksheet",
+      "Instructional strategy selection guidelines"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Service/Customer Support"
+}

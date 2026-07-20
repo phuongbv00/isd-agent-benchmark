@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-TEEN-0756",
+  "variant_type": "balance_teen_k12",
+  "title": "[K-12] Integrated Mathematics-Science Education Instructional Design Workshop",
+  "context": {
+    "prior_knowledge": "Understanding of basic mathematics and science concepts, foundational pedagogy",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Small (1-10 learners)",
+    "additional_context": "Course for pre-service/in-service teachers emphasizing real-life integrated lesson design",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "Middle school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can accurately explain 80% or more of the core principles of integrated mathematics-science education models.",
+    "Learners can design and present an integrated lesson plan for real-world problem-solving within 90 minutes.",
+    "Using a formative assessment rubric, learners can evaluate peer teachers’ lesson designs with three or more specific feedback points."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Integrated Instructional Design Template",
+      "Real-World Problem Casebook",
+      "Digital Collaboration Tools (e.g., Miro)",
+      "Formative assessment rubric sample"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Social Studies"
+}

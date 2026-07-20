@@ -1,0 +1,38 @@
+{
+  "scenario_id": "IDLD-6367",
+  "variant_type": "idld_aligned",
+  "title": "Multimedia Educational Material Development Process Based on Practitioner Interviews",
+  "context": {
+    "prior_knowledge": "Basic science knowledge and foundational understanding of digital content creation tools",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Emphasis on practical competency in developing multimedia materials within smartphone-centric limited environments",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "They can explain key activities in each stage of the multimedia production process (planning, design, development, evaluation) with 80% accuracy.",
+    "They can present three or more core responsibilities for key roles (planner, designer, developer) required in developing science education multimedia.",
+    "They can apply multimedia production techniques usable in mobile environments (e.g., storyboard creation, video editing) to develop one science-themed educational resource.",
+    "They can apply success factors derived from practitioner interviews (e.g., content consistency, user feedback incorporation) to project development."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Zoom Account",
+      "Free Mobile Editing Tools for Smartphones (e.g., CapCut, Canva)",
+      "Multimedia Sample Materials for Science Education",
+      "Practitioner Interview Video Resources"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Science"
+}

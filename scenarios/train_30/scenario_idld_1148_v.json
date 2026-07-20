@@ -1,0 +1,36 @@
+{
+  "scenario_id": "IDLD-1148-V",
+  "variant_type": "context_variant",
+  "title": "Strengthening Leadership Practical Competencies: CALL-Based Mathematical Project Learning Design in Digital Environments",
+  "context": {
+    "prior_knowledge": "Requirement of intermediate theoretical background and practical experience",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Practical Competency Enhancement Program for Corporate Management/HR Professionals",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "High school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Students can systematically analyze complex mathematical problems and produce project deliverables using Computer-Assisted Language Learning (CALL) tools",
+    "Learners can improve mathematical modeling skills by over 30% through project-based activities",
+    "Teams demonstrate critical thinking by deriving optimized solutions through five or more iterative design processes"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Business Simulation Tool",
+      "HR Management System",
+      "Business Analytics Tool"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Business/HR/Admin Support"
+}

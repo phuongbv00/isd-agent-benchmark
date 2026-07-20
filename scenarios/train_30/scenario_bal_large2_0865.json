@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-LARGE2-0865",
+  "variant_type": "balance_large_scale_v2",
+  "title": "[Large-Scale] Overcoming Digital Learning Barriers and Asynchronous Online Learning Strategies",
+  "context": {
+    "prior_knowledge": "Basic mathematical knowledge and experience with online learning",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Blended learning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "A blended course combining asynchronous online learning and face-to-face instruction in a digital device-provided environment, focusing on bridging learners' digital competency gaps",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 30s",
+    "learner_education": "High school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners will identify three or more accessibility barriers in digital learning environments and propose solutions.",
+    "Learners will complete asynchronous online math problem-solving activities with an 80% or higher completion rate.",
+    "Learners will establish strategies for balancing work and learning through case analysis of digital tool applications."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "LMS (Learning Management System)",
+      "Digital whiteboard software",
+      "Responsive Web-Based Math Problem Bank",
+      "Learning Analytics Tools"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Mathematics"
+}

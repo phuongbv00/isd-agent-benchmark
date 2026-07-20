@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-LARGE2-0903",
+  "variant_type": "balance_large_scale_v2",
+  "title": "[Large-scale] Analysis of Online Learning Dissatisfaction Factors and Improvement Plan Design",
+  "context": {
+    "prior_knowledge": "Basic online learning experience and proficiency in educational technology tools",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Targeting science majors, this program emphasizes real-world problem-solving skills through project-based assessment. It analyzes online learning challenges and explores alternatives using mixed methodologies and user-centered design",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "High school",
+    "learner_role": "Student",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can classify and explain at least five major dissatisfaction factors in online learning",
+    "Learners can systematically propose online learning improvement strategies using mixed methodologies",
+    "Learners can develop online learning content prototypes for science disciplines following user-centered design principles"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Case Analysis Materials",
+      "Social Media Data Sample",
+      "Online Learning Platform Comparison Table",
+      "User Experience Mapping Template"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Bring Your Own Device (BYOD)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Science"
+}

@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-LARGE2-0734",
+  "variant_type": "balance_large_scale_v2",
+  "title": "Large-Scale Community-Based Learning (CBL) Program for Strengthening Preservice Mathematics Teachers' Problem-Solving Competencies",
+  "context": {
+    "prior_knowledge": "Basic mathematical knowledge and understanding of educational theories",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Online synchronous (Zoom, etc.)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Targeting learners requiring enhanced mathematical education competencies as working professionals; environment with digital device accessibility",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "In their 30s",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can design a process for solving real-world community problems using mathematical approaches.",
+    "Learners can collaborate with peer teachers and local stakeholders to concretize problem-solving solutions.",
+    "Learners can develop instructional strategies that integrate theoretical knowledge and field application skills through reflective practice."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "ADDIE Model-Based Instructional Design Guide",
+      "CBL (Challenge-Based Learning) Activity Template",
+      "Online Collaboration Tool (e.g., Miro)",
+      "Local Issue Resolution Case Database"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Mathematics"
+}

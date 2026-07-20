@@ -1,0 +1,36 @@
+{
+  "scenario_id": "BAL-LARGE2-0110",
+  "variant_type": "balance_large_scale_v2",
+  "title": "[Large-Scale] Pre-Service Teacher Competency Enhancement Program Based on Personalized Learning Models",
+  "context": {
+    "prior_knowledge": "Basic Educational Theory and No Experience with Learning Management Systems (LMS)",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Personalized learning design competency development in smartphone-centric limited-technology environments, focusing on systematic acquisition and practical application of learner-tailored instructional design methods for pre-service teachers",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 20s",
+    "learner_education": "High school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Personalized educational plans for learners can be established using a learning management system (LMS)",
+    "Personalized instructional materials for social studies subjects can be developed through project-based learning (PBL)",
+    "Educational effectiveness can be evaluated, and improvement strategies can be derived based on learner data analysis"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Mobile-compatible LMS platform",
+      "Open-source educational content tool",
+      "Learning analytics template"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Moderate - Standard complexity with some constraints",
+  "domain": "Software Development/IT"
+}

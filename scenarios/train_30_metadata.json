@@ -1,0 +1,112 @@
+{
+  "created_at": "2026-07-20T12:26:27",
+  "source_dir": "scenarios/train",
+  "source_note": "Stratified subset (1 per domain×difficulty cell) for tuning.",
+  "target_dir": "scenarios/train_30",
+  "source_count": 24593,
+  "selected_count": 30,
+  "seed": 42,
+  "sampling_unit": "domain × difficulty",
+  "samples_per_cell": 1,
+  "domains": [
+    "AI",
+    "Business/HR/Admin Support",
+    "Education (Teaching & Learning)",
+    "Language",
+    "Mathematics",
+    "Medical/Nursing",
+    "Science",
+    "Service/Customer Support",
+    "Social Studies",
+    "Software Development/IT"
+  ],
+  "difficulty_order": [
+    "Easy - Simple structure with minimal constraints",
+    "Moderate - Standard complexity with some constraints",
+    "Hard - Complex requirements with multiple constraints"
+  ],
+  "matrix": {
+    "AI": {
+      "Easy - Simple structure with minimal constraints": 1,
+      "Moderate - Standard complexity with some constraints": 1,
+      "Hard - Complex requirements with multiple constraints": 1
+    },
+    "Business/HR/Admin Support": {
+      "Easy - Simple structure with minimal constraints": 1,
+      "Moderate - Standard complexity with some constraints": 1,
+      "Hard - Complex requirements with multiple constraints": 1
+    },
+    "Education (Teaching & Learning)": {
+      "Easy - Simple structure with minimal constraints": 1,
+      "Moderate - Standard complexity with some constraints": 1,
+      "Hard - Complex requirements with multiple constraints": 1
+    },
+    "Language": {
+      "Easy - Simple structure with minimal constraints": 1,
+      "Moderate - Standard complexity with some constraints": 1,
+      "Hard - Complex requirements with multiple constraints": 1
+    },
+    "Mathematics": {
+      "Easy - Simple structure with minimal constraints": 1,
+      "Moderate - Standard complexity with some constraints": 1,
+      "Hard - Complex requirements with multiple constraints": 1
+    },
+    "Medical/Nursing": {
+      "Easy - Simple structure with minimal constraints": 1,
+      "Moderate - Standard complexity with some constraints": 1,
+      "Hard - Complex requirements with multiple constraints": 1
+    },
+    "Science": {
+      "Easy - Simple structure with minimal constraints": 1,
+      "Moderate - Standard complexity with some constraints": 1,
+      "Hard - Complex requirements with multiple constraints": 1
+    },
+    "Service/Customer Support": {
+      "Easy - Simple structure with minimal constraints": 1,
+      "Moderate - Standard complexity with some constraints": 1,
+      "Hard - Complex requirements with multiple constraints": 1
+    },
+    "Social Studies": {
+      "Easy - Simple structure with minimal constraints": 1,
+      "Moderate - Standard complexity with some constraints": 1,
+      "Hard - Complex requirements with multiple constraints": 1
+    },
+    "Software Development/IT": {
+      "Easy - Simple structure with minimal constraints": 1,
+      "Moderate - Standard complexity with some constraints": 1,
+      "Hard - Complex requirements with multiple constraints": 1
+    }
+  },
+  "selected_files": [
+    "scenario_bal_large2_0110.json",
+    "scenario_bal_large2_0734.json",
+    "scenario_bal_large2_0865.json",
+    "scenario_bal_large2_0903.json",
+    "scenario_bal_large2_1525.json",
+    "scenario_bal_large_0015.json",
+    "scenario_bal_medium_0560.json",
+    "scenario_bal_self_new_0198.json",
+    "scenario_bal_teen_0404.json",
+    "scenario_bal_teen_0756.json",
+    "scenario_bal_teen_new_0522.json",
+    "scenario_idld_0568_v.json",
+    "scenario_idld_0582_v.json",
+    "scenario_idld_0809_v.json",
+    "scenario_idld_1144_v.json",
+    "scenario_idld_1148_v.json",
+    "scenario_idld_1581_v.json",
+    "scenario_idld_1610.json",
+    "scenario_idld_2433_v.json",
+    "scenario_idld_3226_v.json",
+    "scenario_idld_4216_v.json",
+    "scenario_idld_4535.json",
+    "scenario_idld_4699.json",
+    "scenario_idld_5267.json",
+    "scenario_idld_6367.json",
+    "scenario_idld_6676_v.json",
+    "scenario_idld_6747_v.json",
+    "scenario_idld_7200_v.json",
+    "scenario_idld_8229_v.json",
+    "scenario_idld_8837_v.json"
+  ]
+}

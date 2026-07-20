@@ -10,7 +10,8 @@ def _llm_factory_from_benchmark_config(llm_config: Any) -> ChatModelFactory | No
     if llm_config is None:
         return None
 
-    if getattr(llm_config, "max_tokens", None) and llm_config.max_tokens < 8192:
+    max_tokens = getattr(llm_config, "max_tokens", None)
+    if max_tokens is None or max_tokens < 8192:
         llm_config = llm_config.copy_with(max_tokens=16384)
 
     def factory() -> Any:
@@ -44,6 +45,9 @@ class AlignmentGraphISDAgent:
     ) -> None:
         key = ablation_key or os.environ.get("HARNESS_ABLATION", "full")
         self.ablation_key = key
+        # The factory is the single source of truth for the model; the harness
+        # reads model provenance for its metadata by introspecting it (no parallel
+        # LLMConfig to keep in sync).
         self.config = HarnessRunConfig(
             ablation=AblationConfig.from_key(key),
             llm_factory=llm_factory or _llm_factory_from_benchmark_config(llm_config),

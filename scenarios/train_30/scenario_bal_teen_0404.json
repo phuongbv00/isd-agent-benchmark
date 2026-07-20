@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-TEEN-0404",
+  "variant_type": "balance_teen_k12",
+  "title": "Flipped Learning-Based Mathematics Project Design and Analysis of Learning Behavior Changes in K-12 Education",
+  "context": {
+    "prior_knowledge": "Elementary mathematics curriculum fundamentals and project-based learning experience",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Project-based learning (PBL)",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Designing mathematics education projects in a flipped learning environment using digital devices, and analyzing learner behavioral changes",
+    "institution_type": "K-12 school",
+    "learner_age": "Teens (13-19)",
+    "learner_education": "High school",
+    "learner_role": "Pre-service/In-service teacher",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners apply theoretical frameworks for mathematics project design with 80% or higher accuracy in a flipped learning environment",
+    "Learners secure at least three hours of self-directed learning time per week using digital tools and record learning behavior changes",
+    "Learners submit team-based mathematics education project outcomes with 90% or higher completion rates through PBL-based assessment systems"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Online Lecture Production Tools (Video Editing Software)",
+      "Learning Management System (LMS)",
+      "Digital Devices (Tablet/Laptop)",
+      "Data Analysis Tools (Learning Behavior Tracking Apps)"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Mathematics"
+}

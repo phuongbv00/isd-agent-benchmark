@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-7200-V",
+  "variant_type": "context_variant",
+  "title": "Customer Experience Practical Competency Enhancement: Collaborative Learning Design Strategies for Online Transition in Higher Education",
+  "context": {
+    "prior_knowledge": "Comprehension of core concepts and intermediate-level application skills",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Offline (classroom)",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Service/Customer Engagement Role-Specific Competency Development Program",
+    "institution_type": "Public/Non-profit educational institution",
+    "learner_age": "In their 30s",
+    "learner_education": "Middle school",
+    "learner_role": "Professional (medical/legal/technical)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Participants can propose three or more strategies for designing effective group work in online environments",
+    "Participants can develop two or more instructional designs to mitigate psychological burdens (e.g., anxiety) during collaborative learning",
+    "Participants can plan three types of activities that promote social interaction in blended (face-to-face/online) environments"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Customer Relationship Management (CRM) System",
+      "Customer Interaction Simulator",
+      "Service Manual"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "evaluation_requirement": "프로젝트 기반 평가",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Service/Customer Support"
+}

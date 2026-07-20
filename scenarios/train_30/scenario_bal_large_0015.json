@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-LARGE-0015",
+  "variant_type": "balance_large_scale",
+  "title": "[Large-Scale] Task-Centered Advanced Turkish Practical Communication Skills Enhancement Course",
+  "context": {
+    "prior_knowledge": "Foundational Turkish vocabulary and grammar at CEFR C1 level",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Mobile microlearning",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "A mobile learning environment emphasizing simulation of work environments using digital devices. Task performance based on real-world scenarios in administrative/managerial roles.",
+    "institution_type": "Vocational training institution",
+    "learner_age": "In their 20s",
+    "learner_education": "Middle school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Core data can be extracted from Turkish business reports and orally presented",
+    "Negotiation tasks can be performed using specialized terminology in virtual business meeting scenarios",
+    "Learners can error-free write three Turkish business documents (emails, reports, etc.) using mobile platforms (Google Docs, Notion, etc.) after a one-week short course and achieve ≥70% scores in each category (grammar 20%, vocabulary 20%, format 30%, business suitability 30%) on a peer evaluation rubric."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Turkish Business Terminology Dictionary",
+      "Mobile-Compatible Simulation App",
+      "Virtual Collaboration Tools",
+      "Audio-Visual Task Scenario Materials"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Language"
+}

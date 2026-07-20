@@ -1,18 +1,28 @@
 #!/usr/bin/env python3
-"""Aggregate ISD benchmark artifacts into paper-style comparison tables.
+"""Aggregate ISD benchmark artifacts into paper-style tables + analyses.
 
-The benchmark runner writes per-scenario comparison reports plus an optional
-benchmark_summary.json. This script reads those artifacts and computes a compact
-overview table similar to the main result table in the paper:
+One entry point for every post-run analysis (this merges the former
+stats_rq1.py, stats_ablation.py and 6_aggregate_token_usage.py). Selected via
+``--sections`` (comma-separated, or ``all``); default is ``table``:
 
-  Agent | evaluator model scores | Avg | difficulty scores | phase scores
+  table    : the paper's main comparison table (Agent | judge scores | Avg |
+             difficulty | phase), written to run_dir as csv/md/json.
+  rq1      : proposed vs each baseline, paired Wilcoxon + Holm + bootstrap 95% CI.
+  ablation : the 3-rung RQ2 ladder (wo_ma -> wo-graph -> full) with the
+             paired mechanism contributions AND the structural alignment
+             coverage read from each arm's trajectory metadata (the graph
+             mechanism's fingerprint, which the judge score alone hides).
+  tokens   : per-agent token usage (prompt/completion/total/calls, per scenario).
+  errors   : per-agent hard-failure rate (from *_log.txt) + harness-internal
+             error reasons (from trajectory metadata.errors), bucketed.
+
+Works on both a flat single-run dir and a nested dataset dir.
 
 Examples:
   python scripts/5_aggregate_benchmark_results.py results/test_30_benchmark_...
-  python scripts/5_aggregate_benchmark_results.py results/test_30_benchmark_... \
-      --formats csv,md,json
-  python scripts/5_aggregate_benchmark_results.py results/test_30_benchmark_... \
-      --formats md --include-counts
+  python scripts/5_aggregate_benchmark_results.py results/test_30_... --sections all
+  python scripts/5_aggregate_benchmark_results.py results/single_... --sections ablation,tokens,errors
+  python scripts/5_aggregate_benchmark_results.py results/test_90_... --sections rq1 --baselines baseline,react-isd
 """
 
 from __future__ import annotations
@@ -20,9 +30,11 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
+import random
 import re
 import statistics
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
@@ -680,11 +692,361 @@ def parse_formats(value: str) -> list[str]:
     return formats
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# Analysis sections (merged from the former stats_rq1.py / stats_ablation.py /
+# 6_aggregate_token_usage.py). Each prints a stdout report; only the default
+# "table" section writes files. Selected via --sections.
+# ═══════════════════════════════════════════════════════════════════════════
+
+DEFAULT_PROPOSED = "alignmentgraph-isd"
+DEFAULT_BASELINES = ["baseline", "react-isd", "dick-carey-agent", "addie-agent", "rpisd-agent", "eduplanner"]
+
+# 3-rung RQ2 ablation ladder: wo_ma -> wo-graph -> full. QC is always on;
+# only the presence of graph coordination differs across the top two rungs.
+ABLATION_LADDER = [
+    ("alignmentgraph-isd-wo-ma", "single agent (rung 1)"),
+    ("alignmentgraph-isd-wo-graph", "wo graph coord. (rung 2)"),
+    ("alignmentgraph-isd", "full (rung 3)"),
+]
+ABLATION_CONTRASTS = [
+    ("alignmentgraph-isd-wo-graph", "alignmentgraph-isd-wo-ma", "multi-agent decomposition"),
+    ("alignmentgraph-isd", "alignmentgraph-isd-wo-graph", "alignment graph coordination"),
+]
+# Old rung-1 variant names map to the canonical ``-wo-ma`` so pre-rename result
+# dirs still aggregate.
+ABLATION_ALIASES = {
+    "alignmentgraph-isd-single-agent": "alignmentgraph-isd-wo-ma",
+    "alignmentgraph-isd-single": "alignmentgraph-isd-wo-ma",
+}
+RELATIONS = [f"R{i}" for i in range(1, 14)]
+
+
+# ── shared statistics (paired Wilcoxon + Holm + bootstrap CI) ────────────────
+
+def wilcoxon_signed_rank(diffs: list[float]) -> tuple[float, float, int]:
+    """Two-sided Wilcoxon signed-rank (zeros discarded, tie-corrected normal
+    approximation). Returns (W_plus, p_value, n_effective)."""
+    d = [x for x in diffs if x != 0]
+    n = len(d)
+    if n == 0:
+        return 0.0, 1.0, 0
+    absd = sorted((abs(x), i) for i, x in enumerate(d))
+    ranks = [0.0] * n
+    i = 0
+    while i < n:
+        j = i
+        while j + 1 < n and absd[j + 1][0] == absd[i][0]:
+            j += 1
+        avg = (i + j) / 2 + 1
+        for k in range(i, j + 1):
+            ranks[absd[k][1]] = avg
+        i = j + 1
+    w_plus = sum(r for r, x in zip(ranks, d) if x > 0)
+    mu = n * (n + 1) / 4
+    var = n * (n + 1) * (2 * n + 1) / 24
+    cnt = Counter(abs(x) for x in d)
+    var -= sum(t**3 - t for t in cnt.values()) / 48
+    if var <= 0:
+        return w_plus, 1.0, n
+    z = (w_plus - mu) / math.sqrt(var)
+    p = 2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2))))
+    return w_plus, p, n
+
+
+def bootstrap_ci(diffs: list[float], n_boot: int = 10000, seed: int = 42) -> tuple[float, float]:
+    if not diffs:
+        return float("nan"), float("nan")
+    rng = random.Random(seed)
+    n = len(diffs)
+    means = sorted(sum(rng.choices(diffs, k=n)) / n for _ in range(n_boot))
+    return means[int(0.025 * n_boot)], means[int(0.975 * n_boot) - 1]
+
+
+def holm_correct(pvalues: list[float]) -> list[float]:
+    order = sorted(range(len(pvalues)), key=lambda i: pvalues[i])
+    m = len(pvalues)
+    adjusted: list[float] = [1.0] * m
+    running = 0.0
+    for rank, idx in enumerate(order):
+        running = max(running, min(1.0, (m - rank) * pvalues[idx]))
+        adjusted[idx] = running
+    return adjusted
+
+
+def _mean(values: list[float]) -> float:
+    return sum(values) / len(values) if values else float("nan")
+
+
+# ── loaders that handle BOTH a flat single-run dir and a nested dataset dir ──
+
+def iter_comparison_reports(run_dir: Path) -> Iterable[tuple[str, Path]]:
+    """Yield (scenario_id, comparison_report.json path) for a flat single-run
+    dir (one report at the top) OR a dataset dir (one per scenario subfolder)."""
+    flat = run_dir / "comparison_report.json"
+    if flat.exists():
+        yield run_dir.name, flat
+    for child in sorted(run_dir.iterdir()):
+        if child.is_dir():
+            rep = child / "comparison_report.json"
+            if rep.exists():
+                yield child.name, rep
+
+
+def load_rankings(run_dir: Path) -> dict[str, dict[str, dict]]:
+    """scenario_id -> agent_id -> ranking dict (total_score, addie_mean, ...)."""
+    out: dict[str, dict[str, dict]] = {}
+    for scenario_id, rep in iter_comparison_reports(run_dir):
+        try:
+            data = json.loads(rep.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        out[scenario_id] = {r["agent_id"]: r for r in data.get("comparison", {}).get("rankings", [])}
+    return out
+
+
+# ── RQ1: proposed vs each baseline, paired on total_score ────────────────────
+
+def section_rq1(run_dir: Path, proposed: str, baselines: list[str]) -> None:
+    rankings = load_rankings(run_dir)
+    print(f"\n## RQ1 — {proposed} vs baselines ({len(rankings)} scenarios), paired total_score")
+    results = []
+    for b in baselines:
+        diffs = [
+            per[proposed]["total_score"] - per[b]["total_score"]
+            for per in rankings.values() if proposed in per and b in per
+        ]
+        if not diffs:
+            continue
+        _, p, _ = wilcoxon_signed_rank(diffs)
+        lo, hi = bootstrap_ci(diffs)
+        results.append((b, len(diffs), _mean(diffs), lo, hi, p))
+    if not results:
+        print("  (no paired scenarios found)")
+        return
+    holm = holm_correct([r[5] for r in results])
+    for (b, n, md, lo, hi, p), ph in zip(results, holm):
+        print(f"  {b:18s} n={n:2d}  mean diff={md:+6.2f}  95% CI [{lo:+6.2f}, {hi:+6.2f}]  p={p:.2e}  p_holm={ph:.2e}")
+
+
+# ── RQ2: the 3-rung ablation ladder + structural coverage ────────────────────
+
+def _resolve(agent_id: str) -> str:
+    return ABLATION_ALIASES.get(agent_id, agent_id)
+
+
+def section_ablation(run_dir: Path, latex: bool = True) -> None:
+    rankings = load_rankings(run_dir)
+    resolved = {
+        sid: {_resolve(a): r for a, r in per.items()} for sid, per in rankings.items()
+    }
+    present = [(a, label) for a, label in ABLATION_LADDER if any(a in per for per in resolved.values())]
+    print(f"\n## RQ2 — ablation ladder ({len(resolved)} scenarios)")
+    if present:
+        header = f"{'arm':26s} {'n':>3s} {'Total':>7s} {'ADDIE':>7s} {'Traj.':>7s} " + " ".join(f"{p[:4].capitalize():>6s}" for p in PHASES)
+        print(header)
+        for agent_id, label in present:
+            rows = [per[agent_id] for per in resolved.values() if agent_id in per]
+            total = _mean([r["total_score"] for r in rows])
+            addie = _mean([r["addie_mean"] for r in rows if r.get("addie_mean") is not None])
+            traj = _mean([r["trajectory_score"] for r in rows if r.get("trajectory_score") is not None])
+            phase = {p: _mean([r["phase_scores"][p] for r in rows if p in (r.get("phase_scores") or {})]) for p in PHASES}
+            phase_cols = " ".join(f"{phase.get(p, float('nan')):6.1f}" for p in PHASES)
+            print(f"{label:26s} {len(rows):3d} {total:7.2f} {addie:7.2f} {traj:7.2f} {phase_cols}")
+
+        contrasts = []
+        for upper, lower, mechanism in ABLATION_CONTRASTS:
+            diffs = [per[upper]["total_score"] - per[lower]["total_score"] for per in resolved.values() if upper in per and lower in per]
+            addie_diffs = [per[upper]["addie_mean"] - per[lower]["addie_mean"] for per in resolved.values()
+                           if upper in per and lower in per and per[upper].get("addie_mean") is not None and per[lower].get("addie_mean") is not None]
+            if diffs:
+                _, p, _ = wilcoxon_signed_rank(diffs)
+                lo, hi = bootstrap_ci(diffs)
+                contrasts.append((mechanism, len(diffs), _mean(diffs), _mean(addie_diffs) if addie_diffs else float("nan"), lo, hi, p))
+        if contrasts:
+            print("\n  Mechanism contribution = upper rung - lower rung, paired on total score:")
+            holm = holm_correct([c[6] for c in contrasts])
+            for (mechanism, n, md, mda, lo, hi, p), ph in zip(contrasts, holm):
+                print(f"    {mechanism:30s} n={n:2d}  dTotal={md:+6.2f} [{lo:+6.2f}, {hi:+6.2f}]  dADDIE={mda:+6.2f}  p_holm={ph:.2e}")
+            if latex:
+                print("\n  % LaTeX (mechanism & dTotal & dADDIE & p_holm)")
+                for (mechanism, _n, md, mda, _lo, _hi, _p), ph in zip(contrasts, holm):
+                    print(f"  {mechanism} & ${md:+.2f}$ & ${mda:+.2f}$ & {ph:.1e} \\\\")
+
+    _section_ablation_structural(run_dir)
+
+
+def _relation_coverage(traj_doc: dict) -> dict | None:
+    audit = (traj_doc.get("metadata") or {}).get("audit") or {}
+    coverage = audit.get("relation_coverage")
+    return coverage if isinstance(coverage, dict) and coverage else None
+
+
+def _has_graph(traj_doc: dict) -> bool:
+    """Only the full (graph-coordinated) arm builds an alignment graph; the
+    ablated arms are pure section blobs. Read the flag so graph-free arms are
+    reported as 'no graph' instead of a misleading vacuous 100% coverage (no
+    element targets -> relation_coverage returns 1.0)."""
+    return bool((traj_doc.get("metadata") or {}).get("ablation", {}).get("use_graph_coordination"))
+
+
+def _section_ablation_structural(run_dir: Path) -> None:
+    """Per-relation coverage read from each arm's trajectory metadata — an AUDIT
+    of the graph mechanism (did full establish all 13 relations and close its
+    gaps?), NOT a cross-arm comparison. Graph-free arms have no graph to audit,
+    so they are shown as 'no graph'. Arms are compared by judge score, not here."""
+    per_arm: dict[str, list[dict | None]] = defaultdict(list)
+    for traj in sorted(run_dir.rglob("*_trajectory.json")):
+        try:
+            doc = json.loads(traj.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        agent_id = _resolve(doc.get("agent_id", "") or traj.stem.replace("_trajectory", ""))
+        # None marks a graph-free run; a dict is a real coverage snapshot.
+        per_arm[agent_id].append(_relation_coverage(doc) if _has_graph(doc) else None)
+    if not any(per_arm.values()):
+        print("\n  (no graph arm found — nothing to audit)")
+        return
+    print("\n  Alignment graph audit (coverage % per relation + residual gaps; graph arms only):")
+    print(f"  {'arm':26s} {'n':>3s} " + " ".join(f"{r:>4s}" for r in RELATIONS) + f" {'gaps':>6s}")
+    for agent_id, label in ABLATION_LADDER:
+        runs = per_arm.get(agent_id)
+        if not runs:
+            continue
+        graph_runs = [c for c in runs if c is not None]
+        if not graph_runs:
+            print(f"  {label:26s} {len(runs):3d} " + " ".join("  no" for _ in RELATIONS) + f" {'graph':>6s}")
+            continue
+        cov_cols = []
+        for r in RELATIONS:
+            vals = [c[r]["coverage"] for c in graph_runs if r in c]
+            cov_cols.append(f"{_mean(vals) * 100:4.0f}" if vals else "   -")
+        residual = _mean([sum(len(info.get("uncovered", [])) for info in c.values()) for c in graph_runs])
+        print(f"  {label:26s} {len(graph_runs):3d} " + " ".join(cov_cols) + f" {residual:6.1f}")
+
+
+# ── Token usage (merged from 6_aggregate_token_usage.py) ─────────────────────
+
+def _extract_token_usage(traj_doc: dict) -> tuple[int, int, int] | None:
+    metadata = traj_doc.get("metadata") or {}
+    trajectory = traj_doc.get("trajectory") or {}
+    usage = metadata.get("token_usage")
+    if isinstance(usage, dict) and (usage.get("total_tokens") or usage.get("prompt_tokens") or usage.get("completion_tokens")):
+        return int(usage.get("prompt_tokens", 0) or 0), int(usage.get("completion_tokens", 0) or 0), int(usage.get("llm_calls", 0) or 0)
+    inner = trajectory.get("token_usage")
+    if isinstance(inner, dict) and (inner.get("prompt_tokens") or inner.get("completion_tokens")):
+        return int(inner.get("prompt_tokens", 0) or 0), int(inner.get("completion_tokens", 0) or 0), int(trajectory.get("llm_calls", 0) or 0)
+    total = metadata.get("total_tokens")
+    if isinstance(total, (int, float)) and total:
+        return 0, 0, 0
+    return None
+
+
+def section_tokens(run_dir: Path) -> None:
+    per_agent: dict[str, dict] = defaultdict(lambda: {"prompt": 0, "completion": 0, "total_only": 0, "calls": 0, "n": 0, "missing": 0})
+    for traj in sorted(run_dir.rglob("*_trajectory.json")):
+        try:
+            doc = json.loads(traj.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        agent_id = doc.get("agent_id") or traj.stem.replace("_trajectory", "")
+        row = per_agent[agent_id]
+        row["n"] += 1
+        extracted = _extract_token_usage(doc)
+        if extracted is None:
+            total = (doc.get("metadata") or {}).get("total_tokens")
+            if isinstance(total, (int, float)) and total:
+                row["total_only"] += int(total)
+            else:
+                row["missing"] += 1
+            continue
+        prompt, completion, calls = extracted
+        row["prompt"] += prompt
+        row["completion"] += completion
+        row["calls"] += calls
+        if not (prompt or completion):
+            total = (doc.get("metadata") or {}).get("total_tokens")
+            if isinstance(total, (int, float)):
+                row["total_only"] += int(total)
+    print(f"\n## Token usage ({sum(r['n'] for r in per_agent.values())} runs)")
+    if not per_agent:
+        print("  (no *_trajectory.json found)")
+        return
+    rows = []
+    for agent_id, r in per_agent.items():
+        total = r["prompt"] + r["completion"] + r["total_only"]
+        n = max(r["n"], 1)
+        rows.append((agent_id, r["n"], r["prompt"], r["completion"], total, r["calls"], total / n, r["calls"] / n, r["missing"]))
+    rows.sort(key=lambda x: x[4], reverse=True)
+    print(f"  {'agent':28s} {'n':>3s} {'prompt':>10s} {'compl.':>10s} {'total':>11s} {'calls':>6s} {'tot/scen':>10s} {'calls/scen':>10s} {'missing':>8s}")
+    for agent_id, n, p, c, tot, calls, tps, cps, miss in rows:
+        print(f"  {agent_id:28s} {n:3d} {p:10d} {c:10d} {tot:11d} {calls:6d} {tps:10.1f} {cps:10.2f} {miss:8d}")
+
+
+# ── Error rate + reasons (NEW) ───────────────────────────────────────────────
+
+def _normalize_error(msg: str) -> str:
+    """Collapse an error message to a comparable reason bucket (strip ids,
+    numbers, and paths so the same failure mode groups together)."""
+    msg = re.sub(r"0x[0-9a-fA-F]+", "0x…", str(msg))
+    msg = re.sub(r"\b\d+\b", "N", msg)
+    msg = re.sub(r"(/[^\s'\"]+)+", "<path>", msg)
+    return msg.strip()[:120]
+
+
+def section_errors(run_dir: Path) -> None:
+    """Per-agent hard-failure rate (from *_log.txt Status) + harness-internal
+    error reasons (from trajectory metadata.errors, present even on a SUCCESS
+    run — e.g. a truncated LLM response that degraded one section)."""
+    per_agent: dict[str, dict] = defaultdict(lambda: {"runs": 0, "failed": 0, "internal_errs": 0, "reasons": Counter()})
+
+    for log in sorted(run_dir.rglob("*_log.txt")):
+        agent_id = log.stem.replace("_log", "")
+        text = log.read_text(encoding="utf-8", errors="replace")
+        row = per_agent[agent_id]
+        row["runs"] += 1
+        if "Status: FAILED" in text:
+            row["failed"] += 1
+            m = re.search(r"^Error:\s*(.+)$", text, re.MULTILINE)
+            if m:
+                row["reasons"][_normalize_error(m.group(1))] += 1
+
+    for traj in sorted(run_dir.rglob("*_trajectory.json")):
+        try:
+            doc = json.loads(traj.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        agent_id = doc.get("agent_id") or traj.stem.replace("_trajectory", "")
+        errors = (doc.get("metadata") or {}).get("errors") or []
+        if isinstance(errors, list) and errors:
+            row = per_agent[agent_id]
+            row["internal_errs"] += len(errors)
+            for e in errors:
+                row["reasons"][_normalize_error(e)] += 1
+
+    print(f"\n## Error rate & reasons ({sum(r['runs'] for r in per_agent.values())} runs)")
+    if not per_agent:
+        print("  (no *_log.txt found)")
+        return
+    print(f"  {'agent':28s} {'runs':>5s} {'failed':>7s} {'fail%':>6s} {'internalErr':>12s}  top reasons")
+    for agent_id in sorted(per_agent, key=lambda a: (per_agent[a]['failed'], per_agent[a]['internal_errs']), reverse=True):
+        r = per_agent[agent_id]
+        rate = 100.0 * r["failed"] / r["runs"] if r["runs"] else 0.0
+        reasons = "; ".join(f"{reason} (×{cnt})" for reason, cnt in r["reasons"].most_common(2)) or "-"
+        print(f"  {agent_id:28s} {r['runs']:5d} {r['failed']:7d} {rate:5.1f}% {r['internal_errs']:12d}  {reasons}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Aggregate benchmark result artifacts into paper-style tables."
+        description="Aggregate benchmark result artifacts into paper-style tables + analysis sections."
     )
-    parser.add_argument("run_dir", type=Path, help="Benchmark run directory.")
+    parser.add_argument("run_dir", type=Path, help="Benchmark run directory (flat single-run or nested dataset).")
+    parser.add_argument(
+        "--sections",
+        default="table",
+        help="Comma-separated analyses to run: table,rq1,ablation,tokens,errors (or 'all'). Default: table.",
+    )
+    parser.add_argument("--proposed", default=DEFAULT_PROPOSED, help="Proposed agent id for the RQ1 section.")
+    parser.add_argument("--baselines", default=",".join(DEFAULT_BASELINES), help="Comma-separated baseline ids for RQ1.")
     parser.add_argument(
         "--scenario-root",
         type=Path,
@@ -727,40 +1089,55 @@ def render(
     raise ValueError(f"Unsupported format: {fmt}")
 
 
-def main() -> int:
-    args = parse_args()
-    run_dir = args.run_dir.resolve()
+_ALL_SECTIONS = ["table", "rq1", "ablation", "tokens", "errors"]
+
+
+def _run_table_section(run_dir: Path, args: argparse.Namespace) -> None:
     repo_root = infer_repo_root(run_dir)
     scenario_root = (args.scenario_root or repo_root / "scenarios").resolve()
-
     records = load_records(run_dir)
     if not records:
-        raise SystemExit(f"No comparison artifacts found under {run_dir}")
-
+        print(f"## Comparison table\n  (no comparison artifacts found under {run_dir})")
+        return
     judge_models = collect_judge_models(records)
     labels = make_unique_labels(judge_models)
     aggregates = aggregate(records, scenario_root)
     rows = build_rows(aggregates, judge_models)
-
     bold_best = not args.no_bold_best
 
     written: list[Path] = []
     for fmt in args.formats:
         output_path = run_dir / f"aggregate_table.{fmt}"
-        content = render(
-            fmt,
-            rows,
-            judge_models,
-            labels,
-            args.include_counts,
-            bold_best,
-        )
+        content = render(fmt, rows, judge_models, labels, args.include_counts, bold_best)
         write_output(output_path, content)
         written.append(output_path)
-
     print("Wrote aggregate tables:")
     for path in written:
         print(f"  {path}")
+
+
+def main() -> int:
+    args = parse_args()
+    run_dir = args.run_dir.resolve()
+
+    requested = args.sections.strip().lower()
+    sections = _ALL_SECTIONS if requested in ("all", "*") else [s.strip() for s in requested.split(",") if s.strip()]
+    unknown = [s for s in sections if s not in _ALL_SECTIONS]
+    if unknown:
+        raise SystemExit(f"Unknown section(s): {unknown}. Valid: {_ALL_SECTIONS} (or 'all').")
+
+    baselines = [b.strip() for b in args.baselines.split(",") if b.strip()]
+    print(f"=== {run_dir.name} ===")
+    if "table" in sections:
+        _run_table_section(run_dir, args)
+    if "rq1" in sections:
+        section_rq1(run_dir, args.proposed, baselines)
+    if "ablation" in sections:
+        section_ablation(run_dir)
+    if "tokens" in sections:
+        section_tokens(run_dir)
+    if "errors" in sections:
+        section_errors(run_dir)
     return 0
 
 

@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-4216-V",
+  "variant_type": "context_variant",
+  "title": "Online Science Leadership Simulation: Engagement Maintenance Strategies Through Problem-Based Learning",
+  "context": {
+    "prior_knowledge": "Knowledge of fundamental science theories and practical field experience",
+    "duration": "Short-term intensive (within 1 week)",
+    "learning_environment": "Simulation/VR-based",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "VR simulation-based problem-solving educational environment for science sector managers/leaders",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "40s and above",
+    "learner_education": "Adult learner (non-degree)",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can independently solve 80% or more of real-world science-related problems in a VR-based simulation environment",
+    "Learners achieve 4.0/5.0 or higher in participation evaluations when collaborating in teams using the PBL approach",
+    "Learners can specify and implement three or more self-directed participation strategies in online learning environments"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "VR equipment set",
+      "Cloud-based collaboration tool",
+      "PBL scenario database"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "evaluation_requirement": "형성평가 중심",
+    "assessment_type": "Project-based assessment"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Science"
+}

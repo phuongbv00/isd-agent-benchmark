@@ -1,0 +1,37 @@
+{
+  "scenario_id": "IDLD-6747-V",
+  "variant_type": "context_variant",
+  "title": "Organizational Learning Capacity Building for Sustainability",
+  "context": {
+    "prior_knowledge": "Fundamental organizational management knowledge and leadership experience",
+    "duration": "Long-term course (1-6 months)",
+    "learning_environment": "Simulation/VR-based",
+    "class_size": "Large (30+ learners)",
+    "additional_context": "Customized learning environments using VR simulations in smartphone-centric limited technology environments",
+    "institution_type": "Corporate/Enterprise",
+    "learner_age": "40s and above",
+    "learner_education": "Middle school",
+    "learner_role": "Office worker (administrative/management)",
+    "domain_expertise": "Intermediate"
+  },
+  "learning_goals": [
+    "Learners can explain the association between Sustainable Development Goals (SDGs) and organizational learning capabilities.",
+    "Learners can derive sustainability improvement strategies by analyzing organizational diagnostic data using structural equation modeling.",
+    "Learners can establish an action plan to strengthen organizational learning capabilities (OLC) by designing Mindful Organization (MO) operational strategies."
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Smartphone-Compatible VR Simulation Tool",
+      "Survey Questionnaire Template",
+      "Structural equation modeling software (cloud version)"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Limited tech environment (no PC, smartphone only)",
+    "evaluation_requirement": "형성평가 중심",
+    "assessment_type": "Formative assessment-focused"
+  },
+  "difficulty": "Hard - Complex requirements with multiple constraints",
+  "domain": "Medical/Nursing"
+}

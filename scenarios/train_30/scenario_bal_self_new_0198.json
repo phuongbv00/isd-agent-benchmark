@@ -1,0 +1,37 @@
+{
+  "scenario_id": "BAL-SELF-NEW-0198",
+  "variant_type": "balance_self_filtered",
+  "title": "[Self-Directed] Evaluation and Application of Explicit Instruction for Students with Mathematics Learning Disabilities",
+  "context": {
+    "prior_knowledge": "Understanding of basic mathematical concepts and general pedagogical knowledge",
+    "duration": "Mid-term course (2-4 weeks)",
+    "learning_environment": "Online asynchronous (LMS)",
+    "class_size": "Medium (10-30 learners)",
+    "additional_context": "Focus on Evaluating and Developing Improvement Strategies for Mathematics Teaching Methods for Students with Learning Disabilities",
+    "institution_type": "University (undergraduate)",
+    "learner_age": "In their 20s",
+    "learner_education": "University",
+    "learner_role": "Student",
+    "domain_expertise": "Beginner"
+  },
+  "learning_goals": [
+    "Learners can explain core elements of explicit instruction (direct instruction, systematic practice, feedback provision, etc.) with over 80% accuracy",
+    "Learners can analyze practical cases using a checklist that evaluates the application level of explicit instruction in mathematics programs",
+    "Based on assessment results, learners can propose at least three improvement plans to enhance mathematical achievement for students with learning disabilities"
+  ],
+  "constraints": {
+    "budget": "medium",
+    "resources": [
+      "Explicit Instruction Teaching Method Evaluation Guide",
+      "Mathematics Program Case Study Materials",
+      "Online Learning Module",
+      "Offline Worksheet"
+    ],
+    "accessibility": null,
+    "language": "en",
+    "tech_requirements": "Digital devices provided",
+    "assessment_type": "Summative assessment-focused"
+  },
+  "difficulty": "Easy - Simple structure with minimal constraints",
+  "domain": "Education (Teaching & Learning)"
+}

@@ -410,8 +410,8 @@ def install_agents() -> bool:
 
 AG_ABLATION_VARIANTS = {
     "alignmentgraph-isd": "full",
+    "alignmentgraph-isd-wo-graph": "wo_graph",
     "alignmentgraph-isd-wo-ma": "wo_ma",
-    "alignmentgraph-isd-wo-qc": "wo_qc",
 }
 
 
@@ -614,11 +614,22 @@ def _run_agent_task(
             with open(scenario_path, "r", encoding="utf-8") as f:
                 scenario = json.load(f)
 
-            # Run the agent (module-based)
+            # Run the agent (module-based). Bracket the run with the thread-local
+            # token accounter so every agent gets a uniform token_usage in its
+            # metadata (baselines included), regardless of whether the agent
+            # tracks tokens itself. See shared/llm/token_accounting.py.
+            from shared.llm import token_accounting
+            token_accounting.reset()
             start_time = time.time()
             runner = _get_agent_runner(agent_id, llm_config=llm_config)
             result = runner(scenario)
             elapsed = time.time() - start_time
+            token_usage = token_accounting.snapshot()
+            if isinstance(result, dict):
+                result.setdefault("metadata", {})
+                if isinstance(result["metadata"], dict):
+                    result["metadata"]["token_usage"] = token_usage
+                    result["metadata"]["execution_time_seconds"] = elapsed
 
             # Save the ADDIE output
             addie_output = result.get("addie_output", result)
