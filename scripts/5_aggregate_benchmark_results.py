@@ -886,7 +886,7 @@ def _has_graph(traj_doc: dict) -> bool:
     ablated arms are pure section blobs. Read the flag so graph-free arms are
     reported as 'no graph' instead of a misleading vacuous 100% coverage (no
     element targets -> relation_coverage returns 1.0)."""
-    return bool((traj_doc.get("metadata") or {}).get("ablation", {}).get("use_graph_coordination"))
+    return bool((traj_doc.get("metadata") or {}).get("ablation", {}).get("enable_alignment_graph"))
 
 
 def _section_ablation_structural(run_dir: Path) -> None:
