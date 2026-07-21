@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """Aggregate ISD benchmark artifacts into paper-style tables + analyses.
 
-One entry point for every post-run analysis (this merges the former
-stats_rq1.py, stats_ablation.py and 6_aggregate_token_usage.py). Selected via
-``--sections`` (comma-separated, or ``all``); default is ``table``:
+One entry point for post-run analysis of a SINGLE results dir (this merges the
+former stats_rq1.py and 6_aggregate_token_usage.py). For the multi-run model
+ladder (RQ1/RQ2 across sizes and repeated runs), use
+``7_pool_ladder_runs.py`` instead — this script does not pool across runs.
+Selected via ``--sections`` (comma-separated, or ``all``); default is ``table``:
 
   table    : the paper's main comparison table (Agent | judge scores | Avg |
              difficulty | phase), written to run_dir as csv/md/json.
   rq1      : proposed vs each baseline, paired Wilcoxon + Holm + bootstrap 95% CI.
-  ablation : the 3-rung RQ2 ladder (wo_ma -> wo-graph -> full) with the
-             paired mechanism contributions AND the structural alignment
-             coverage read from each arm's trajectory metadata (the graph
-             mechanism's fingerprint, which the judge score alone hides).
   tokens   : per-agent token usage (prompt/completion/total/calls, per scenario).
   errors   : per-agent hard-failure rate (from *_log.txt) + harness-internal
              error reasons (from trajectory metadata.errors), bucketed.
@@ -21,7 +19,7 @@ Works on both a flat single-run dir and a nested dataset dir.
 Examples:
   python scripts/5_aggregate_benchmark_results.py results/test_30_benchmark_...
   python scripts/5_aggregate_benchmark_results.py results/test_30_... --sections all
-  python scripts/5_aggregate_benchmark_results.py results/single_... --sections ablation,tokens,errors
+  python scripts/5_aggregate_benchmark_results.py results/single_... --sections tokens,errors
   python scripts/5_aggregate_benchmark_results.py results/test_90_... --sections rq1 --baselines baseline,react-isd
 """
 
@@ -90,6 +88,7 @@ class AgentAggregate:
     total_scores: list[float] = field(default_factory=list)
     addie_scores: list[float] = field(default_factory=list)
     trajectory_scores: list[float] = field(default_factory=list)
+    alignment_scores: list[float] = field(default_factory=list)
     judge_scores: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
     difficulty_scores: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
     phase_scores: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
@@ -102,6 +101,9 @@ class AgentAggregate:
 
     def mean_trajectory(self) -> float | None:
         return mean_or_none(self.trajectory_scores)
+
+    def mean_alignment(self) -> float | None:
+        return mean_or_none(self.alignment_scores)
 
     def mean_judge(self, model: str) -> float | None:
         return mean_or_none(self.judge_scores.get(model, []))
@@ -353,6 +355,31 @@ def aggregate(records: list[ScenarioRecord], scenario_root: Path) -> dict[str, A
     return aggregates
 
 
+def apply_alignment_scores(run_dir: Path, aggregates: dict[str, AgentAggregate]) -> int:
+    """Fold per-scenario ``alignment_scores.json`` files (written by
+    scripts/6_score_alignment.py) into the aggregates. The alignment composite
+    is a separate, deterministic [0,1] metric — it is reported alongside and
+    NEVER mixed into the 0.7/0.3 Total. Returns the number of files found."""
+    found = 0
+    for scores_path in sorted(run_dir.rglob("alignment_scores.json")):
+        try:
+            payload = load_json(scores_path)
+        except (json.JSONDecodeError, OSError):
+            continue
+        agents = payload.get("agents")
+        if not isinstance(agents, dict):
+            continue
+        found += 1
+        for agent_id, score in agents.items():
+            composite = (score or {}).get("composite")
+            if composite is None:
+                continue
+            if agent_id not in aggregates:
+                aggregates[agent_id] = AgentAggregate(agent_id=agent_id)
+            aggregates[agent_id].alignment_scores.append(float(composite))
+    return found
+
+
 def ordered_agents(aggregates: dict[str, AgentAggregate]) -> list[str]:
     known = [agent for agent in DEFAULT_AGENT_ORDER if agent in aggregates]
     unknown = sorted(agent for agent in aggregates if agent not in DEFAULT_AGENT_ORDER)
@@ -382,6 +409,7 @@ def build_rows(
                 "avg": evaluator_avg,
                 "addie": agg.mean_addie(),
                 "trajectory": agg.mean_trajectory(),
+                "alignment": agg.mean_alignment(),
                 "difficulty": {
                     difficulty: agg.mean_difficulty(difficulty)
                     for difficulty in DIFFICULTIES
@@ -398,6 +426,7 @@ def numeric_columns(judge_models: list[str]) -> list[tuple[str, tuple[str, str |
     columns.append(("avg", ("avg", None)))
     columns.append(("addie", ("addie", None)))
     columns.append(("trajectory", ("trajectory", None)))
+    columns.append(("alignment", ("alignment", None)))
     columns.extend((f"difficulty:{difficulty}", ("difficulty", difficulty)) for difficulty in DIFFICULTIES)
     columns.extend((f"phase:{phase}", ("phases", phase)) for phase in PHASES)
     return columns
@@ -405,7 +434,7 @@ def numeric_columns(judge_models: list[str]) -> list[tuple[str, tuple[str, str |
 
 def row_value(row: dict[str, Any], source: tuple[str, str | None]) -> float | None:
     section, key = source
-    if section in {"avg", "addie", "trajectory"}:
+    if section in {"avg", "addie", "trajectory", "alignment"}:
         return row.get(section)
     return row.get(section, {}).get(key)
 
@@ -481,7 +510,7 @@ def render_markdown(
     lines.extend(table(headers, body_rows))
     lines.append("")
 
-    headers = ["Agent", "Total", "ADDIE", "Trajectory"]
+    headers = ["Agent", "Total", "ADDIE", "Trajectory", "Alignment"]
     body_rows = []
     for row in rows:
         body_rows.append(
@@ -493,6 +522,11 @@ def render_markdown(
                     row["trajectory"],
                     2,
                     is_best(row["trajectory"], best.get("trajectory")),
+                ),
+                format_number(
+                    row["alignment"],
+                    3,
+                    is_best(row["alignment"], best.get("alignment")),
                 ),
             ]
         )
@@ -547,7 +581,7 @@ def render_csv(rows: list[dict[str, Any]], judge_models: list[str], labels: dict
     writer = csv.writer(buffer)
     header = ["agent_id", "agent", "evaluated", "success", "failed"]
     header.extend(labels[model] for model in judge_models)
-    header.extend(["Avg", "ADDIE", "Trajectory", "Easy", "Medium", "Hard"])
+    header.extend(["Avg", "ADDIE", "Trajectory", "Alignment", "Easy", "Medium", "Hard"])
     header.extend(PHASE_LABELS[phase] for phase in PHASES)
     writer.writerow(header)
 
@@ -563,6 +597,7 @@ def render_csv(rows: list[dict[str, Any]], judge_models: list[str], labels: dict
         values.append(fmt(row["avg"], 2))
         values.append(fmt(row["addie"], 2))
         values.append(fmt(row["trajectory"], 2))
+        values.append(fmt(row["alignment"], 3))
         values.extend(fmt(row["difficulty"].get(difficulty), 2) for difficulty in DIFFICULTIES)
         values.extend(fmt(row["phases"].get(phase), 1) for phase in PHASES)
         writer.writerow(values)
@@ -608,6 +643,7 @@ def render_json(rows: list[dict[str, Any]], judge_models: list[str], labels: dic
                     "Total": rounded(row["avg"], 2),
                     "ADDIE": rounded(row["addie"], 2),
                     "Trajectory": rounded(row["trajectory"], 2),
+                    "Alignment": rounded(row["alignment"], 3),
                 },
             }
         )
@@ -640,7 +676,7 @@ def render_json(rows: list[dict[str, Any]], judge_models: list[str], labels: dic
             },
             "score_components": {
                 "title": "Score Components",
-                "columns": ["Total", "ADDIE", "Trajectory"],
+                "columns": ["Total", "ADDIE", "Trajectory", "Alignment"],
                 "rows": component_rows,
             },
             "difficulty": {
@@ -664,6 +700,8 @@ def render_json(rows: list[dict[str, Any]], judge_models: list[str], labels: dic
             "Score Components uses stored total_score, addie_median/addie_score, and trajectory_score averaged across evaluated scenarios.",
             "Difficulty columns use stored total_score grouped by scenario difficulty.",
             "Phase-wise columns use phase_scores available in comparison_report artifacts.",
+            "Alignment is the deterministic, LLM-free constructive-alignment composite in [0,1] "
+            "(scripts/6_score_alignment.py); it is reported separately and never mixed into Total.",
         ],
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)
@@ -693,32 +731,13 @@ def parse_formats(value: str) -> list[str]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Analysis sections (merged from the former stats_rq1.py / stats_ablation.py /
+# Analysis sections (merged from the former stats_rq1.py /
 # 6_aggregate_token_usage.py). Each prints a stdout report; only the default
 # "table" section writes files. Selected via --sections.
 # ═══════════════════════════════════════════════════════════════════════════
 
 DEFAULT_PROPOSED = "alignmentgraph-isd"
 DEFAULT_BASELINES = ["baseline", "react-isd", "dick-carey-agent", "addie-agent", "rpisd-agent", "eduplanner"]
-
-# 3-rung RQ2 ablation ladder: wo_ma -> wo-graph -> full. QC is always on;
-# only the presence of graph coordination differs across the top two rungs.
-ABLATION_LADDER = [
-    ("alignmentgraph-isd-wo-ma", "single agent (rung 1)"),
-    ("alignmentgraph-isd-wo-graph", "wo graph coord. (rung 2)"),
-    ("alignmentgraph-isd", "full (rung 3)"),
-]
-ABLATION_CONTRASTS = [
-    ("alignmentgraph-isd-wo-graph", "alignmentgraph-isd-wo-ma", "multi-agent decomposition"),
-    ("alignmentgraph-isd", "alignmentgraph-isd-wo-graph", "alignment graph coordination"),
-]
-# Old rung-1 variant names map to the canonical ``-wo-ma`` so pre-rename result
-# dirs still aggregate.
-ABLATION_ALIASES = {
-    "alignmentgraph-isd-single-agent": "alignmentgraph-isd-wo-ma",
-    "alignmentgraph-isd-single": "alignmentgraph-isd-wo-ma",
-}
-RELATIONS = [f"R{i}" for i in range(1, 14)]
 
 
 # ── shared statistics (paired Wilcoxon + Holm + bootstrap CI) ────────────────
@@ -826,102 +845,6 @@ def section_rq1(run_dir: Path, proposed: str, baselines: list[str]) -> None:
     holm = holm_correct([r[5] for r in results])
     for (b, n, md, lo, hi, p), ph in zip(results, holm):
         print(f"  {b:18s} n={n:2d}  mean diff={md:+6.2f}  95% CI [{lo:+6.2f}, {hi:+6.2f}]  p={p:.2e}  p_holm={ph:.2e}")
-
-
-# ── RQ2: the 3-rung ablation ladder + structural coverage ────────────────────
-
-def _resolve(agent_id: str) -> str:
-    return ABLATION_ALIASES.get(agent_id, agent_id)
-
-
-def section_ablation(run_dir: Path, latex: bool = True) -> None:
-    rankings = load_rankings(run_dir)
-    resolved = {
-        sid: {_resolve(a): r for a, r in per.items()} for sid, per in rankings.items()
-    }
-    present = [(a, label) for a, label in ABLATION_LADDER if any(a in per for per in resolved.values())]
-    print(f"\n## RQ2 — ablation ladder ({len(resolved)} scenarios)")
-    if present:
-        header = f"{'arm':26s} {'n':>3s} {'Total':>7s} {'ADDIE':>7s} {'Traj.':>7s} " + " ".join(f"{p[:4].capitalize():>6s}" for p in PHASES)
-        print(header)
-        for agent_id, label in present:
-            rows = [per[agent_id] for per in resolved.values() if agent_id in per]
-            total = _mean([r["total_score"] for r in rows])
-            addie = _mean([r["addie_mean"] for r in rows if r.get("addie_mean") is not None])
-            traj = _mean([r["trajectory_score"] for r in rows if r.get("trajectory_score") is not None])
-            phase = {p: _mean([r["phase_scores"][p] for r in rows if p in (r.get("phase_scores") or {})]) for p in PHASES}
-            phase_cols = " ".join(f"{phase.get(p, float('nan')):6.1f}" for p in PHASES)
-            print(f"{label:26s} {len(rows):3d} {total:7.2f} {addie:7.2f} {traj:7.2f} {phase_cols}")
-
-        contrasts = []
-        for upper, lower, mechanism in ABLATION_CONTRASTS:
-            diffs = [per[upper]["total_score"] - per[lower]["total_score"] for per in resolved.values() if upper in per and lower in per]
-            addie_diffs = [per[upper]["addie_mean"] - per[lower]["addie_mean"] for per in resolved.values()
-                           if upper in per and lower in per and per[upper].get("addie_mean") is not None and per[lower].get("addie_mean") is not None]
-            if diffs:
-                _, p, _ = wilcoxon_signed_rank(diffs)
-                lo, hi = bootstrap_ci(diffs)
-                contrasts.append((mechanism, len(diffs), _mean(diffs), _mean(addie_diffs) if addie_diffs else float("nan"), lo, hi, p))
-        if contrasts:
-            print("\n  Mechanism contribution = upper rung - lower rung, paired on total score:")
-            holm = holm_correct([c[6] for c in contrasts])
-            for (mechanism, n, md, mda, lo, hi, p), ph in zip(contrasts, holm):
-                print(f"    {mechanism:30s} n={n:2d}  dTotal={md:+6.2f} [{lo:+6.2f}, {hi:+6.2f}]  dADDIE={mda:+6.2f}  p_holm={ph:.2e}")
-            if latex:
-                print("\n  % LaTeX (mechanism & dTotal & dADDIE & p_holm)")
-                for (mechanism, _n, md, mda, _lo, _hi, _p), ph in zip(contrasts, holm):
-                    print(f"  {mechanism} & ${md:+.2f}$ & ${mda:+.2f}$ & {ph:.1e} \\\\")
-
-    _section_ablation_structural(run_dir)
-
-
-def _relation_coverage(traj_doc: dict) -> dict | None:
-    audit = (traj_doc.get("metadata") or {}).get("audit") or {}
-    coverage = audit.get("relation_coverage")
-    return coverage if isinstance(coverage, dict) and coverage else None
-
-
-def _has_graph(traj_doc: dict) -> bool:
-    """Only the full (graph-coordinated) arm builds an alignment graph; the
-    ablated arms are pure section blobs. Read the flag so graph-free arms are
-    reported as 'no graph' instead of a misleading vacuous 100% coverage (no
-    element targets -> relation_coverage returns 1.0)."""
-    return bool((traj_doc.get("metadata") or {}).get("ablation", {}).get("enable_alignment_graph"))
-
-
-def _section_ablation_structural(run_dir: Path) -> None:
-    """Per-relation coverage read from each arm's trajectory metadata — an AUDIT
-    of the graph mechanism (did full establish all 13 relations and close its
-    gaps?), NOT a cross-arm comparison. Graph-free arms have no graph to audit,
-    so they are shown as 'no graph'. Arms are compared by judge score, not here."""
-    per_arm: dict[str, list[dict | None]] = defaultdict(list)
-    for traj in sorted(run_dir.rglob("*_trajectory.json")):
-        try:
-            doc = json.loads(traj.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            continue
-        agent_id = _resolve(doc.get("agent_id", "") or traj.stem.replace("_trajectory", ""))
-        # None marks a graph-free run; a dict is a real coverage snapshot.
-        per_arm[agent_id].append(_relation_coverage(doc) if _has_graph(doc) else None)
-    if not any(per_arm.values()):
-        print("\n  (no graph arm found — nothing to audit)")
-        return
-    print("\n  Alignment graph audit (coverage % per relation + residual gaps; graph arms only):")
-    print(f"  {'arm':26s} {'n':>3s} " + " ".join(f"{r:>4s}" for r in RELATIONS) + f" {'gaps':>6s}")
-    for agent_id, label in ABLATION_LADDER:
-        runs = per_arm.get(agent_id)
-        if not runs:
-            continue
-        graph_runs = [c for c in runs if c is not None]
-        if not graph_runs:
-            print(f"  {label:26s} {len(runs):3d} " + " ".join("  no" for _ in RELATIONS) + f" {'graph':>6s}")
-            continue
-        cov_cols = []
-        for r in RELATIONS:
-            vals = [c[r]["coverage"] for c in graph_runs if r in c]
-            cov_cols.append(f"{_mean(vals) * 100:4.0f}" if vals else "   -")
-        residual = _mean([sum(len(info.get("uncovered", [])) for info in c.values()) for c in graph_runs])
-        print(f"  {label:26s} {len(graph_runs):3d} " + " ".join(cov_cols) + f" {residual:6.1f}")
 
 
 # ── Token usage (merged from 6_aggregate_token_usage.py) ─────────────────────
@@ -1043,7 +966,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sections",
         default="table",
-        help="Comma-separated analyses to run: table,rq1,ablation,tokens,errors (or 'all'). Default: table.",
+        help="Comma-separated analyses to run: table,rq1,tokens,errors (or 'all'). Default: table.",
     )
     parser.add_argument("--proposed", default=DEFAULT_PROPOSED, help="Proposed agent id for the RQ1 section.")
     parser.add_argument("--baselines", default=",".join(DEFAULT_BASELINES), help="Comma-separated baseline ids for RQ1.")
@@ -1089,7 +1012,7 @@ def render(
     raise ValueError(f"Unsupported format: {fmt}")
 
 
-_ALL_SECTIONS = ["table", "rq1", "ablation", "tokens", "errors"]
+_ALL_SECTIONS = ["table", "rq1", "tokens", "errors"]
 
 
 def _run_table_section(run_dir: Path, args: argparse.Namespace) -> None:
@@ -1102,6 +1025,10 @@ def _run_table_section(run_dir: Path, args: argparse.Namespace) -> None:
     judge_models = collect_judge_models(records)
     labels = make_unique_labels(judge_models)
     aggregates = aggregate(records, scenario_root)
+    n_alignment_files = apply_alignment_scores(run_dir, aggregates)
+    if n_alignment_files:
+        print(f"Folded alignment_scores.json from {n_alignment_files} scenario dir(s) "
+              "into the Alignment column.")
     rows = build_rows(aggregates, judge_models)
     bold_best = not args.no_bold_best
 
@@ -1132,8 +1059,6 @@ def main() -> int:
         _run_table_section(run_dir, args)
     if "rq1" in sections:
         section_rq1(run_dir, args.proposed, baselines)
-    if "ablation" in sections:
-        section_ablation(run_dir)
     if "tokens" in sections:
         section_tokens(run_dir)
     if "errors" in sections:

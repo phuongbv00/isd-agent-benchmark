@@ -390,6 +390,7 @@ def install_agents() -> bool:
         PROJECT_ROOT / "agents" / "addie-agent",
         PROJECT_ROOT / "agents" / "dick-carey-agent",
         PROJECT_ROOT / "agents" / "rpisd-agent",
+        PROJECT_ROOT / "agents" / "alignmentgraph-isd",
         PROJECT_ROOT / "evaluator",
     ]
 
@@ -408,13 +409,6 @@ def install_agents() -> bool:
     return True
 
 
-AG_ABLATION_VARIANTS = {
-    "alignmentgraph-isd": "full",
-    "alignmentgraph-isd-wo-graph": "wo_graph",
-    "alignmentgraph-isd-wo-ma": "wo_ma",
-}
-
-
 def check_agents_installed() -> dict[str, bool]:
     """Check whether agent modules can be imported."""
     agents = {
@@ -424,7 +418,7 @@ def check_agents_installed() -> dict[str, bool]:
         "addie-agent": False,
         "dick-carey-agent": False,
         "rpisd-agent": False,
-        **{agent_id: False for agent_id in AG_ABLATION_VARIANTS},
+        "alignmentgraph-isd": False,
     }
 
     # Module import test
@@ -448,8 +442,7 @@ def check_agents_installed() -> dict[str, bool]:
 
     try:
         from alignmentgraph_isd_agent import AlignmentGraphISDAgent
-        for agent_id in AG_ABLATION_VARIANTS:
-            agents[agent_id] = True
+        agents["alignmentgraph-isd"] = True
     except ImportError:
         pass
 
@@ -476,6 +469,18 @@ def check_agents_installed() -> dict[str, bool]:
 
 def _resolve_llm_config(llm_config: Optional[LLMConfig] = None) -> LLMConfig:
     return llm_config or llm_config_from_env()
+
+
+def _normalize_agent_max_tokens(llm_config: LLMConfig) -> LLMConfig:
+    """Give every agent the same per-call output budget.
+
+    Respects an explicit ``AGENT_MODEL_MAX_TOKENS`` (already folded into the
+    resolved config by ``llm_config_from_env``) — that value is uniform across
+    agents too — otherwise pins the uniform benchmark default. This is the single
+    place per-agent max_tokens is set; individual runners must not override it."""
+    if os.getenv("AGENT_MODEL_MAX_TOKENS"):
+        return llm_config
+    return llm_config.copy_with(max_tokens=16_384)
 
 
 def _build_judge_env(
@@ -520,12 +525,15 @@ def _judge_models_from_env(judge_env: Optional[dict[str, str]]) -> list[str]:
 
 def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
     """Return the run function for the given agent ID (module-based)."""
-    llm_config = _resolve_llm_config(llm_config)
+    llm_config = _normalize_agent_max_tokens(_resolve_llm_config(llm_config))
+    uniform_max_tokens = llm_config.max_tokens
 
     if agent_id == "baseline":
         from baseline.generator import BaselineGenerator
         def run_baseline(scenario: dict) -> dict:
-            gen = BaselineGenerator(llm_config=llm_config.copy_with(max_tokens=32768))
+            # Pass max_tokens explicitly: BaselineGenerator's __init__ default
+            # (32768) would otherwise override the uniform budget on the config.
+            gen = BaselineGenerator(llm_config=llm_config, max_tokens=uniform_max_tokens)
             return gen.generate(scenario)
         return run_baseline
 
@@ -556,12 +564,10 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
             return agent.run(scenario)
         return run_react
 
-    elif agent_id in AG_ABLATION_VARIANTS:
+    elif agent_id == "alignmentgraph-isd":
         from alignmentgraph_isd_agent import AlignmentGraphISDAgent
-        _ag_llm_config = llm_config.copy_with(max_tokens=16384) if llm_config else llm_config
-        _ag_ablation_key = AG_ABLATION_VARIANTS[agent_id]
         def run_alignmentgraph_isd(scenario: dict) -> dict:
-            agent = AlignmentGraphISDAgent(llm_config=_ag_llm_config, ablation_key=_ag_ablation_key)
+            agent = AlignmentGraphISDAgent(llm_config=llm_config)
             return agent.run(scenario)
         return run_alignmentgraph_isd
 
@@ -646,6 +652,18 @@ def _run_agent_task(
             }
             with open(trajectory_path, "w", encoding="utf-8") as f:
                 json.dump(trajectory_data, f, ensure_ascii=False, indent=2, default=str)
+
+            # Save the alignment-graph dump when the agent provides one
+            # (its own files, kept separate from output/trajectory).
+            if isinstance(result, dict):
+                graph_dump = result.get("graph")
+                if isinstance(graph_dump, dict) and graph_dump:
+                    with open(output_dir / f"{agent_id}_graph.json", "w", encoding="utf-8") as f:
+                        json.dump(graph_dump, f, ensure_ascii=False, indent=2, default=str)
+                graph_dot = result.get("graph_dot")
+                if isinstance(graph_dot, str) and graph_dot:
+                    with open(output_dir / f"{agent_id}_graph.dot", "w", encoding="utf-8") as f:
+                        f.write(graph_dot)
 
             # Save the log
             with open(log_path, "w", encoding="utf-8") as f:
@@ -979,6 +997,7 @@ def run_full_benchmark(
     multi_judge: bool = True,
     llm_config: Optional[LLMConfig] = None,
     judge_env: Optional[dict[str, str]] = None,
+    run_tag: Optional[str] = None,
 ) -> dict:
     """Run the full benchmark (IDLD dataset structure).
 
@@ -991,6 +1010,9 @@ def run_full_benchmark(
         scenario_parallel: Whether to run scenarios in parallel (default: True)
         scenario_max_workers: Number of concurrent scenarios (default: 8)
         dataset: Dataset selection ("train", "test", None=variant mode)
+        run_tag: Optional label inserted into the run directory name
+            (e.g. "r1" -> test_90_benchmark_<model>_r1_<timestamp>), used to
+            distinguish repeated runs of the same model.
     """
     # Ignore variants when in dataset mode
     if dataset:
@@ -1012,11 +1034,14 @@ def run_full_benchmark(
     model_name = llm_config.model
     model_safe_name = model_name.split("/")[-1].replace(":", "-")  # Remove provider prefix and replace colons
 
+    # Optional run tag (e.g. "r1") to distinguish repeated runs of the same model
+    tag_part = f"_{run_tag}" if run_tag else ""
+
     # Reflect dataset mode in the directory name (e.g. test_benchmark_claude-opus-4.5_20260122_...)
     if dataset:
-        run_dir = RESULTS_DIR / f"{dataset}_benchmark_{model_safe_name}_{timestamp}"
+        run_dir = RESULTS_DIR / f"{dataset}_benchmark_{model_safe_name}{tag_part}_{timestamp}"
     else:
-        run_dir = RESULTS_DIR / f"benchmark_{model_safe_name}_{timestamp}"
+        run_dir = RESULTS_DIR / f"benchmark_{model_safe_name}{tag_part}_{timestamp}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     # Log file path
@@ -1066,6 +1091,7 @@ def run_full_benchmark(
             "variants": variants,
             "dataset": dataset,
             "agents": agents,
+            "run_tag": run_tag,
             "parallel": parallel,
             "max_workers": max_workers,
             "scenario_parallel": scenario_parallel,
@@ -1407,6 +1433,14 @@ def main():
         help="Use single-judge evaluation (disable multi-judge)",
     )
     parser.add_argument(
+        "--run-tag",
+        type=str,
+        default=None,
+        help="Optional label inserted into the run directory name "
+             "(e.g. --run-tag r1 -> <dataset>_benchmark_<model>_r1_<timestamp>); "
+             "use to distinguish repeated runs of the same model",
+    )
+    parser.add_argument(
         "--rate-limit",
         "-r",
         type=str,
@@ -1651,6 +1685,7 @@ def main():
         multi_judge=use_multi_judge,
         llm_config=llm_config,
         judge_env=judge_env,
+        run_tag=args.run_tag,
     )
 
     # Generate the summary report

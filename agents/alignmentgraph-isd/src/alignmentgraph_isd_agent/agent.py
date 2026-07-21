@@ -3,15 +3,42 @@ import os
 from typing import Any
 
 from alignmentgraph_isd import DesignBrief, MetaAgent
-from alignmentgraph_isd.config import AblationConfig, ChatModelFactory, HarnessRunConfig
+from alignmentgraph_isd.config import ChatModelFactory, HarnessRunConfig
+
+
+def _regen_settings_from_env() -> dict[str, Any]:
+    """Rate-limit posture for the package's empty-section regen loop, sourced from
+    the benchmark environment. The regen backoff defaults to the benchmark's own
+    rate knob (``BENCHMARK_DELAY``, set by the ``-r`` preset) so per-agent re-runs
+    respect the same concurrency posture as the outer scheduler; a 429 window then
+    gets a chance to drain rather than being hammered by immediate retries.
+    ``HARNESS_REGEN_BACKOFF`` overrides the delay, ``HARNESS_REGEN_BUDGET`` the
+    number of extra attempts."""
+    settings: dict[str, Any] = {}
+    backoff = os.getenv("HARNESS_REGEN_BACKOFF") or os.getenv("BENCHMARK_DELAY")
+    if backoff is not None:
+        try:
+            settings["regen_backoff_seconds"] = float(backoff)
+        except ValueError:
+            pass
+    budget = os.getenv("HARNESS_REGEN_BUDGET")
+    if budget is not None:
+        try:
+            settings["regen_budget"] = int(budget)
+        except ValueError:
+            pass
+    return settings
 
 
 def _llm_factory_from_benchmark_config(llm_config: Any) -> ChatModelFactory | None:
     if llm_config is None:
         return None
 
-    max_tokens = getattr(llm_config, "max_tokens", None)
-    if max_tokens is None or max_tokens < 8192:
+    # Only supply a default when the caller set nothing; never override an
+    # explicit budget. The benchmark normalizes max_tokens uniformly across all
+    # agents (see run_benchmark._normalize_agent_max_tokens), so overriding here
+    # would reintroduce the very asymmetry that normalization removes.
+    if getattr(llm_config, "max_tokens", None) is None:
         llm_config = llm_config.copy_with(max_tokens=16384)
 
     def factory() -> Any:
@@ -40,22 +67,18 @@ class AlignmentGraphISDAgent:
     def __init__(
         self,
         llm_config=None,
-        ablation_key: str | None = None,
         llm_factory: ChatModelFactory | None = None,
     ) -> None:
-        key = ablation_key or os.environ.get("HARNESS_ABLATION", "full")
-        self.ablation_key = key
         # The factory is the single source of truth for the model; the harness
         # reads model provenance for its metadata by introspecting it (no parallel
         # LLMConfig to keep in sync).
         self.config = HarnessRunConfig(
-            ablation=AblationConfig.from_key(key),
             llm_factory=llm_factory or _llm_factory_from_benchmark_config(llm_config),
+            **_regen_settings_from_env(),
         )
 
     def run(self, scenario: dict | DesignBrief) -> dict:
-        result = MetaAgent(self.config).run(_scenario_to_design_brief(scenario))
-        metadata = result.setdefault("metadata", {})
-        if isinstance(metadata, dict):
-            metadata.setdefault("ablation", self.ablation_key)
-        return result
+        # The result carries the full alignment-graph dump as its own keys
+        # ("graph" / "graph_dot"); the benchmark runner writes them to
+        # <agent_id>_graph.json / <agent_id>_graph.dot next to the output.
+        return MetaAgent(self.config).run(_scenario_to_design_brief(scenario))

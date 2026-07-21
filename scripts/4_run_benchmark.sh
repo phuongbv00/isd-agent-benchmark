@@ -15,6 +15,9 @@ DATASET="${DATASET:-test}"
 #   <SLOT>_AGENT_MODEL_BASE_URL
 #   <SLOT>_AGENT_MODEL_NAME
 #   <SLOT>_AGENT_MODEL_API_KEY_ENVS   (comma-separated env names; 1+ allowed)
+#   <SLOT>_RATE_LIMIT                 (optional; overrides the global RATE_LIMIT
+#                                      for this slot only — different providers
+#                                      have different rate limits)
 # Override AGENT_MODEL_SLOTS to add/remove/reorder parallel sessions, e.g.
 #   AGENT_MODEL_SLOTS="claude,gpt" ./scripts/4_run_benchmark.sh
 # ---------------------------------------------------------------------------
@@ -56,7 +59,7 @@ NUM_SLOTS=$(echo "$_AGENT_MODEL_SLOTS_LIST" | wc -w | tr -d ' ')
 echo "=============================================="
 echo "  Running ${NUM_SLOTS} models in parallel via tmux"
 echo "  Dataset: $DATASET"
-echo "  Rate Limit: $RATE_LIMIT"
+echo "  Rate Limit: $RATE_LIMIT (global default; per-slot <SLOT>_RATE_LIMIT overrides)"
 echo "  Model config: --agent-model-* and --judge-model-* flags"
 echo "  Judge models: $JUDGE_MODEL_NAMES (provider=$JUDGE_MODEL_PROVIDER, base=$JUDGE_MODEL_BASE_URL)"
 echo "  Log directory: $LOG_DIR"
@@ -67,7 +70,8 @@ for slot in $_AGENT_MODEL_SLOTS_LIST; do
     provider_var="${upper}_AGENT_MODEL_PROVIDER"
     name_var="${upper}_AGENT_MODEL_NAME"
     key_envs_var="${upper}_AGENT_MODEL_API_KEY_ENVS"
-    echo "    - ${slot}: ${!name_var} (provider=${!provider_var}, keys=${!key_envs_var})"
+    rate_var="${upper}_RATE_LIMIT"
+    echo "    - ${slot}: ${!name_var} (provider=${!provider_var}, keys=${!key_envs_var}, rate=${!rate_var:-$RATE_LIMIT})"
 done
 echo "=============================================="
 
@@ -84,17 +88,19 @@ for slot in $_AGENT_MODEL_SLOTS_LIST; do
     base_url_var="${upper}_AGENT_MODEL_BASE_URL"
     name_var="${upper}_AGENT_MODEL_NAME"
     key_envs_var="${upper}_AGENT_MODEL_API_KEY_ENVS"
+    rate_var="${upper}_RATE_LIMIT"
+    slot_rate="${!rate_var:-$RATE_LIMIT}"
 
     session="bench-${slot}"
     log_file="$LOG_DIR/${slot}.log"
 
-    echo "[${i}/${NUM_SLOTS}] ${slot}: ${!name_var}..."
+    echo "[${i}/${NUM_SLOTS}] ${slot}: ${!name_var} (rate=$slot_rate)..."
 
     tmux new-session -d -s "$session" \
 "cd $(pwd) || exit 1; source .env 2>/dev/null || true; python run_benchmark.py \
     --dataset $DATASET \
     --agents $AGENTS \
-    --rate-limit $RATE_LIMIT \
+    --rate-limit $slot_rate \
     --agent-model-provider ${!provider_var} \
     --agent-model-base-url ${!base_url_var} \
     --agent-model-name ${!name_var} \

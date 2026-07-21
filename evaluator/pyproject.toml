@@ -36,6 +36,20 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "ruff>=0.4.0",
 ]
+# Neural text encoder for the alignment metric (metrics/alignment.py).
+# The default TF-IDF char-ngram fallback needs nothing beyond the stdlib.
+alignment = [
+    "sentence-transformers>=2.5.0",
+]
+# Fine-tuning + local inference of the transformer Bloom classifier
+# (scripts/train_bloom_classifier.py, TransformerBloomClassifier).
+bloom-train = [
+    "transformers>=4.40.0",
+    "datasets>=2.19.0",
+    "accelerate>=0.30.0",
+    "torch>=2.2.0",
+    "scikit-learn>=1.4.0",
+]
 
 [project.scripts]
 isd-evaluator = "isd_evaluator.cli:app"

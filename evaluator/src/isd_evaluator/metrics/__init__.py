@@ -5,6 +5,7 @@ lazy import로 처리하여 openai 미설치 환경에서도 ContextWeightAdjust
 """
 
 # openai 미의존 모듈은 즉시 import
+from isd_evaluator.metrics.alignment import AlignmentEvaluator, AlignmentScore
 from isd_evaluator.metrics.context_weights import ContextWeightAdjuster
 from isd_evaluator.models import (
     ADDIEScore,
@@ -19,6 +20,8 @@ __all__ = [
     "CompositeEvaluator",
     "MultiJudgeEvaluator",
     "ContextWeightAdjuster",
+    "AlignmentEvaluator",
+    "AlignmentScore",
     # Score models
     "ADDIEScore",
     "CompositeScore",
