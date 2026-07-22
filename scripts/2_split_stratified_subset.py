@@ -17,9 +17,9 @@ This script instead copies a fixed N-per-cell subset to disk, no duplicates.
 
 Examples:
   # 30-scenario tuning set from train (proper ML hygiene: tune on train, report on test)
-  python scenarios/make_stratified_subset.py --source scenarios/train --target scenarios/train_30
+  python scripts/2_split_stratified_subset.py --source scenarios/train --target scenarios/train_30
   # 90-scenario test set, 3 per cell
-  python scenarios/make_stratified_subset.py --source scenarios/test --target scenarios/test_90 --per-cell 3
+  python scripts/2_split_stratified_subset.py --source scenarios/test --target scenarios/test_90 --per-cell 3
 """
 from __future__ import annotations
 

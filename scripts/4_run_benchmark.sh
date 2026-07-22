@@ -8,6 +8,15 @@ source .env 2>/dev/null || true
 AGENTS="${AGENTS:-baseline,eduplanner,react-isd,addie-agent,dick-carey-agent,rpisd-agent}"
 RATE_LIMIT="${RATE_LIMIT:-turbo}"
 DATASET="${DATASET:-test}"
+# Optional run tag(s) appended to the results dir name -- used by the tune
+# loop on train_30 (guide section 5) to separate tune iterations. Accepts a
+# comma- (or space-) separated list, run SEQUENTIALLY inside each slot's tmux
+# session, same var and mechanism as RUN_TAGS in 5_run_ladder.sh:
+#   RUN_TAGS=tune1                   -> one tagged run
+#   RUN_TAGS=tune1,tune2,tune3       -> three sequential runs per slot
+# Empty (default) -> single untagged run.
+RUN_TAGS="${RUN_TAGS:-}"
+_RUN_TAGS_LIST="${RUN_TAGS//,/ }"
 
 # ---------------------------------------------------------------------------
 # Agent model slots — comma-separated session labels. Each slot reads:
@@ -33,7 +42,7 @@ slot_upper() {
 # child tmux sessions inherit them.
 # NOTE: no associative arrays here -- macOS ships bash 3.2 as /bin/bash (no
 # `declare -A`), which silently degrades to a broken integer-indexed array
-# (see 6_run_ladder.sh, which has `set -u` and crashes outright on this).
+# (see 5_run_ladder.sh, which has `set -u` and crashes outright on this).
 _exported_keys_list=""
 register_key_envs() {
     local IFS=','
@@ -104,7 +113,27 @@ for slot in $_AGENT_MODEL_SLOTS_LIST; do
 
     echo "[${i}/${NUM_SLOTS}] ${slot}: ${!name_var} (rate=$slot_rate)..."
 
-    tmux new-session -d -s "$session" \
+    if [[ -n "$_RUN_TAGS_LIST" ]]; then
+        # Sequential tagged runs inside the session (mirrors 5_run_ladder.sh):
+        # \$tag expands per-iteration in the child shell, not at launch time.
+        tmux new-session -d -s "$session" \
+"cd $(pwd) || exit 1; source .env 2>/dev/null || true; \
+for tag in $_RUN_TAGS_LIST; do \
+    echo \"=== ${slot} run tag \$tag starting: \$(date) ===\"; \
+    python run_benchmark.py \
+    --dataset $DATASET \
+    --agents $AGENTS \
+    --run-tag \$tag \
+    --rate-limit $slot_rate \
+    --agent-model-provider ${!provider_var} \
+    --agent-model-base-url ${!base_url_var} \
+    --agent-model-name ${!name_var} \
+    --agent-model-api-key-envs ${!key_envs_var} \
+    2>&1 | tee -a $log_file; \
+    echo \"=== ${slot} run tag \$tag finished: \$(date) ===\"; \
+done; echo 'Done!'; read"
+    else
+        tmux new-session -d -s "$session" \
 "cd $(pwd) || exit 1; source .env 2>/dev/null || true; python run_benchmark.py \
     --dataset $DATASET \
     --agents $AGENTS \
@@ -114,6 +143,7 @@ for slot in $_AGENT_MODEL_SLOTS_LIST; do
     --agent-model-name ${!name_var} \
     --agent-model-api-key-envs ${!key_envs_var} \
     2>&1 | tee $log_file; echo 'Done!'; read"
+    fi
 done
 
 echo ""

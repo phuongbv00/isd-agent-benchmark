@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from langchain_anthropic import ChatAnthropic
@@ -24,9 +25,19 @@ def _chat_kwargs(config: LLMConfig) -> dict[str, Any]:
     }
     if config.max_tokens is not None:
         kwargs["max_tokens"] = config.max_tokens
+    # For Small-context backends
+    cap_env = os.getenv("AGENT_MODEL_MAX_TOKENS_CAP")
+    if cap_env:
+        cap = int(cap_env)
+        current = kwargs.get("max_tokens")
+        kwargs["max_tokens"] = cap if current is None else min(current, cap)
     if config.model_kwargs:
         kwargs["model_kwargs"] = config.model_kwargs
     return kwargs
+
+
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def create_chat_model(config: LLMConfig):
@@ -47,6 +58,13 @@ def create_chat_model(config: LLMConfig):
             kwargs["api_key"] = api_key
         if config.base_url:
             kwargs["base_url"] = config.base_url
+        if _env_flag("AGENT_MODEL_STREAMING"):
+            kwargs["streaming"] = True
+            kwargs["stream_usage"] = True
+        if _env_flag("AGENT_MODEL_DISABLE_THINKING"):
+            kwargs["extra_body"] = {
+                "chat_template_kwargs": {"enable_thinking": False}
+            }
         return ChatOpenAI(**kwargs)
 
     raise ValueError(f"Unsupported LLM API spec: {config.api_spec}")

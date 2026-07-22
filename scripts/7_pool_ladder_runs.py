@@ -31,11 +31,10 @@ Usage:
   # or auto-group by model name parsed from the dir naming convention
   python scripts/7_pool_ladder_runs.py --auto-glob 'results/test_90_benchmark_*_r*'
 
-The statistics helpers (wilcoxon_signed_rank, bootstrap_ci, holm_correct) are
-copied verbatim from scripts/5_aggregate_benchmark_results.py (single source
-of the algorithms; copied because that file is being modified concurrently
-and importing a module whose name starts with a digit needs importlib
-gymnastics).
+The statistics helpers (wilcoxon_signed_rank, bootstrap_ci, holm_correct)
+live here — this file is the single home of the algorithms since
+5_aggregate_benchmark_results.py (their original co-owner) was removed;
+its per-agent token-usage aggregation was absorbed as pool_tokens().
 """
 
 from __future__ import annotations
@@ -61,7 +60,7 @@ N_BOOT = 10000
 BOOT_SEED = 42
 
 
-# ── statistics — copied from scripts/5_aggregate_benchmark_results.py ────────
+# ── statistics (single home since 5_aggregate_benchmark_results.py was removed) ──
 
 def wilcoxon_signed_rank(diffs: list[float]) -> tuple[float, float, int]:
     """Two-sided Wilcoxon signed-rank (zeros discarded, tie-corrected normal
@@ -502,6 +501,65 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
     }
 
 
+
+def pool_tokens(run_dirs_by_model: dict[str, list[Path]],
+                agents: list[str]) -> Optional[dict]:
+    """Pool per-agent token usage / runtime from *_trajectory.json metadata.
+
+    (Absorbed from the deleted 5_aggregate_benchmark_results.py "tokens"
+    section, in pooled form: mean across runs per scenario, then across
+    scenarios.) Operational metadata only -- never part of Total or the
+    alignment composite.
+    """
+    out_models = {}
+    found_any = False
+    for label, run_dirs in run_dirs_by_model.items():
+        # vals[agent][field][scenario] = [per-run values]
+        vals: dict[str, dict[str, dict[str, list[float]]]] = {}
+        for run_dir in run_dirs:
+            for sid, scen_dir in iter_scenario_dirs(run_dir):
+                for agent in agents:
+                    traj = scen_dir / f"{agent}_trajectory.json"
+                    if not traj.exists():
+                        continue
+                    try:
+                        md = json.loads(traj.read_text(encoding="utf-8")).get("metadata") or {}
+                    except (json.JSONDecodeError, OSError):
+                        continue
+                    tu = md.get("token_usage") or {}
+                    fields = {
+                        "prompt_tokens": tu.get("prompt_tokens"),
+                        "completion_tokens": tu.get("completion_tokens"),
+                        "total_tokens": tu.get("total_tokens"),
+                        "llm_calls": tu.get("llm_calls"),
+                        "execution_time_seconds": md.get("execution_time_seconds"),
+                    }
+                    for field, v in fields.items():
+                        if isinstance(v, (int, float)) and not isinstance(v, bool):
+                            found_any = True
+                            vals.setdefault(agent, {}).setdefault(field, {}) \
+                                .setdefault(sid, []).append(float(v))
+        if vals:
+            out_models[label] = {
+                agent: {
+                    field: {
+                        "n_scenarios": len(by_scen),
+                        "mean": _mean([_mean(v) for v in by_scen.values()]),
+                        "sd_across_scenarios": _sd([_mean(v) for v in by_scen.values()]),
+                    }
+                    for field, by_scen in sorted(fields_map.items())
+                }
+                for agent, fields_map in sorted(vals.items())
+            }
+    if not found_any:
+        return None
+    return {
+        "source": "*_trajectory.json metadata (token_usage + execution_time), "
+                  "pooled mean across runs then scenarios; operational metadata only",
+        "models": out_models,
+    }
+
+
 # ── report printing ──────────────────────────────────────────────────────────
 
 def print_report(pooled: dict, proposed: str, baselines: list[str]) -> None:
@@ -548,6 +606,16 @@ def print_report(pooled: dict, proposed: str, baselines: list[str]) -> None:
               f"DiD={r['did_mean']:+6.2f} CI95[{lo:+6.2f},{hi:+6.2f}] p={r['did_wilcoxon_p']:.2e}")
         print(f"      trend: {trend}  slope/step={r['trend_ols_slope_per_size_step']:+.2f} "
               f"CI95[{r['trend_slope_ci95'][0]:+.2f},{r['trend_slope_ci95'][1]:+.2f}]")
+
+    if pooled.get("token_usage"):
+        print("\n## Token usage / runtime (operational metadata, mean per scenario)")
+        for label, agents_tok in pooled["token_usage"]["models"].items():
+            print(f"  [{label}]")
+            for agent, fields in agents_tok.items():
+                tt = fields.get("total_tokens", {}).get("mean", float("nan"))
+                calls = fields.get("llm_calls", {}).get("mean", float("nan"))
+                secs = fields.get("execution_time_seconds", {}).get("mean", float("nan"))
+                print(f"    {agent:20s} total_tokens={tt:10.0f}  llm_calls={calls:6.1f}  exec_s={secs:7.1f}")
 
     if pooled.get("alignment"):
         print("\n## Alignment metrics (RQ2, pooled from alignment_scores.json)")
@@ -633,6 +701,7 @@ def main() -> None:
         "models": models,
         "interaction": interaction_tests(models, args.proposed, baselines),
         "alignment": pool_alignment(models, run_dirs_by_model, agents),
+        "token_usage": pool_tokens(run_dirs_by_model, agents),
     }
 
     print_report(pooled, args.proposed, baselines)

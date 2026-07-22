@@ -12,9 +12,9 @@ character-n-gram fallback; pass ``--encoder st`` to use a local
 sentence-transformers model for real scoring runs.
 
 Examples:
-  python scripts/6_score_alignment.py results/test_90_benchmark_..._104536
-  python scripts/6_score_alignment.py results/test_90_... --limit 5
-  python scripts/6_score_alignment.py results/test_90_... --encoder st \
+  python scripts/7_score_alignment.py results/test_90_benchmark_..._104536
+  python scripts/7_score_alignment.py results/test_90_... --limit 5
+  python scripts/7_score_alignment.py results/test_90_... --encoder st \
       --st-model sentence-transformers/LaBSE
 """
 
