@@ -480,7 +480,7 @@ def _normalize_agent_max_tokens(llm_config: LLMConfig) -> LLMConfig:
     place per-agent max_tokens is set; individual runners must not override it."""
     if os.getenv("AGENT_MODEL_MAX_TOKENS"):
         return llm_config
-    return llm_config.copy_with(max_tokens=16_384)
+    return llm_config.copy_with(max_tokens=16384)
 
 
 def _build_judge_env(
@@ -1583,7 +1583,7 @@ def main():
     rate_limit_configs = {
         "conservative": {"max_workers": 2, "scenario_max_workers": 2, "delay": 2.0},
         "moderate": {"max_workers": 3, "scenario_max_workers": 4, "delay": 0.5},
-        "aggressive": {"max_workers": 6, "scenario_max_workers": 8, "delay": 0.1},
+        "aggressive": {"max_workers": 7, "scenario_max_workers": 8, "delay": 0.1},
         "turbo": {"max_workers": 7, "scenario_max_workers": 15, "delay": 0.0},
     }
     rate_config = rate_limit_configs[args.rate_limit]

@@ -43,6 +43,16 @@ Usage:
   # Deploy a single slot (e.g. re-deploying after a HF id fix):
   python scripts/runpod_deploy_ladder.py deploy --volume-id <id> --slots qwen9b
 
+  # Already deployed endpoints yourself (e.g. via the RunPod console) instead
+  # of using `deploy`? Register them the same way, so status/teardown and
+  # ladder_env.sh work identically. Reads MODEL_NAME back from each live
+  # endpoint rather than trusting DEFAULT_SLOTS, so the env file always
+  # matches what the endpoint actually serves (console-deployed vLLM
+  # endpoints commonly use lowercase HF ids, e.g. "qwen/qwen3.5-0.8b"):
+  python scripts/runpod_deploy_ladder.py import \
+      --endpoint qwen08b=<id> --endpoint qwen2b=<id> \
+      --endpoint qwen4b=<id> --endpoint qwen9b=<id>
+
   # 4. Check endpoint health / worker status:
   python scripts/runpod_deploy_ladder.py status --manifest results/runpod_ladder_<ts>/manifest.json
 
@@ -285,6 +295,83 @@ def cmd_deploy(args: argparse.Namespace) -> None:
     print("cheap warm-up request per endpoint before the timed benchmark run.")
 
 
+def cmd_import(args: argparse.Namespace) -> None:
+    """Register endpoints created outside this script (e.g. via the RunPod
+    console) into a manifest + ladder_env.sh, same shape as `deploy` writes,
+    so status/teardown and 6_run_ladder.sh's auto-source work identically."""
+    pairs: dict[str, str] = {}
+    for item in args.endpoint:
+        if "=" not in item:
+            print(f"ERROR: --endpoint must be SLOT=ENDPOINT_ID, got {item!r}", file=sys.stderr)
+            sys.exit(1)
+        slot, endpoint_id = item.split("=", 1)
+        if slot not in DEFAULT_SLOTS:
+            print(f"ERROR: unknown slot {slot!r}; known: {list(DEFAULT_SLOTS)}", file=sys.stderr)
+            sys.exit(1)
+        pairs[slot] = endpoint_id
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_dir = os.path.join("results", f"runpod_ladder_{timestamp}")
+    os.makedirs(out_dir, exist_ok=True)
+
+    manifest = {"timestamp": timestamp, "volume_id": args.volume_id or None, "imported": True, "slots": {}}
+    env_lines = []
+    no_volume_slots = []
+
+    for slot, endpoint_id in pairs.items():
+        info = _rest("GET", f"/endpoints/{endpoint_id}")
+        if not info.get("networkVolumeId"):
+            no_volume_slots.append(slot)
+        # Trust the live endpoint's configured model over DEFAULT_SLOTS --
+        # console-deployed vLLM workers commonly use lowercase HF ids, and a
+        # mismatch here means the OpenAI-compatible server 404s every request.
+        model_name = info.get("env", {}).get("MODEL_NAME") or DEFAULT_SLOTS[slot]["hf_model"]
+        base_url = f"https://api.runpod.ai/v2/{endpoint_id}/openai/v1"
+        print(f"[{slot}] endpoint_id={endpoint_id} model={model_name}")
+
+        manifest["slots"][slot] = {
+            "hf_model": model_name,
+            "gpu_type_ids": info.get("gpuTypeIds", []),
+            # GET /endpoints/{id} does return templateId (unlike list view) --
+            # teardown skips template deletion if this ever comes back empty.
+            "template_id": info.get("templateId"),
+            "endpoint_id": endpoint_id,
+            "base_url": base_url,
+            "workers_max": info.get("workersMax"),
+            "idle_timeout": info.get("idleTimeout"),
+        }
+
+        upper = _slot_upper(slot)
+        env_lines += [
+            f"export {upper}_AGENT_MODEL_PROVIDER=runpod-vllm",
+            f"export {upper}_AGENT_MODEL_BASE_URL={base_url}",
+            f"export {upper}_AGENT_MODEL_NAME={model_name}",
+            f"export {upper}_AGENT_MODEL_API_KEY_ENVS=RUNPOD_API_KEY",
+        ]
+
+    manifest_path = os.path.join(out_dir, "manifest.json")
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
+    env_path = os.path.join(out_dir, "ladder_env.sh")
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.write("# Source this before ./scripts/6_run_ladder.sh\n")
+        f.write("# Requires RUNPOD_API_KEY to already be exported (.env).\n")
+        f.write("\n".join(env_lines) + "\n")
+
+    print("\n==============================================================")
+    print(f"Manifest: {manifest_path}")
+    print(f"Env file: {env_path}")
+    print("==============================================================")
+    if no_volume_slots:
+        print(f"\nNote: no network volume attached on: {', '.join(no_volume_slots)}")
+        print("(not created via `create-volume`+`deploy`), so cold starts")
+        print("re-download weights from Hugging Face every time -- fine for a")
+        print("smoke test, but consider attaching one for the full ladder run.")
+    print(f"\nsource {env_path}")
+    print("./scripts/6_run_ladder.sh")
+
+
 def cmd_status(args: argparse.Namespace) -> None:
     with open(args.manifest, encoding="utf-8") as f:
         manifest = json.load(f)
@@ -307,11 +394,14 @@ def cmd_teardown(args: argparse.Namespace) -> None:
         manifest = json.load(f)
     for slot, info in manifest["slots"].items():
         endpoint_id = info["endpoint_id"]
-        template_id = info["template_id"]
+        template_id = info.get("template_id")
         print(f"[{slot}] deleting endpoint {endpoint_id} ...")
         _rest("DELETE", f"/endpoints/{endpoint_id}")
-        print(f"[{slot}] deleting template {template_id} ...")
-        _rest("DELETE", f"/templates/{template_id}")
+        if template_id:
+            print(f"[{slot}] deleting template {template_id} ...")
+            _rest("DELETE", f"/templates/{template_id}")
+        else:
+            print(f"[{slot}] no template_id on record (imported endpoint) -- skipping template delete")
     print("\nDone. The shared network volume was NOT deleted (reused across")
     print(f"re-runs); volume_id={manifest.get('volume_id')}. Delete it manually")
     print("via the RunPod console if you no longer need the cached weights.")
@@ -337,6 +427,14 @@ def main() -> None:
     p_deploy.add_argument("--hf-token", default=os.environ.get("HUGGING_FACE_HUB_TOKEN", ""))
     p_deploy.add_argument("--max-model-len", type=int, default=0)
     p_deploy.set_defaults(func=cmd_deploy)
+
+    p_import = sub.add_parser("import", help="Register endpoints created outside this script (e.g. via console)")
+    p_import.add_argument(
+        "--endpoint", action="append", required=True, metavar="SLOT=ENDPOINT_ID",
+        help="Repeatable, e.g. --endpoint qwen08b=abc123 --endpoint qwen9b=def456",
+    )
+    p_import.add_argument("--volume-id", default="", help="Network volume id, if any, for the manifest")
+    p_import.set_defaults(func=cmd_import)
 
     p_status = sub.add_parser("status", help="Check endpoint health from a deploy manifest")
     p_status.add_argument("--manifest", required=True)

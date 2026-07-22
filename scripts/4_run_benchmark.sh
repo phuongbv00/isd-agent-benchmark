@@ -31,15 +31,23 @@ slot_upper() {
 
 # Export every API key env referenced by any slot or by the judge config so
 # child tmux sessions inherit them.
-declare -A _exported_keys=()
+# NOTE: no associative arrays here -- macOS ships bash 3.2 as /bin/bash (no
+# `declare -A`), which silently degrades to a broken integer-indexed array
+# (see 6_run_ladder.sh, which has `set -u` and crashes outright on this).
+_exported_keys_list=""
 register_key_envs() {
     local IFS=','
     for env_name in $1; do
         env_name="${env_name// /}"
-        if [[ -n "$env_name" && -z "${_exported_keys[$env_name]:-}" ]]; then
-            export "$env_name"
-            _exported_keys[$env_name]=1
-        fi
+        case " $_exported_keys_list " in
+            *" $env_name "*) ;;
+            *)
+                if [[ -n "$env_name" ]]; then
+                    export "$env_name"
+                    _exported_keys_list="$_exported_keys_list $env_name"
+                fi
+                ;;
+        esac
     done
 }
 for slot in $_AGENT_MODEL_SLOTS_LIST; do
