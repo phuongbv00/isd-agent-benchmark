@@ -33,41 +33,76 @@ RUNS="${RUNS:-1 2 3}"
 #   <SLOT>_AGENT_MODEL_PROVIDER / _BASE_URL / _NAME / _API_KEY_ENVS
 #   <SLOT>_RATE_LIMIT  (optional; overrides the global RATE_LIMIT for this slot
 #                       only — e.g. a smaller Qwen on a tighter-limited provider)
-# Defaults below target OpenRouter. The 9B ID is confirmed from the previous
-# artifact run (results/test_90_benchmark_qwen3.5-9b-nitro_20260714_104536:
-# "qwen/qwen3.5-9b:nitro").
 #
-# TODO(user): VERIFY the exact OpenRouter model IDs for 0.8B / 2B / 4B before
-# launching — the defaults below are inferred from the 9B naming pattern and
-# may not exist under these exact IDs (check https://openrouter.ai/models,
-# e.g. whether the ":nitro" variant is offered for the small sizes).
+# Backing: RunPod Serverless vLLM endpoints (via runpod_deploy_ladder.py),
+# not OpenRouter. BASE_URL depends on the endpoint_id RunPod assigns at
+# deploy time, so there is no static default for it -- run:
+#   python scripts/runpod_deploy_ladder.py deploy --volume-id <id>
+#   source results/runpod_ladder_<ts>/ladder_env.sh
+# before this script. If neither that file nor the *_BASE_URL vars are
+# already exported, this script auto-sources the newest
+# results/runpod_ladder_*/ladder_env.sh it can find (override the path via
+# RUNPOD_LADDER_ENV), then hard-fails with instructions if BASE_URL is still
+# unset for any slot -- see the validation block below.
 # ---------------------------------------------------------------------------
 LADDER_SLOTS="${LADDER_SLOTS:-qwen08b,qwen2b,qwen4b,qwen9b}"
 _LADDER_SLOTS_LIST="${LADDER_SLOTS//,/ }"
 
-QWEN08B_AGENT_MODEL_PROVIDER="${QWEN08B_AGENT_MODEL_PROVIDER:-openrouter}"
-QWEN08B_AGENT_MODEL_BASE_URL="${QWEN08B_AGENT_MODEL_BASE_URL:-https://openrouter.ai/api/v1}"
-QWEN08B_AGENT_MODEL_NAME="${QWEN08B_AGENT_MODEL_NAME:-qwen/qwen3.5-0.8b:nitro}"   # TODO(user): verify ID
-QWEN08B_AGENT_MODEL_API_KEY_ENVS="${QWEN08B_AGENT_MODEL_API_KEY_ENVS:-OPENROUTER_API_KEY}"
+if [[ -z "${QWEN08B_AGENT_MODEL_BASE_URL:-}${QWEN2B_AGENT_MODEL_BASE_URL:-}${QWEN4B_AGENT_MODEL_BASE_URL:-}${QWEN9B_AGENT_MODEL_BASE_URL:-}" ]]; then
+    _auto_env="${RUNPOD_LADDER_ENV:-}"
+    if [[ -z "$_auto_env" ]]; then
+        _auto_env=$(ls -t results/runpod_ladder_*/ladder_env.sh 2>/dev/null | head -1)
+    fi
+    if [[ -n "$_auto_env" && -f "$_auto_env" ]]; then
+        echo "Sourcing RunPod endpoint env: $_auto_env"
+        source "$_auto_env"
+    fi
+fi
 
-QWEN2B_AGENT_MODEL_PROVIDER="${QWEN2B_AGENT_MODEL_PROVIDER:-openrouter}"
-QWEN2B_AGENT_MODEL_BASE_URL="${QWEN2B_AGENT_MODEL_BASE_URL:-https://openrouter.ai/api/v1}"
-QWEN2B_AGENT_MODEL_NAME="${QWEN2B_AGENT_MODEL_NAME:-qwen/qwen3.5-2b:nitro}"       # TODO(user): verify ID
-QWEN2B_AGENT_MODEL_API_KEY_ENVS="${QWEN2B_AGENT_MODEL_API_KEY_ENVS:-OPENROUTER_API_KEY}"
+# HF model IDs match DEFAULT_SLOTS in runpod_deploy_ladder.py -- keep in sync.
+QWEN08B_AGENT_MODEL_PROVIDER="${QWEN08B_AGENT_MODEL_PROVIDER:-runpod-vllm}"
+QWEN08B_AGENT_MODEL_BASE_URL="${QWEN08B_AGENT_MODEL_BASE_URL:-}"
+QWEN08B_AGENT_MODEL_NAME="${QWEN08B_AGENT_MODEL_NAME:-Qwen/Qwen3.5-0.8B}"
+QWEN08B_AGENT_MODEL_API_KEY_ENVS="${QWEN08B_AGENT_MODEL_API_KEY_ENVS:-RUNPOD_API_KEY}"
 
-QWEN4B_AGENT_MODEL_PROVIDER="${QWEN4B_AGENT_MODEL_PROVIDER:-openrouter}"
-QWEN4B_AGENT_MODEL_BASE_URL="${QWEN4B_AGENT_MODEL_BASE_URL:-https://openrouter.ai/api/v1}"
-QWEN4B_AGENT_MODEL_NAME="${QWEN4B_AGENT_MODEL_NAME:-qwen/qwen3.5-4b:nitro}"       # TODO(user): verify ID
-QWEN4B_AGENT_MODEL_API_KEY_ENVS="${QWEN4B_AGENT_MODEL_API_KEY_ENVS:-OPENROUTER_API_KEY}"
+QWEN2B_AGENT_MODEL_PROVIDER="${QWEN2B_AGENT_MODEL_PROVIDER:-runpod-vllm}"
+QWEN2B_AGENT_MODEL_BASE_URL="${QWEN2B_AGENT_MODEL_BASE_URL:-}"
+QWEN2B_AGENT_MODEL_NAME="${QWEN2B_AGENT_MODEL_NAME:-Qwen/Qwen3.5-2B}"
+QWEN2B_AGENT_MODEL_API_KEY_ENVS="${QWEN2B_AGENT_MODEL_API_KEY_ENVS:-RUNPOD_API_KEY}"
 
-QWEN9B_AGENT_MODEL_PROVIDER="${QWEN9B_AGENT_MODEL_PROVIDER:-openrouter}"
-QWEN9B_AGENT_MODEL_BASE_URL="${QWEN9B_AGENT_MODEL_BASE_URL:-https://openrouter.ai/api/v1}"
-QWEN9B_AGENT_MODEL_NAME="${QWEN9B_AGENT_MODEL_NAME:-qwen/qwen3.5-9b:nitro}"       # confirmed from 20260714 run
-QWEN9B_AGENT_MODEL_API_KEY_ENVS="${QWEN9B_AGENT_MODEL_API_KEY_ENVS:-OPENROUTER_API_KEY}"
+QWEN4B_AGENT_MODEL_PROVIDER="${QWEN4B_AGENT_MODEL_PROVIDER:-runpod-vllm}"
+QWEN4B_AGENT_MODEL_BASE_URL="${QWEN4B_AGENT_MODEL_BASE_URL:-}"
+QWEN4B_AGENT_MODEL_NAME="${QWEN4B_AGENT_MODEL_NAME:-Qwen/Qwen3.5-4B}"
+QWEN4B_AGENT_MODEL_API_KEY_ENVS="${QWEN4B_AGENT_MODEL_API_KEY_ENVS:-RUNPOD_API_KEY}"
+
+QWEN9B_AGENT_MODEL_PROVIDER="${QWEN9B_AGENT_MODEL_PROVIDER:-runpod-vllm}"
+QWEN9B_AGENT_MODEL_BASE_URL="${QWEN9B_AGENT_MODEL_BASE_URL:-}"
+QWEN9B_AGENT_MODEL_NAME="${QWEN9B_AGENT_MODEL_NAME:-Qwen/Qwen3.5-9B}"
+QWEN9B_AGENT_MODEL_API_KEY_ENVS="${QWEN9B_AGENT_MODEL_API_KEY_ENVS:-RUNPOD_API_KEY}"
 
 slot_upper() {
     echo "$1" | tr '[:lower:]-' '[:upper:]_'
 }
+
+# Fail fast: an empty *_BASE_URL would otherwise vanish from the unquoted
+# run_benchmark.py invocation below (bash drops empty unquoted expansions),
+# silently shifting --agent-model-base-url's value onto the next flag.
+_missing_base_url=""
+for slot in $_LADDER_SLOTS_LIST; do
+    upper=$(slot_upper "$slot")
+    base_url_var="${upper}_AGENT_MODEL_BASE_URL"
+    if [[ -z "${!base_url_var:-}" ]]; then
+        _missing_base_url="${_missing_base_url} ${slot}"
+    fi
+done
+if [[ -n "$_missing_base_url" ]]; then
+    echo "ERROR: no RunPod BASE_URL set for slot(s):${_missing_base_url}" >&2
+    echo "Deploy endpoints first, then source the generated env file:" >&2
+    echo "  python scripts/runpod_deploy_ladder.py deploy --volume-id <id>" >&2
+    echo "  source results/runpod_ladder_<ts>/ladder_env.sh" >&2
+    echo "  ./scripts/6_run_ladder.sh" >&2
+    exit 1
+fi
 
 # Export every API key env referenced by any slot or the judge config so child
 # tmux sessions inherit them (same mechanism as 4_run_benchmark.sh).
@@ -115,7 +150,7 @@ echo ""
 echo "  !! WARNING: this launches ~$((NUM_SLOTS * NUM_RUNS)) full benchmark runs"
 echo "  !! (~$((NUM_SLOTS * NUM_RUNS * NUM_AGENTS * 90)) agent generations on test_90, plus judge calls)."
 echo "  !! This costs REAL MONEY and takes MANY HOURS."
-echo "  !! Verify the TODO model IDs for 0.8B/2B/4B in this script first."
+echo "  !! Also billing RunPod GPU time per endpoint on top of this."
 echo "=============================================================="
 read -r -p "Type 'yes' to launch the ladder: " CONFIRM
 if [[ "$CONFIRM" != "yes" ]]; then

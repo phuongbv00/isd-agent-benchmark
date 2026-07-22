@@ -7,11 +7,19 @@ TRAIN split so hyper-parameter/prompt tuning never touches the test set.
 
 Default: 1 scenario per (domain × difficulty) cell = 10 domains × 3 levels = 30.
 
+See also (different jobs, both also called "stratified"):
+  - split_train_test.py: one-time 95/5 split of the raw dataset, stratified on
+    domain|difficulty|learning_environment.
+  - sampling_strategy.py (StratifiedScenarioSampler): runtime n-sample selection
+    inside run_benchmark.py, stratified on 4 separate imbalance axes and may
+    duplicate items (oversample strategy).
+This script instead copies a fixed N-per-cell subset to disk, no duplicates.
+
 Examples:
   # 30-scenario tuning set from train (proper ML hygiene: tune on train, report on test)
-  python scripts/7_make_stratified_subset.py --source scenarios/train --target scenarios/train_30
-  # 90-scenario set, 3 per cell
-  python scripts/7_make_stratified_subset.py --source scenarios/train --target scenarios/train_90 --per-cell 3
+  python scenarios/make_stratified_subset.py --source scenarios/train --target scenarios/train_30
+  # 90-scenario test set, 3 per cell
+  python scenarios/make_stratified_subset.py --source scenarios/test --target scenarios/test_90 --per-cell 3
 """
 from __future__ import annotations
 

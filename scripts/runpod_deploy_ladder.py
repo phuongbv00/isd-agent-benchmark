@@ -2,8 +2,7 @@
 """Deploy/manage RunPod Serverless vLLM endpoints for the RQ1 model ladder.
 
 Self-hosts the exact Qwen checkpoints for the ladder (0.8B / 2B / 4B / 9B)
-as RunPod Serverless vLLM endpoints, instead of guessing OpenRouter model IDs
-(see the TODO(user) markers in 6_run_ladder.sh). Each endpoint exposes an
+as RunPod Serverless vLLM endpoints. Each endpoint exposes an
 OpenAI-compatible API that plugs directly into the benchmark's existing
 --agent-model-provider/--agent-model-base-url/--agent-model-name/
 --agent-model-api-key-envs flags -- no changes needed to 6_run_ladder.sh
@@ -75,7 +74,21 @@ from datetime import datetime
 
 REST_BASE = "https://rest.runpod.io/v1"
 GRAPHQL_URL = "https://api.runpod.io/graphql"
-VLLM_IMAGE = "runpod/worker-vllm:stable-cuda12.1.0"
+# Verified 2026-07-22 against https://github.com/runpod-workers/worker-vllm
+# releases + Docker Hub: `runpod/worker-vllm:stable-cuda12.1.0` (the old tag
+# this constant used to hold) is a ~2-year-old, unmaintained image and was
+# replaced. `runpod/worker-v1-vllm` is the current image; v2.22.5 (pushed
+# 2026-06-30) is its newest *stable* release, bundling vLLM 0.20.2 -- no
+# newer numbered release exists yet (Docker Hub's newer tags are unlabeled
+# CI dev/test builds, e.g. `dev-refs-pull-*`, not meant to be pinned).
+# Requires CUDA >= 13.0 on the host, which RTX 4090 / A6000 satisfy.
+# CAUTION: vLLM's `Qwen3.5` model class exists in current docs, but I could
+# not confirm it already shipped in 0.20.2 specifically vs. a later 0.2x.
+# If deploy succeeds but the worker errors on load with an unrecognized
+# architecture, retry against one of the newer (unstable/dev) CI tags on
+# https://hub.docker.com/r/runpod/worker-v1-vllm/tags, or check for a
+# worker-vllm release newer than v2.22.5 first.
+VLLM_IMAGE = "runpod/worker-v1-vllm:v2.22.5"
 
 # ---------------------------------------------------------------------------
 # Ladder slot defaults. HF model IDs and GPU tiers are TODO(user): VERIFY --
@@ -125,7 +138,9 @@ def _rest(method: str, path: str, body: dict | None = None) -> dict:
     req.add_header("Content-Type", "application/json")
     try:
         with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            raw = resp.read()
+            # DELETE returns 204 No Content with an empty body.
+            return json.loads(raw.decode("utf-8")) if raw else {}
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", errors="replace")
         print(f"ERROR {method} {path}: HTTP {e.code}\n{detail}", file=sys.stderr)
@@ -171,7 +186,7 @@ def _create_template(slot: str, cfg: dict, volume_id: str, args: argparse.Namesp
         "HF_HOME": "/runpod-volume/huggingface",
     }
     if args.hf_token:
-        env["HUGGING_FACE_HUB_TOKEN"] = args.hf_token
+        env["HF_TOKEN"] = args.hf_token
     if args.max_model_len:
         env["MAX_MODEL_LEN"] = str(args.max_model_len)
     body = {
@@ -277,7 +292,7 @@ def cmd_status(args: argparse.Namespace) -> None:
         endpoint_id = info["endpoint_id"]
         url = f"https://api.runpod.ai/v2/{endpoint_id}/health"
         req = urllib.request.Request(url)
-        req.add_header("authorization", _api_key())
+        req.add_header("Authorization", f"Bearer {_api_key()}")
         try:
             with urllib.request.urlopen(req) as resp:
                 health = json.loads(resp.read().decode("utf-8"))
