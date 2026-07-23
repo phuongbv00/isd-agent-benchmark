@@ -62,9 +62,19 @@ BOOT_SEED = 42
 
 # ── statistics (single home since 5_aggregate_benchmark_results.py was removed) ──
 
+EXACT_WILCOXON_N_MAX = 25  # exact permutation null up to this n_effective
+
+
 def wilcoxon_signed_rank(diffs: list[float]) -> tuple[float, float, int]:
-    """Two-sided Wilcoxon signed-rank (zeros discarded, tie-corrected normal
-    approximation). Returns (W_plus, p_value, n_effective)."""
+    """Two-sided Wilcoxon signed-rank (zeros discarded). Returns
+    (W_plus, p_value, n_effective).
+
+    For n_effective <= EXACT_WILCOXON_N_MAX the p-value is EXACT: the full
+    sign-flip permutation null of W+ is enumerated by dynamic programming
+    over (tie-averaged, doubled-to-integer) ranks. The normal approximation
+    is only used beyond that — it is anti-conservative at tiny n (e.g. it
+    can print p=0.11 at n=3 where the exact two-sided minimum is 0.25),
+    which misled the first ladder report."""
     d = [x for x in diffs if x != 0]
     n = len(d)
     if n == 0:
@@ -81,6 +91,26 @@ def wilcoxon_signed_rank(diffs: list[float]) -> tuple[float, float, int]:
             ranks[absd[k][1]] = avg
         i = j + 1
     w_plus = sum(r for r, x in zip(ranks, d) if x > 0)
+
+    if n <= EXACT_WILCOXON_N_MAX:
+        # DP over doubled ranks (tie-averaged ranks are multiples of 0.5,
+        # so doubling makes them integers). dp[s] = #sign assignments whose
+        # positive-rank doubled-sum equals s.
+        dranks = [round(2 * r) for r in ranks]
+        total = sum(dranks)
+        dp = [0] * (total + 1)
+        dp[0] = 1
+        for r in dranks:
+            for s in range(total, r - 1, -1):
+                dp[s] += dp[s - r]
+        w2 = round(2 * w_plus)
+        lo, hi = min(w2, total - w2), max(w2, total - w2)
+        count = sum(dp[: lo + 1]) + sum(dp[hi:])
+        if lo == hi:
+            count -= dp[lo]  # the single central point was counted in both tails
+        p = min(1.0, count / (1 << n))
+        return w_plus, p, n
+
     mu = n * (n + 1) / 4
     var = n * (n + 1) * (2 * n + 1) / 24
     cnt = Counter(abs(x) for x in d)
@@ -99,6 +129,22 @@ def bootstrap_ci(diffs: list[float], n_boot: int = N_BOOT, seed: int = BOOT_SEED
     n = len(diffs)
     means = sorted(sum(rng.choices(diffs, k=n)) / n for _ in range(n_boot))
     return means[int(0.025 * n_boot)], means[int(0.975 * n_boot) - 1]
+
+
+def fisher_exact_2x2(a: int, b: int, c: int, d: int) -> float:
+    """Two-sided Fisher exact test p for the 2x2 table [[a, b], [c, d]]
+    (sum of hypergeometric probabilities <= that of the observed table)."""
+    row1, row2, col1 = a + b, c + d, a + c
+    n = row1 + row2
+
+    def p_table(x: int) -> float:
+        return (math.comb(row1, x) * math.comb(row2, col1 - x)) / math.comb(n, col1)
+
+    p_obs = p_table(a)
+    lo_x = max(0, col1 - row2)
+    hi_x = min(col1, row1)
+    return min(1.0, sum(p for x in range(lo_x, hi_x + 1)
+                        if (p := p_table(x)) <= p_obs * (1 + 1e-12)))
 
 
 def holm_correct(pvalues: list[float]) -> list[float]:
@@ -461,10 +507,65 @@ def interaction_tests(models: list[dict], proposed: str, baselines: list[str],
     }
 
 
+def failure_tests(models: list[dict], proposed: str, baselines: list[str]) -> dict:
+    """Scenario-level output-failure comparison (proposed vs each baseline).
+
+    Unit = scenario (union across the size's runs); "failed" = the agent has no
+    scorable output in at least one run (n_scenarios_any_missing). Fisher exact
+    two-sided on the 2x2 [failed, ok] x [proposed, baseline]. This is the
+    robustness face of the "harness compensates for small models" claim — it
+    stays valid where tiny complete-case n makes the score comparison
+    untestable. Run-level totals are reported descriptively only (runs of the
+    same scenario are not independent)."""
+    out = []
+    for model in models:
+        n_union = model["n_scenarios_union"]
+        n_runs = model["n_runs"]
+        summ = model["agents"]
+        rows = []
+        miss_p = summ[proposed]["n_scenarios_any_missing"]
+        for b in baselines:
+            miss_b = summ[b]["n_scenarios_any_missing"]
+            p = fisher_exact_2x2(miss_p, n_union - miss_p, miss_b, n_union - miss_b)
+            run_level_b = sum(info["missing_by_agent"].get(b, 0) for info in model["per_run"])
+            rows.append({
+                "baseline": b,
+                "proposed_failed_scenarios": miss_p,
+                "baseline_failed_scenarios": miss_b,
+                "n_scenarios": n_union,
+                "baseline_failed_run_level": f"{run_level_b}/{n_runs * n_union}",
+                "fisher_p_two_sided": p,
+            })
+        holm = holm_correct([r["fisher_p_two_sided"] for r in rows])
+        for r, ph in zip(rows, holm):
+            r["p_holm"] = ph
+        out.append({"label": model["label"], "rows": rows})
+    return {
+        "definition": (
+            "Scenario-level failure = agent missing a scorable output in >=1 of the "
+            "size's runs (n_scenarios_any_missing). Fisher exact two-sided, Holm over "
+            f"{len(baselines)} comparisons per size. Run-level counts descriptive only."
+        ),
+        "per_model": out,
+    }
+
+
 def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
-                   agents: list[str]) -> Optional[dict]:
-    """Pool alignment_scores.json metrics if any exist (RQ2). Graceful skip."""
+                   agents: list[str], proposed: str,
+                   baselines: list[str]) -> Optional[dict]:
+    """Pool alignment_scores.json metrics if any exist (RQ2). Graceful skip.
+
+    Besides the per-metric means, computes for the composite:
+      * paired Wilcoxon (exact at small n) + Holm + bootstrap CI, proposed vs
+        each baseline, paired by scenario on mean-of-runs (scenarios where both
+        agents were scored) — the RQ2 inferential layer;
+      * a conditional mean: composite restricted to scenarios whose output
+        yielded >=1 objective (porter_mean defined). The unconditional mean
+        scores unparseable/objective-less outputs as ~0, so it mixes failure
+        rate with alignment quality; the conditional mean isolates the latter.
+    """
     out_models = {}
+    stats_models = []
     found_any = False
     for model in models:
         label = model["label"]
@@ -481,23 +582,79 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
                     for metric, val in metrics.items():
                         metric_vals.setdefault(agent, {}).setdefault(metric, {}) \
                             .setdefault(sid, []).append(val)
-        if metric_vals:
-            out_models[label] = {
-                agent: {
-                    metric: {
-                        "n_scenarios": len(by_scen),
-                        "mean": _mean([_mean(v) for v in by_scen.values()]),
-                        "sd_across_scenarios": _sd([_mean(v) for v in by_scen.values()]),
-                    }
-                    for metric, by_scen in sorted(metrics.items())
+        if not metric_vals:
+            continue
+        out_models[label] = {
+            agent: {
+                metric: {
+                    "n_scenarios": len(by_scen),
+                    "mean": _mean([_mean(v) for v in by_scen.values()]),
+                    "sd_across_scenarios": _sd([_mean(v) for v in by_scen.values()]),
                 }
-                for agent, metrics in sorted(metric_vals.items())
+                for metric, by_scen in sorted(metrics.items())
             }
+            for agent, metrics in sorted(metric_vals.items())
+        }
+
+        # per-scenario composite (mean of runs where scored) + conditional set
+        comp_map: dict[str, dict[str, float]] = {}
+        cond_map: dict[str, dict[str, float]] = {}
+        for agent, metrics in metric_vals.items():
+            comp = metrics.get("composite", {})
+            porter = metrics.get("porter_mean", {})
+            comp_map[agent] = {sid: _mean(v) for sid, v in comp.items()}
+            cond_map[agent] = {sid: _mean(v) for sid, v in comp.items() if sid in porter}
+
+        rows = []
+        for b in baselines:
+            pmap, bmap = comp_map.get(proposed, {}), comp_map.get(b, {})
+            shared = sorted(set(pmap) & set(bmap))
+            diffs = [pmap[s] - bmap[s] for s in shared]
+            if not diffs:
+                rows.append({"baseline": b, "n": 0})
+                continue
+            w, p, n_eff = wilcoxon_signed_rank(diffs)
+            lo, hi = bootstrap_ci(diffs)
+            rows.append({
+                "baseline": b,
+                "n": len(diffs),
+                "n_effective_nonzero": n_eff,
+                "mean_diff": _mean(diffs),
+                "ci95": [lo, hi],
+                "wilcoxon_w_plus": w,
+                "p_raw": p,
+                "rank_biserial_r": rank_biserial(diffs),
+            })
+        with_p = [r for r in rows if "p_raw" in r]
+        holm = holm_correct([r["p_raw"] for r in with_p])
+        for r, ph in zip(with_p, holm):
+            r["p_holm"] = ph
+        stats_models.append({
+            "label": label,
+            "conditional_composite": {
+                agent: {"n": len(vals), "mean": _mean(list(vals.values()))}
+                for agent, vals in sorted(cond_map.items()) if vals
+            },
+            "comparisons": rows,
+        })
     if not found_any:
         return None
     return {
         "source": "alignment_scores.json per scenario dir (pooled mean across runs, then across scenarios)",
         "models": out_models,
+        "stats": {
+            "definition": (
+                "Paired composite diffs (proposed - baseline) per scenario "
+                "(mean of runs where scored; scenarios scored for both agents). "
+                "Wilcoxon two-sided (exact null for n<=%d), Holm over %d "
+                "comparisons per size, bootstrap CI (%d, seed %d). "
+                "conditional_composite = composite over scenarios whose output "
+                "yielded >=1 objective (isolates alignment quality from parse/"
+                "capability failure, which the unconditional mean folds in as ~0 "
+                "scores)." % (EXACT_WILCOXON_N_MAX, len(baselines), N_BOOT, BOOT_SEED)
+            ),
+            "per_model": stats_models,
+        },
     }
 
 
@@ -617,6 +774,17 @@ def print_report(pooled: dict, proposed: str, baselines: list[str]) -> None:
                 secs = fields.get("execution_time_seconds", {}).get("mean", float("nan"))
                 print(f"    {agent:20s} total_tokens={tt:10.0f}  llm_calls={calls:6.1f}  exec_s={secs:7.1f}")
 
+    if pooled.get("failure_rates"):
+        print("\n## Output-failure rates (scenario-level, Fisher exact vs proposed)")
+        print(f"  {pooled['failure_rates']['definition']}")
+        for entry in pooled["failure_rates"]["per_model"]:
+            print(f"  [{entry['label']}]")
+            for r in entry["rows"]:
+                print(f"    vs {r['baseline']:20s} failed {r['proposed_failed_scenarios']:2d} vs "
+                      f"{r['baseline_failed_scenarios']:2d} /{r['n_scenarios']} scenarios "
+                      f"(run-level {r['baseline_failed_run_level']:>8s})  "
+                      f"p={r['fisher_p_two_sided']:.2e} p_holm={r['p_holm']:.2e}")
+
     if pooled.get("alignment"):
         print("\n## Alignment metrics (RQ2, pooled from alignment_scores.json)")
         for label, agents_metrics in pooled["alignment"]["models"].items():
@@ -625,6 +793,23 @@ def print_report(pooled: dict, proposed: str, baselines: list[str]) -> None:
                 parts = ", ".join(f"{m}={v['mean']:.3f}(n={v['n_scenarios']})"
                                   for m, v in metrics.items())
                 print(f"    {agent:20s} {parts}")
+        stats = pooled["alignment"].get("stats")
+        if stats:
+            print("\n## Alignment composite — paired stats + conditional means (RQ2)")
+            print(f"  {stats['definition']}")
+            for entry in stats["per_model"]:
+                print(f"  [{entry['label']}]")
+                for r in entry["comparisons"]:
+                    if r.get("n", 0) == 0 or "p_raw" not in r:
+                        print(f"    vs {r['baseline']:20s} (no paired scenarios)")
+                        continue
+                    lo, hi = r["ci95"]
+                    print(f"    vs {r['baseline']:20s} n={r['n']:3d} dComp={r['mean_diff']:+7.3f} "
+                          f"CI95[{lo:+6.3f},{hi:+6.3f}] r_rb={r['rank_biserial_r']:+.2f} "
+                          f"p={r['p_raw']:.2e} p_holm={r['p_holm']:.2e}")
+                cond = ", ".join(f"{a}={v['mean']:.3f}(n={v['n']})"
+                                 for a, v in entry["conditional_composite"].items())
+                print(f"    conditional (>=1 objective): {cond}")
     else:
         print("\n## Alignment metrics: no alignment_scores.json found — skipped (RQ2 metric "
               "not yet computed; re-run pooling after it lands).")
@@ -700,7 +885,9 @@ def main() -> None:
         },
         "models": models,
         "interaction": interaction_tests(models, args.proposed, baselines),
-        "alignment": pool_alignment(models, run_dirs_by_model, agents),
+        "failure_rates": failure_tests(models, args.proposed, baselines),
+        "alignment": pool_alignment(models, run_dirs_by_model, agents,
+                                    args.proposed, baselines),
         "token_usage": pool_tokens(run_dirs_by_model, agents),
     }
 

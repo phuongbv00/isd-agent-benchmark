@@ -2,7 +2,8 @@
 """Generate paper tables + number macros from pooled_ladder.json (no hand-typed numbers).
 
 Reads the output of scripts/7_pool_ladder_runs.py and writes into
-docs/paper/acm/vn/generated/ :
+results/generated/ (benchmark-local; sync into the thesis paper tree with
+docs/scripts/sync_generated.sh from the thesis repo root):
 
   tab_rq1.tex           complete booktabs table* — agents x 4 model sizes,
                         cell = mean Total (+- run-to-run SD), n column per size
@@ -33,9 +34,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]  # master-thesis/
-DEFAULT_OUTDIR = REPO_ROOT / "docs" / "paper" / "acm" / "vn" / "generated"
-DEFAULT_POOLED = Path(__file__).resolve().parents[1] / "results" / "pooled_ladder.json"
+BENCH_ROOT = Path(__file__).resolve().parents[1]  # isd-agent-benchmark/
+DEFAULT_OUTDIR = BENCH_ROOT / "results" / "generated"
+DEFAULT_POOLED = BENCH_ROOT / "results" / "pooled_ladder.json"
 
 AGENT_DISPLAY = {
     "baseline": "Baseline",

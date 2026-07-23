@@ -4,7 +4,8 @@
 Companion of scripts/8_gen_paper_tables.py — same stage of the pipeline, same
 input, but emits figures instead of tables. Writes every figure as both .pdf
 (vector, for LaTeX \\includegraphics) and .png (dpi 200, for quick preview)
-into docs/paper/acm/vn/generated/figures/ :
+into results/generated/figures/ (benchmark-local; sync into the thesis paper
+tree with docs/scripts/sync_generated.sh from the thesis repo root):
 
   fig_rq1_ladder          mean Total vs model size, one line per agent,
                           error bar = run-to-run SD (headline RQ1 figure)
@@ -58,9 +59,8 @@ except ImportError:  # pragma: no cover
     sys.exit(1)
 
 BENCH_ROOT = Path(__file__).resolve().parents[1]   # isd-agent-benchmark/
-THESIS_ROOT = Path(__file__).resolve().parents[2]  # master-thesis/
 DEFAULT_POOLED = BENCH_ROOT / "results" / "pooled_ladder.json"
-DEFAULT_OUTDIR = THESIS_ROOT / "docs" / "paper" / "acm" / "vn" / "generated" / "figures"
+DEFAULT_OUTDIR = BENCH_ROOT / "results" / "generated" / "figures"
 
 # Same identities as scripts/8_gen_paper_tables.py (kept in sync by hand).
 AGENT_DISPLAY = {
@@ -78,22 +78,34 @@ AGENT_ORDER = [
 ]
 PROPOSED = "alignmentgraph-isd"
 
-# Okabe-Ito-derived categorical palette, fixed per agent (never cycled),
-# validated colorblind-safe as an ordered set; the proposed agent gets the
-# most salient slot plus a heavier line + distinct marker (secondary encoding).
+# Rainbow-ordered (spectral) 7-hue categorical palette, fixed per agent
+# (never cycled). Spectral ordering means the perceptually-closest hues are
+# validated as adjacent pairs; the set passes the lightness band, chroma
+# floor and normal-vision floor, with one adjacent pair (olive/orange) in
+# the CVD 6-8 band — covered by a secondary encoding (olive is dashed, see
+# AGENT_LINESTYLE). Line charts draw baselines as plain lines (no markers);
+# only the proposed agent carries a marker + heavier width, so it can never
+# be confused with a comparison line.
 AGENT_COLOR = {
-    "baseline": "#E69F00",
-    "eduplanner": "#56B4E9",
-    "addie-agent": "#D55E00",
-    "rpisd-agent": "#009E73",
-    "dick-carey-agent": "#CC79A7",
-    "react-isd": "#882255",
-    "alignmentgraph-isd": "#0072B2",
+    "baseline": "#C42D00",            # red
+    "eduplanner": "#EF9E0B",          # orange
+    "addie-agent": "#8F9900",         # olive   (dashed — CVD pair w/ orange)
+    "rpisd-agent": "#007A3D",         # green
+    "dick-carey-agent": "#00B0D5",    # cyan
+    "alignmentgraph-isd": "#0048B0",  # blue    (proposed — emphasized)
+    "react-isd": "#E8438F",           # magenta
 }
-AGENT_MARKER = {
-    "baseline": "o", "eduplanner": "s", "addie-agent": "^", "rpisd-agent": "v",
-    "dick-carey-agent": "P", "react-isd": "X", "alignmentgraph-isd": "D",
+AGENT_LINESTYLE = {
+    "addie-agent": (0, (4, 1.8)),     # secondary encoding for the olive/orange CVD pair
 }
+
+
+def point_marker(agent: str) -> str:
+    """Marker for point/scatter figures: uniform circles, diamond = proposed.
+
+    Per-agent marker shapes were dropped everywhere — identity is carried by
+    hue (+ the olive dash on lines); shape only singles out the proposed."""
+    return "D" if agent == PROPOSED else "o"
 
 # The 5 alignment components (order fixed; same set as 7_score_alignment.py
 # COMPONENTS minus the composite, which gets its own figure).
@@ -145,13 +157,15 @@ def agents_in(pooled: dict) -> list[str]:
 
 
 def line_kw(agent: str) -> dict:
-    """Series style: proposed is emphasized, baselines recessive."""
+    """Series style: proposed = heavy line + diamond marker; baselines =
+    plain lines, no markers (identity carried by hue + the one dash)."""
     proposed = agent == PROPOSED
     return {
         "color": AGENT_COLOR.get(agent, "#666666"),
-        "marker": AGENT_MARKER.get(agent, "o"),
-        "linewidth": 2.0 if proposed else 1.2,
-        "markersize": 5.5 if proposed else 4,
+        "marker": "D" if proposed else "",
+        "linestyle": AGENT_LINESTYLE.get(agent, "-"),
+        "linewidth": 2.6 if proposed else 1.4,
+        "markersize": 5.5,
         "zorder": 5 if proposed else 3,
         "markeredgecolor": "white",
         "markeredgewidth": 0.6,
@@ -160,7 +174,7 @@ def line_kw(agent: str) -> dict:
 
 def agent_legend(fig, agents: list[str], **kw) -> None:
     handles = [
-        Line2D([], [], label=AGENT_DISPLAY.get(a, a), linestyle="-", **{
+        Line2D([], [], label=AGENT_DISPLAY.get(a, a), **{
             k: v for k, v in line_kw(a).items() if k != "zorder"})
         for a in agents
     ]
@@ -270,12 +284,12 @@ def fig_rq1_delta(pooled: dict, outdir: Path, written: list[Path]) -> None:
         sig = [_nan(r.get("p_holm")) < 0.05 for r in rows_by_size]
 
         ax.axhline(0, color="#999999", linewidth=0.8, zorder=1)
-        ax.fill_between(sizes, los, his, color="#0072B2", alpha=0.15, linewidth=0, zorder=2)
-        ax.plot(sizes, ys, color="#0072B2", linewidth=1.4, zorder=3)
+        ax.fill_between(sizes, los, his, color=AGENT_COLOR[PROPOSED], alpha=0.15, linewidth=0, zorder=2)
+        ax.plot(sizes, ys, color=AGENT_COLOR[PROPOSED], linewidth=1.4, zorder=3)
         for x, y, s, r, m in zip(sizes, ys, sig, rows_by_size, models):
             ax.plot([x], [y], marker="D", markersize=4.5,
-                    markerfacecolor="#0072B2" if s else "white",
-                    markeredgecolor="#0072B2", markeredgewidth=1.0, zorder=4)
+                    markerfacecolor=AGENT_COLOR[PROPOSED] if s else "white",
+                    markeredgecolor=AGENT_COLOR[PROPOSED], markeredgewidth=1.0, zorder=4)
             # flag points backed by few complete-case pairs (heavy agent failure)
             n = r.get("n")
             if n is not None and n < 0.5 * (m.get("n_scenarios_union") or n):
@@ -439,7 +453,7 @@ def fig_rq2_vs_rq1_scatter(pairs: dict, agents: list[str], outdir: Path,
             all_c += list(cs)
             ax.scatter(ts, cs, s=7, alpha=0.45, linewidths=0,
                        color=AGENT_COLOR.get(a, "#666666"),
-                       marker=AGENT_MARKER.get(a, "o"),
+                       marker=point_marker(a),
                        zorder=5 if a == PROPOSED else 3)
         rho = spearman_rho(all_t, all_c)
         ax.set_title(f"Qwen3.5-{size_display(lb)}", fontsize=8)
@@ -513,7 +527,7 @@ def fig_cost_quality(pooled: dict, outdir: Path, written: list[Path]) -> bool:
             ax.plot(xs, ys, alpha=0.9, color=kw["color"], marker="",
                     linewidth=0.9 if a != PROPOSED else 1.6, zorder=kw["zorder"])
             for x, y, ms in zip(xs, ys, size_ms):
-                ax.plot([x], [y], marker=kw["marker"], markersize=ms,
+                ax.plot([x], [y], marker=point_marker(a), markersize=ms,
                         color=kw["color"], markeredgecolor="white",
                         markeredgewidth=0.6, zorder=kw["zorder"] + 1)
         if logx:
