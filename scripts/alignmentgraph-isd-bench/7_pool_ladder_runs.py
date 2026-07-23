@@ -24,12 +24,12 @@ Outputs ``pooled_ladder.json`` plus a human-readable stdout report:
     exist in scenario dirs (graceful skip otherwise)
 
 Usage:
-  python scripts/7_pool_ladder_runs.py \
+  python scripts/alignmentgraph-isd-bench/7_pool_ladder_runs.py \
       --model qwen0.8b=results/test_90_benchmark_qwen3.5-0.8b-nitro_r1_...,results/..._r2_...,results/..._r3_... \
       --model qwen2b=... --model qwen4b=... --model qwen9b=...
 
   # or auto-group by model name parsed from the dir naming convention
-  python scripts/7_pool_ladder_runs.py --auto-glob 'results/test_90_benchmark_*_r*'
+  python scripts/alignmentgraph-isd-bench/7_pool_ladder_runs.py --auto-glob 'results/test_90_benchmark_*_r*'
 
 The statistics helpers (wilcoxon_signed_rank, bootstrap_ci, holm_correct)
 live here — this file is the single home of the algorithms since

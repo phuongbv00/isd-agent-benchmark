@@ -140,15 +140,15 @@ python scripts/3_sync_runpod_pods_env.py
 DATASET=train_30 AGENT_MODEL_SLOTS=qwen2b RUN_TAGS=tune1 ./scripts/4_run_benchmark.sh
 
 # RQ1 model ladder (4 sizes x 3 runs x 7 agents on test_90) + audits
-python scripts/5_audit_preflight.py
-./scripts/5_run_ladder.sh
-python scripts/6_audit_inflight.py             # while running
-python scripts/6_audit_postrun.py              # after each run
+python scripts/alignmentgraph-isd-bench/5_audit_preflight.py
+./scripts/alignmentgraph-isd-bench/5_run_ladder.sh
+python scripts/alignmentgraph-isd-bench/6_audit_inflight.py             # while running
+python scripts/alignmentgraph-isd-bench/6_audit_postrun.py              # after each run
 
 # Post-processing: RQ2 alignment scoring, pooling, paper tables
-for RUN in results/test_90_benchmark_*_r*; do python scripts/7_score_alignment.py "$RUN"; done
-python scripts/7_pool_ladder_runs.py --auto-glob 'results/test_90_benchmark_*_r*'
-python scripts/8_gen_paper_tables.py --pooled results/pooled_ladder.json
+for RUN in results/test_90_benchmark_*_r*; do python scripts/alignmentgraph-isd-bench/7_score_alignment.py "$RUN"; done
+python scripts/alignmentgraph-isd-bench/7_pool_ladder_runs.py --auto-glob 'results/test_90_benchmark_*_r*'
+python scripts/alignmentgraph-isd-bench/8_gen_paper_tables.py --pooled results/pooled_ladder.json
 ```
 
 ## Configuration Matrix

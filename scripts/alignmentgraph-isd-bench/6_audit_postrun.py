@@ -18,8 +18,8 @@ pooling failure policies. Red = infrastructure-level junk (stubs, empty
 outputs, zero token accounting, model/dir mismatch).
 
 Usage:
-  python scripts/6_audit_postrun.py                          # all ladder runs
-  python scripts/6_audit_postrun.py results/test_90_benchmark_Qwen3.5-2B_r1_*
+  python scripts/alignmentgraph-isd-bench/6_audit_postrun.py                          # all ladder runs
+  python scripts/alignmentgraph-isd-bench/6_audit_postrun.py results/test_90_benchmark_Qwen3.5-2B_r1_*
 
 Exit code 0 = no red findings, 1 = red findings present.
 """
@@ -31,7 +31,7 @@ import json
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 AGENTS = ["eduplanner", "baseline", "react-isd", "addie-agent",
           "dick-carey-agent", "rpisd-agent", "alignmentgraph-isd"]
 STUB_MARKS = ['"미지정"', '"problem_definition": null']
@@ -142,7 +142,7 @@ def audit_run(run_dir: Path) -> dict:
     n_align = sum(1 for sd in scen_dirs if (sd / "alignment_scores.json").exists())
     if n_align < n:
         info.append(f"alignment_scores.json: {n_align}/{n} "
-                    "(run scripts/7_score_alignment.py before pooling RQ2)")
+                    "(run scripts/alignmentgraph-isd-bench/7_score_alignment.py before pooling RQ2)")
 
     return {"n_scenarios": n, "missing": missing, "red": red, "info": info,
             "judge_counts": sorted(judge_counts)}

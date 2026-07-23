@@ -14,7 +14,7 @@
 # estimates and how to resume a partial ladder.
 # ---------------------------------------------------------------------------
 set -u
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 source .env 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ AGENTS="${AGENTS:-eduplanner,baseline,react-isd,addie-agent,dick-carey-agent,rpi
 # Run tags: 3 independent runs per model size. Comma- or space-separated
 # full tags (same var and mechanism as RUN_TAGS in 4_run_benchmark.sh).
 # For resume, override e.g.
-#   RUN_TAGS="r2,r3" LADDER_SLOTS="qwen08b" ./scripts/5_run_ladder.sh
+#   RUN_TAGS="r2,r3" LADDER_SLOTS="qwen08b" ./scripts/alignmentgraph-isd-bench/5_run_ladder.sh
 RUN_TAGS="${RUN_TAGS:-r1 r2 r3}"
 _RUN_TAGS_LIST="${RUN_TAGS//,/ }"
 
@@ -94,7 +94,7 @@ if [[ -n "$_missing_base_url" ]]; then
     echo "Deploy the pods in the console (template link in ../docs/benchmark_guides.md, section 4)," >&2
     echo "then sync their env-quads into .env and relaunch:" >&2
     echo "  python scripts/3_sync_runpod_pods_env.py" >&2
-    echo "  ./scripts/5_run_ladder.sh" >&2
+    echo "  ./scripts/alignmentgraph-isd-bench/5_run_ladder.sh" >&2
     exit 1
 fi
 
@@ -290,4 +290,4 @@ echo ""
 echo "Stop everything: tmux kill-server"
 echo ""
 echo "After all runs finish, pool with:"
-echo "  python scripts/7_pool_ladder_runs.py --auto-glob 'results/${DATASET}_benchmark_*_r*'"
+echo "  python scripts/alignmentgraph-isd-bench/7_pool_ladder_runs.py --auto-glob 'results/${DATASET}_benchmark_*_r*'"

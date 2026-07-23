@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate paper figures (RQ1/RQ2 statistical charts) from pooled_ladder.json.
 
-Companion of scripts/8_gen_paper_tables.py — same stage of the pipeline, same
+Companion of scripts/alignmentgraph-isd-bench/8_gen_paper_tables.py — same stage of the pipeline, same
 input, but emits figures instead of tables. Writes every figure as both .pdf
 (vector, for LaTeX \\includegraphics) and .png (dpi 200, for quick preview)
 into results/generated/figures/ (benchmark-local; sync into the thesis paper
@@ -27,10 +27,10 @@ with the generated tables). Numbers come exclusively from pooled_ladder.json
 and the raw run dirs — nothing hand-typed.
 
 Usage:
-  python scripts/8_gen_paper_figures.py                       # pooled JSON only
-  python scripts/8_gen_paper_figures.py \
+  python scripts/alignmentgraph-isd-bench/8_gen_paper_figures.py                       # pooled JSON only
+  python scripts/alignmentgraph-isd-bench/8_gen_paper_figures.py \
       --runs-glob 'results/test_90_benchmark_*_r*'            # + scatter figure
-  python scripts/8_gen_paper_figures.py --demo                # synthetic layout test
+  python scripts/alignmentgraph-isd-bench/8_gen_paper_figures.py --demo                # synthetic layout test
 """
 
 from __future__ import annotations
@@ -58,11 +58,11 @@ except ImportError:  # pragma: no cover
     )
     sys.exit(1)
 
-BENCH_ROOT = Path(__file__).resolve().parents[1]   # isd-agent-benchmark/
+BENCH_ROOT = Path(__file__).resolve().parents[2]   # isd-agent-benchmark/
 DEFAULT_POOLED = BENCH_ROOT / "results" / "pooled_ladder.json"
 DEFAULT_OUTDIR = BENCH_ROOT / "results" / "generated" / "figures"
 
-# Same identities as scripts/8_gen_paper_tables.py (kept in sync by hand).
+# Same identities as scripts/alignmentgraph-isd-bench/8_gen_paper_tables.py (kept in sync by hand).
 AGENT_DISPLAY = {
     "baseline": "Baseline",
     "eduplanner": "EduPlanner",
@@ -640,7 +640,7 @@ def main() -> None:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--pooled", type=Path, default=DEFAULT_POOLED,
-                        help="pooled_ladder.json from scripts/7_pool_ladder_runs.py")
+                        help="pooled_ladder.json from scripts/alignmentgraph-isd-bench/7_pool_ladder_runs.py")
     parser.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR,
                         help="output directory for .pdf/.png figures")
     parser.add_argument("--runs-glob", default=None, metavar="PATTERN",

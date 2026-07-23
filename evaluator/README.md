@@ -81,7 +81,7 @@ LLM이 일관된 평가 기준을 적용할 수 있도록 지원합니다.
 한/영 동사 lexicon 기반이고, `scripts/train_bloom_classifier.py`로 학습한
 transformer 체크포인트로 대체할 수 있습니다(`evaluator/scripts/README.md`).
 
-벤치마크 레벨 실행: 상위 저장소의 `scripts/7_score_alignment.py`가 run dir
+벤치마크 레벨 실행: 상위 저장소의 `scripts/alignmentgraph-isd-bench/7_score_alignment.py`가 run dir
 전체를 채점해 시나리오별 `alignment_scores.json`을 남깁니다. 지표 정의
 전문은 모노레포의 `docs/benchmark_guides.md` 부록 A.3 참조.
 

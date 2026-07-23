@@ -12,9 +12,9 @@ character-n-gram fallback; pass ``--encoder st`` to use a local
 sentence-transformers model for real scoring runs.
 
 Examples:
-  python scripts/7_score_alignment.py results/test_90_benchmark_..._104536
-  python scripts/7_score_alignment.py results/test_90_... --limit 5
-  python scripts/7_score_alignment.py results/test_90_... --encoder st \
+  python scripts/alignmentgraph-isd-bench/7_score_alignment.py results/test_90_benchmark_..._104536
+  python scripts/alignmentgraph-isd-bench/7_score_alignment.py results/test_90_... --limit 5
+  python scripts/alignmentgraph-isd-bench/7_score_alignment.py results/test_90_... --encoder st \
       --st-model sentence-transformers/LaBSE
 """
 
@@ -28,7 +28,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "evaluator" / "src"))
 
 from isd_evaluator.metrics.alignment import (  # noqa: E402

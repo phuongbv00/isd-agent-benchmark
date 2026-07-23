@@ -12,9 +12,9 @@ default), the red-flag counters that must all stay at 0:
 plus ok/fail tallies and progress-log freshness (stale > --stale-min minutes
 -> warning). Run it every 30-60 minutes during the ladder, e.g.:
 
-  python scripts/6_audit_inflight.py            # newest ladder dir
-  python scripts/6_audit_inflight.py --ladder-dir results/ladder_20260722_200348
-  watch -n 300 python scripts/6_audit_inflight.py
+  python scripts/alignmentgraph-isd-bench/6_audit_inflight.py            # newest ladder dir
+  python scripts/alignmentgraph-isd-bench/6_audit_inflight.py --ladder-dir results/ladder_20260722_200348
+  watch -n 300 python scripts/alignmentgraph-isd-bench/6_audit_inflight.py
 
 Exit code 0 = clean, 1 = at least one red flag > 0.
 """
@@ -26,7 +26,7 @@ import sys
 import time
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 RED_FLAGS = {
     "524": "Error code: 524",

@@ -21,7 +21,7 @@ Usage:
   python scripts/3_sync_runpod_pods_env.py            # sync pods -> .env block
   python scripts/3_sync_runpod_pods_env.py --dry-run  # print the block, write nothing
   source .env
-  ./scripts/5_run_ladder.sh
+  ./scripts/alignmentgraph-isd-bench/5_run_ladder.sh
 
 The managed block contains, per slot, the benchmark env-quad:
 
@@ -259,7 +259,7 @@ def main() -> None:
 
     print(f"\n{action} {ENV_PATH} ({len(slots)} slot(s))")
     print("\nsource .env")
-    print("./scripts/5_run_ladder.sh")
+    print("./scripts/alignmentgraph-isd-bench/5_run_ladder.sh")
 
 
 if __name__ == "__main__":

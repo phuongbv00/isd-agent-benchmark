@@ -15,8 +15,8 @@ Checks, per ladder slot found in .env (managed block or manual quads):
 Reads .env itself (no `source` needed). Exit code 0 = all PASS, 1 = any FAIL.
 
 Usage:
-  python scripts/5_audit_preflight.py
-  python scripts/5_audit_preflight.py --no-smoke
+  python scripts/alignmentgraph-isd-bench/5_audit_preflight.py
+  python scripts/alignmentgraph-isd-bench/5_audit_preflight.py --no-smoke
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 SLOTS = ["qwen08b", "qwen2b", "qwen4b", "qwen9b"]
 REQUIRED_FLAGS = {
     "AGENT_MODEL_MAX_TOKENS_CAP": "8096",
