@@ -117,20 +117,39 @@ python run_benchmark.py \
 
 ### 3. Run Benchmark
 
-```bash
-# Split data into train/test
-./scripts/2_split_data.sh
+The `scripts/` prefix numbers follow the execution order of the full pipeline
+(the end-to-end guide, including the self-hosted RunPod/vLLM serving setup and
+the RQ1 "model ladder", lives in the parent monorepo:
+`../docs/benchmark_guides.md`):
 
-# Run benchmark test
+```bash
+# Data (one-time; results are committed)
+./scripts/2_split_data.sh                      # 95/5 stratified train/test split
+python scripts/2_split_stratified_subset.py \
+    --source scenarios/train --target scenarios/train_30              # tuning set
+python scripts/2_split_stratified_subset.py \
+    --source scenarios/test --target scenarios/test_90 --per-cell 3   # bench set
+
+# Serving env (self-hosted pods): sync env-quads into .env
+python scripts/3_sync_runpod_pods_env.py
+
+# Smoke run (1 scenario)
 ./scripts/3_run_benchmark_test.sh
 
-# Run full benchmark
-./scripts/4_run_benchmark.sh
-```
+# Tune / general multi-model runs (one tmux session per slot)
+DATASET=train_30 AGENT_MODEL_SLOTS=qwen2b RUN_TAGS=tune1 ./scripts/4_run_benchmark.sh
 
-Benchmark scripts pass base URLs explicitly. Override `OPENROUTER_BASE_URL`,
-`UPSTAGE_BASE_URL`, `AGENT_MODEL_BASE_URL`, or `JUDGE_MODEL_BASE_URL` before
-running a script when targeting a proxy or local OpenAI-compatible endpoint.
+# RQ1 model ladder (4 sizes x 3 runs x 7 agents on test_90) + audits
+python scripts/5_audit_preflight.py
+./scripts/5_run_ladder.sh
+python scripts/6_audit_inflight.py             # while running
+python scripts/6_audit_postrun.py              # after each run
+
+# Post-processing: RQ2 alignment scoring, pooling, paper tables
+for RUN in results/test_90_benchmark_*_r*; do python scripts/7_score_alignment.py "$RUN"; done
+python scripts/7_pool_ladder_runs.py --auto-glob 'results/test_90_benchmark_*_r*'
+python scripts/8_gen_paper_tables.py --pooled results/pooled_ladder.json
+```
 
 ## Configuration Matrix
 
@@ -233,9 +252,8 @@ multi-judge evaluation.
 | `AGENTS` | `baseline,eduplanner,react-isd,addie-agent,dick-carey-agent,rpisd-agent` | Agents passed to `run_benchmark.py`. |
 | `RATE_LIMIT` | `turbo` | Rate-limit mode passed to `--rate-limit`. |
 | `DATASET` | `test` | Dataset passed to `--dataset`. |
-| `AGENT_MODEL_SLOTS` | `gpt,gemini,solar` | Comma-separated slot labels. Each slot becomes one tmux session. |
-| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Shared OpenRouter endpoint used by slot defaults. |
-| `UPSTAGE_BASE_URL` | `https://api.upstage.ai/v1/solar` | Shared Upstage endpoint used by slot defaults. |
+| `AGENT_MODEL_SLOTS` | `gpt,gemini,solar` | Comma-separated slot labels. Each slot becomes one tmux session (parallel). |
+| `RUN_TAGS` | *(empty)* | Comma/space-separated run tags (e.g. `tune1,tune2`), run sequentially inside each slot session; empty = one untagged run. Same var in `5_run_ladder.sh` (default `r1 r2 r3`). |
 
 Each slot reads these variables, where `<SLOT>` is uppercased and `-` becomes
 `_`, for example `GPT_AGENT_MODEL_NAME`:
@@ -246,6 +264,7 @@ Each slot reads these variables, where `<SLOT>` is uppercased and `-` becomes
 | `<SLOT>_AGENT_MODEL_BASE_URL` | Base URL for this tmux session. |
 | `<SLOT>_AGENT_MODEL_NAME` | Agent model for this tmux session. |
 | `<SLOT>_AGENT_MODEL_API_KEY_ENVS` | Comma-separated credential env vars for this tmux session. |
+| `<SLOT>_RATE_LIMIT` | Optional per-slot override of the global `RATE_LIMIT` preset. |
 
 ### Other Environment Variables
 
@@ -254,7 +273,9 @@ Each slot reads these variables, where `<SLOT>` is uppercased and `-` becomes
 | `OPENROUTER_API_KEY`, `UPSTAGE_API_KEY`, `UPSTAGE_API_KEY2`, `UPSTAGE_API_KEY3`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | Common secret variables referenced by `*_API_KEY_ENV` or `*_API_KEY_ENVS`. |
 | `BENCHMARK_DELAY` | Delay between submissions. Normally set by `--rate-limit`. |
 | `ISD_EVAL_PROGRESS` | Internal evaluator progress marker flag set by the benchmark runner. |
-| `HARNESS_ABLATION` | `alignmentgraph-isd` ablation preset. The 3-rung RQ2 ladder: `full` (multi-agent + graph coordination), `wo_graph` (multi-agent, no graph coordination), `single_agent`/`wo_ma` (no decomposition). `wo_qc` is a debug-only preset (QC entirely off), not part of the RQ2 ladder. RAG (external corpus) is a case-study-only add-on (`case_study` preset), never used on the benchmark. |
+| `AGENT_MODEL_MAX_TOKENS_CAP` | Central clamp on every agent's completion budget (`shared/llm/factory.py`). Unset = agents' own budgets apply unchanged. Ladder runs use `8096` for the 16k-context self-hosted models. |
+| `AGENT_MODEL_STREAMING` | `1` enables client streaming (`stream_usage=True`); required behind proxies with read timeouts (RunPod/Cloudflare 524). |
+| `AGENT_MODEL_DISABLE_THINKING` | `1` requests non-thinking mode (`chat_template_kwargs: {enable_thinking: false}`); required for small Qwen3.5 models whose `<think>` otherwise exhausts the completion budget. |
 
 Note: `SCENARIO_MAX_WORKERS` and `AGENT_MAX_WORKERS` appear in `.env.example`
 as optional notes, but `run_benchmark.py` currently reads worker counts from
@@ -269,6 +290,11 @@ CLI flags and `--rate-limit`, not directly from those env vars.
 | scenarios/context_variant/part2 | 7,953 | Context Matrix variations |
 | **Total** | **25,795** | All scenarios |
 
+Derived splits (committed, seed 42): `scenarios/train` (~24.6k) / `scenarios/test`
+(~1.2k) from the 95/5 stratified split; `scenarios/train_30` (tuning) and
+`scenarios/test_90` (benchmark reporting) are fixed domain×difficulty
+stratified subsets with metadata JSONs alongside.
+
 ## Agents
 
 | Agent | Type | Description |
@@ -279,6 +305,7 @@ CLI flags and `--rate-limit`, not directly from those env vars.
 | ADDIE-Agent | ISD-Specialized | ADDIE framework |
 | Dick-Carey-Agent | ISD-Specialized | Dick & Carey model |
 | RPISD-Agent | ISD-Specialized | Rapid Prototyping ISD |
+| AlignmentGraph-ISD | ISD-Specialized | Alignment-graph multi-agent harness (thesis contribution; thin adapter over the top-level `alignmentgraph-isd` package — not in the default agent list, add via `--agents`) |
 
 ## Directory Structure
 
@@ -287,18 +314,28 @@ isd-agent-bench/
 ├── .env.example          # Environment template
 ├── README.md             # This file
 ├── run_benchmark.py      # Main benchmark runner
-├── scripts/              # Shell scripts
-│   ├── 1_setup.sh        # Install dependencies
-│   ├── 2_split_data.sh   # Split train/test
-│   ├── 3_run_benchmark_test.sh  # Quick test
-│   └── 4_run_benchmark.sh       # Full benchmark
+├── scripts/              # Numbered by pipeline order
+│   ├── 1_setup.sh                   # Install dependencies
+│   ├── 2_split_data.sh              # 95/5 train/test split
+│   ├── 2_split_stratified_subset.py # Cut train_30 / test_90 subsets
+│   ├── 3_sync_runpod_pods_env.py    # Sync RunPod pod env-quads into .env
+│   ├── 3_run_benchmark_test.sh      # Smoke run (1 scenario)
+│   ├── 4_run_benchmark.sh           # General tmux launcher (tuning)
+│   ├── 5_audit_preflight.py         # Pod/auth/flags/disk checks
+│   ├── 5_run_ladder.sh              # RQ1 model-ladder launcher
+│   ├── 6_audit_inflight.py          # Red-flag counters while running
+│   ├── 6_audit_postrun.py           # Completeness/integrity/metrics audit
+│   ├── 7_score_alignment.py         # RQ2 alignment scoring (LLM-free)
+│   ├── 7_pool_ladder_runs.py        # Pool runs -> stats + token usage
+│   └── 8_gen_paper_tables.py        # Paper .tex tables + macros
 ├── scenarios/            # ISD scenarios (25,795)
 │   ├── idld_aligned/     # SCOPUS-based (8,842)
 │   ├── context_variant/  # Augmented (16,953)
-│   ├── train/            # Training set
-│   └── test/             # Test set
-├── agents/               # 6 ISD agents
-├── evaluator/            # ADDIE rubric evaluator
+│   ├── train/ test/      # 95/5 split (committed)
+│   └── train_30/ test_90/  # Fixed stratified subsets (+ *_metadata.json)
+├── agents/               # 7 ISD agents (6 defaults + alignmentgraph-isd adapter)
+├── evaluator/            # ADDIE rubric + trajectory + alignment evaluator
+├── results/              # Run dirs: <dataset>_benchmark_<model>_<tag>_<ts>/
 └── shared/               # Common schemas, utilities, and LLM factory
 ```
 

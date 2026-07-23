@@ -32,7 +32,7 @@ pip install --upgrade pip
 
 # Install base dependencies
 echo "Installing base dependencies..."
-pip install langchain langchain-core langgraph openai tqdm typer rich
+pip install -e .
 
 # Install each agent
 echo "Installing agents..."

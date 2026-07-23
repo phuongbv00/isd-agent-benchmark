@@ -61,6 +61,30 @@ LLM이 일관된 평가 기준을 적용할 수 있도록 지원합니다.
 총점 = ADDIE × 0.7 + Trajectory × 0.3
 ```
 
+### Constructive Alignment 평가 (RQ2, LLM 미사용)
+
+`isd_evaluator.metrics.alignment`의 `AlignmentEvaluator`는 ADDIE 산출물의
+**constructive alignment**(학습목표 ↔ 평가 ↔ 활동 ↔ 총괄평가 정합성)를
+결정론적 공식으로 측정합니다 — 집계 단계에서 LLM 호출이 전혀 없고,
+텍스트만 읽습니다(에이전트가 자기 신고한 `objective_id`/`level` 필드는
+채점에 쓰지 않음). 구성 요소는 모두 [0, 1]:
+
+| 구성 요소 | 설명 |
+|-----------|------|
+| Porter Alignment Index | topic × Bloom-level 분포 행렬 일치도 (Porter 2002) |
+| Webb Range-of-Knowledge | objective당 매칭 평가항목 존재 비율 (Webb 1997/1999) |
+| Webb Bloom-Consistency | 매칭 항목의 Bloom level ≥ objective level 비율 |
+| Embedding coverage / precision | objective↔item 상호 최대 cosine 유사도 (traceability) |
+
+기본 텍스트 인코더는 순수 파이썬 character n-gram TF-IDF이며,
+`SentenceTransformerEncoder`(LaBSE 등)로 교체 가능합니다. Bloom 분류는
+한/영 동사 lexicon 기반이고, `scripts/train_bloom_classifier.py`로 학습한
+transformer 체크포인트로 대체할 수 있습니다(`evaluator/scripts/README.md`).
+
+벤치마크 레벨 실행: 상위 저장소의 `scripts/7_score_alignment.py`가 run dir
+전체를 채점해 시나리오별 `alignment_scores.json`을 남깁니다. 지표 정의
+전문은 모노레포의 `docs/benchmark_guides.md` 부록 A.3 참조.
+
 ## 컨텍스트 기반 가중치 조정
 
 시나리오의 맥락에 따라 ADDIE 단계별 가중치가 **동적으로 조정**됩니다.
@@ -180,13 +204,20 @@ isd-evaluator info
 
 ## 환경 변수
 
+Judge 모델 설정은 `JUDGE_MODEL_*` 환경 변수로 해석됩니다(멀티 judge 기본,
+agent 모델과 분리 — self-preference bias 방지). 전체 매트릭스는 벤치마크
+루트 `README.md` 참조:
+
 ```bash
-export OPENAI_API_KEY="your-api-key"
-# 또는
-export UPSTAGE_API_KEY="your-api-key"
-export GOOGLE_API_KEY="your-api-key"
+export JUDGE_MODEL_PROVIDER=openrouter
+export JUDGE_MODEL_NAMES=openai/gpt-4o-mini,google/gemini-2.5-flash-lite
+export JUDGE_MODEL_BASE_URL=https://openrouter.ai/api/v1
+export JUDGE_MODEL_API_KEY_ENV=OPENROUTER_API_KEY
+export OPENROUTER_API_KEY="your-api-key"
 ```
 
 ## 참조
 
-- [구현 계획](plan.md)
+- 지표 정의 전문 및 e2e 파이프라인: 모노레포 `docs/benchmark_guides.md`
+  (부록 A: metrics reference)
+- Bloom 분류기 학습: [`scripts/README.md`](scripts/README.md)

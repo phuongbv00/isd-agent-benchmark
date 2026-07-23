@@ -1,0 +1,18 @@
+[project]
+name = "isd-agent-benchmark"
+version = "0.1.0"
+description = "ISD-Agent-Bench orchestrator dependencies"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain",
+    "langchain-core",
+    "langgraph",
+    "openai",
+    "tqdm",
+    "typer",
+    "rich",
+    "matplotlib",
+]
+
+[tool.setuptools]
+py-modules = []

@@ -61,7 +61,6 @@ class BenchmarkProgressLogger:
         self.log_file = log_file
         self.lock = threading.Lock()
 
-        # Initialize log file
         if self.log_file:
             self._write_log_header()
 
@@ -242,7 +241,6 @@ Total tasks: {self.total_tasks} (scenarios x agents)
         """Log the final summary."""
         total_elapsed = time.time() - self.start_time
 
-        # Compute statistics
         total_success = 0
         total_failed = 0
         for variant_results in results.get("scenarios", {}).values():
@@ -278,7 +276,6 @@ Total tasks: {self.total_tasks} (scenarios x agents)
             with open(self.log_file, 'a', encoding='utf-8') as f:
                 f.write(summary)
 
-# Load environment variables from the .env file
 try:
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).parent / ".env")
@@ -612,11 +609,9 @@ def _run_agent_task(
         trajectory_path = output_dir / f"{agent_id}_trajectory.json"
         log_path = output_dir / f"{agent_id}_log.txt"
 
-        # Create the output directory
         output_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            # Load the scenario
             with open(scenario_path, "r", encoding="utf-8") as f:
                 scenario = json.load(f)
 
@@ -637,12 +632,10 @@ def _run_agent_task(
                     result["metadata"]["token_usage"] = token_usage
                     result["metadata"]["execution_time_seconds"] = elapsed
 
-            # Save the ADDIE output
             addie_output = result.get("addie_output", result)
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(addie_output, f, ensure_ascii=False, indent=2, default=str)
 
-            # Save the trajectory
             trajectory_data = {
                 "scenario_id": scenario.get("scenario_id", "unknown"),
                 "agent_id": agent_id,
@@ -665,7 +658,6 @@ def _run_agent_task(
                     with open(output_dir / f"{agent_id}_graph.dot", "w", encoding="utf-8") as f:
                         f.write(graph_dot)
 
-            # Save the log
             with open(log_path, "w", encoding="utf-8") as f:
                 f.write(f"=== {agent_id} execution log ===\n")
                 f.write(f"Scenario: {scenario_path}\n")
@@ -799,7 +791,6 @@ def run_single_benchmark(
     print(f"\nScenario: {scenario_path.name}")
     print("-" * 40)
 
-    # Create the output directory
     output_dir.mkdir(parents=True, exist_ok=True)
 
     results = {
@@ -813,7 +804,6 @@ def run_single_benchmark(
         logger.log_step(sid, 0, "start")
 
     if parallel and len(agents) > 1:
-        # Parallel execution: ThreadPoolExecutor + Semaphore
         effective_workers = max_workers
         print(f"  [parallel mode] running {len(agents)} agents concurrently (max_workers={effective_workers})")
         semaphore = threading.Semaphore(effective_workers)
@@ -901,7 +891,6 @@ def run_single_benchmark(
             "--agents", ",".join(successful_agents),
         ]
 
-        # Use multi-judge or single-judge evaluation
         if multi_judge:
             cmd.append("--multi-judge")
         else:
@@ -922,7 +911,6 @@ def run_single_benchmark(
             else:
                 print("Done")
 
-            # Load the evaluation result
             report_path = output_dir / "comparison_report.json"
             if report_path.exists():
                 with open(report_path, "r", encoding="utf-8") as f:
@@ -1027,7 +1015,6 @@ def run_full_benchmark(
     all_scenarios = get_all_scenarios(dataset=dataset)
     total_scenarios = sum(len(s) for s in all_scenarios.values())
 
-    # Timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Build a directory-safe model name (e.g. anthropic/claude-opus-4.5 -> claude-opus-4.5)
@@ -1044,10 +1031,8 @@ def run_full_benchmark(
         run_dir = RESULTS_DIR / f"benchmark_{model_safe_name}{tag_part}_{timestamp}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    # Log file path
     log_file = run_dir / "benchmark_progress.log"
 
-    # Initialize the logger
     logger = BenchmarkProgressLogger(
         total_scenarios=total_scenarios,
         total_agents=len(agents),
@@ -1109,7 +1094,6 @@ def run_full_benchmark(
 
     scenario_index = 0
 
-    # Run scenarios for each variant
     for variant in variants:
         scenarios = all_scenarios.get(variant, [])
         if not scenarios:
@@ -1122,7 +1106,6 @@ def run_full_benchmark(
 
         results["scenarios"][variant] = {}
 
-        # tqdm progress bar setup
         scenario_iter = scenarios
         if TQDM_AVAILABLE:
             scenario_iter = tqdm(
@@ -1240,12 +1223,10 @@ def run_full_benchmark(
 
             scenario_index += len(scenarios)
 
-    # Save the full results
     summary_path = run_dir / "benchmark_summary.json"
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2, default=str)
 
-    # Final summary log
     logger.log_final_summary(results)
 
     return results
@@ -1266,7 +1247,6 @@ def generate_summary_report(results: dict, output_path: Path) -> None:
         "",
     ]
 
-    # Aggregation
     total_scenarios = 0
     agent_stats = {}
 
@@ -1292,7 +1272,6 @@ def generate_summary_report(results: dict, output_path: Path) -> None:
 
                 lines.append(f"- {agent_id}: {status}")
 
-            # Evaluation results
             if "evaluation" in scenario_result:
                 eval_data = scenario_result["evaluation"]
                 lines.append("")
@@ -1326,7 +1305,6 @@ def generate_summary_report(results: dict, output_path: Path) -> None:
 
             lines.append("")
 
-    # Agent statistics
     lines.append("## Agent statistics")
     lines.append("")
     lines.append("| Agent | Success | Failed | Success rate |")
@@ -1341,7 +1319,6 @@ def generate_summary_report(results: dict, output_path: Path) -> None:
     lines.append("---")
     lines.append(f"Total scenarios: {total_scenarios}")
 
-    # Save
     with open(output_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
@@ -1594,15 +1571,12 @@ def main():
     if args.scenario_max_workers == 8:  # default value
         args.scenario_max_workers = rate_config["scenario_max_workers"]
 
-    # Set the global delay
     os.environ["BENCHMARK_DELAY"] = str(rate_config["delay"])
 
-    # Install
     if args.install:
         success = install_agents()
         sys.exit(0 if success else 1)
 
-    # Check installation
     if args.check:
         print("\nAgent installation status:")
         print("-" * 40)
@@ -1617,7 +1591,6 @@ def main():
             print("Install them with the --install option.")
         sys.exit(0 if all_installed else 1)
 
-    # Check whether modules can be imported
     status = check_agents_installed()
     if not all(status.values()):
         missing = [agent for agent, installed in status.items() if not installed]
@@ -1688,7 +1661,6 @@ def main():
         run_tag=args.run_tag,
     )
 
-    # Generate the summary report
     timestamp = results["timestamp"]
     output_dir = results.get("output_dir", RESULTS_DIR / f"benchmark_{timestamp}")
     summary_path = Path(output_dir) / "SUMMARY.md"
