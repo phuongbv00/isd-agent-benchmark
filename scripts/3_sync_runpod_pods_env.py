@@ -15,7 +15,8 @@ nothing outside the markers is touched.
 It only ever READS from the RunPod API (GET /pods). Creating, stopping and
 deleting pods stays a console operation.
 
-Requires: RUNPOD_API_KEY env var (https://www.runpod.io/console/user/settings).
+Requires: RUNPOD_API_KEY in .env (https://www.runpod.io/console/user/settings) --
+loaded automatically via python-dotenv, no need to `source .env` first.
 
 Usage:
   python scripts/3_sync_runpod_pods_env.py            # sync pods -> .env block
@@ -25,17 +26,17 @@ Usage:
 
 The managed block contains, per slot, the benchmark env-quad:
 
-  export QWEN2B_AGENT_MODEL_PROVIDER=runpod-vllm
-  export QWEN2B_AGENT_MODEL_BASE_URL=https://<pod_id>-8000.proxy.runpod.net/v1
-  export QWEN2B_AGENT_MODEL_NAME=Qwen/Qwen3.5-2B
-  export QWEN2B_AGENT_MODEL_API_KEY_ENVS=VLLM_API_KEY
+  QWEN2B_AGENT_MODEL_PROVIDER=runpod-vllm
+  QWEN2B_AGENT_MODEL_BASE_URL=https://<pod_id>-8000.proxy.runpod.net/v1
+  QWEN2B_AGENT_MODEL_NAME=Qwen/Qwen3.5-2B
+  QWEN2B_AGENT_MODEL_API_KEY_ENVS=VLLM_API_KEY
 
 plus the three protective flags every ladder run must have (see
 ../docs/benchmark_guides.md, section 4.4, for the incidents that motivated them):
 
-  export AGENT_MODEL_MAX_TOKENS_CAP=8096
-  export AGENT_MODEL_STREAMING=1
-  export AGENT_MODEL_DISABLE_THINKING=1
+  AGENT_MODEL_MAX_TOKENS_CAP=8096
+  AGENT_MODEL_STREAMING=1
+  AGENT_MODEL_DISABLE_THINKING=1
 
 VLLM_API_KEY itself must already be set in .env -- it is the Bearer
 token the template's vLLM server was started with, not the RunPod API key.
@@ -57,6 +58,12 @@ ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 BLOCK_BEGIN = "# >>> qwen-ladder pods (managed by scripts/3_sync_runpod_pods_env.py) >>>"
 BLOCK_END = "# <<< qwen-ladder pods <<<"
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(ENV_PATH)
+except ImportError:
+    pass  # Skip if dotenv is not available
+
 # Ladder slot <- size marker, matched case-insensitively against the pod's
 # vLLM start command (the model is its first positional token -- the template
 # has no shell, so env vars can't carry it), falling back to the pod name.
@@ -68,9 +75,9 @@ SLOT_PATTERNS = [
 ]
 
 PROTECTIVE_FLAGS = [
-    "export AGENT_MODEL_MAX_TOKENS_CAP=8096",
-    "export AGENT_MODEL_STREAMING=1",
-    "export AGENT_MODEL_DISABLE_THINKING=1",
+    "AGENT_MODEL_MAX_TOKENS_CAP=8096",
+    "AGENT_MODEL_STREAMING=1",
+    "AGENT_MODEL_DISABLE_THINKING=1",
 ]
 
 
@@ -210,10 +217,10 @@ def main() -> None:
         upper = slot.upper().replace("-", "_")
         env_lines += [
             f"# {slot}: pod {info['pod_id']} ({info.get('gpu_type') or '?'}, {info['status']})",
-            f"export {upper}_AGENT_MODEL_PROVIDER=runpod-vllm",
-            f"export {upper}_AGENT_MODEL_BASE_URL={info['base_url']}",
-            f"export {upper}_AGENT_MODEL_NAME={info['hf_model']}",
-            f"export {upper}_AGENT_MODEL_API_KEY_ENVS=VLLM_API_KEY",
+            f"{upper}_AGENT_MODEL_PROVIDER=runpod-vllm",
+            f"{upper}_AGENT_MODEL_BASE_URL={info['base_url']}",
+            f"{upper}_AGENT_MODEL_NAME={info['hf_model']}",
+            f"{upper}_AGENT_MODEL_API_KEY_ENVS=VLLM_API_KEY",
         ]
 
     block = "\n".join(

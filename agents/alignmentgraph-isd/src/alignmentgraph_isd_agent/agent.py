@@ -68,12 +68,22 @@ class AlignmentGraphISDAgent:
         self,
         llm_config=None,
         llm_factory: ChatModelFactory | None = None,
+        *,
+        enable_verifier: bool = True,
+        enable_graph_context: bool = True,
     ) -> None:
         # The factory is the single source of truth for the model; the harness
         # reads model provenance for its metadata by introspecting it (no parallel
         # LLMConfig to keep in sync).
+        #
+        # The ablation flags are kwargs (not env vars) on purpose: the benchmark
+        # registry pins them per agent_id (alignmentgraph-isd-no-verifier etc.),
+        # so an arm can never run with the wrong config because of a missing
+        # export. Defaults = the full pipeline.
         self.config = HarnessRunConfig(
             llm_factory=llm_factory or _llm_factory_from_benchmark_config(llm_config),
+            enable_verifier=enable_verifier,
+            enable_graph_context=enable_graph_context,
             **_regen_settings_from_env(),
         )
 

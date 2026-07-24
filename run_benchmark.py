@@ -568,6 +568,34 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
             return agent.run(scenario)
         return run_alignmentgraph_isd
 
+    # Ablation arms (thesis ablation study): the same package with one or both
+    # harness mechanisms switched off via constructor kwargs. Registered as
+    # separate agent ids so all arms run inside ONE benchmark invocation and get
+    # judged in the same session as the full pipeline. Not part of the default
+    # agent list — select explicitly via --agents.
+    elif agent_id == "alignmentgraph-isd-no-verifier":
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        def run_alignmentgraph_isd_no_verifier(scenario: dict) -> dict:
+            agent = AlignmentGraphISDAgent(llm_config=llm_config, enable_verifier=False)
+            return agent.run(scenario)
+        return run_alignmentgraph_isd_no_verifier
+
+    elif agent_id == "alignmentgraph-isd-no-graph-ctx":
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        def run_alignmentgraph_isd_no_graph_ctx(scenario: dict) -> dict:
+            agent = AlignmentGraphISDAgent(llm_config=llm_config, enable_graph_context=False)
+            return agent.run(scenario)
+        return run_alignmentgraph_isd_no_graph_ctx
+
+    elif agent_id == "alignmentgraph-isd-skeleton":
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        def run_alignmentgraph_isd_skeleton(scenario: dict) -> dict:
+            agent = AlignmentGraphISDAgent(
+                llm_config=llm_config, enable_verifier=False, enable_graph_context=False
+            )
+            return agent.run(scenario)
+        return run_alignmentgraph_isd_skeleton
+
     elif agent_id == "addie-agent":
         from addie_agent.agent import ADDIEAgent
         def run_addie(scenario: dict) -> dict:
