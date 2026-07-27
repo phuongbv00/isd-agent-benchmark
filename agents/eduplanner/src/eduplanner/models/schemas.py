@@ -8,41 +8,41 @@ from pydantic import BaseModel, Field
 class ContextInfo(BaseModel):
     """학습 맥락 정보"""
     # 기존 필드 (optional로 변경)
-    target_audience: Optional[str] = Field(None, description="학습 대상자")
-    prior_knowledge: Optional[str] = Field(None, description="사전 지식 수준")
-    duration: Optional[str] = Field(None, description="학습 시간")
-    learning_environment: Optional[str] = Field(None, description="학습 환경")
-    class_size: Optional[str] = Field(None, description="학습자 수 (문자열)")
-    additional_context: Optional[str] = Field(None, description="추가 맥락")
+    target_audience: Optional[str] = Field(None, description="Target learners")
+    prior_knowledge: Optional[str] = Field(None, description="Prior knowledge level")
+    duration: Optional[str] = Field(None, description="Learning time")
+    learning_environment: Optional[str] = Field(None, description="Learning environment")
+    class_size: Optional[str] = Field(None, description="Number of learners (string)")
+    additional_context: Optional[str] = Field(None, description="Additional context")
     # IDLD 시나리오 추가 필드
-    institution_type: Optional[str] = Field(None, description="기관 유형")
-    learner_age: Optional[str] = Field(None, description="학습자 연령")
-    learner_education: Optional[str] = Field(None, description="학습자 학력")
-    learner_role: Optional[str] = Field(None, description="학습자 역할")
-    domain_expertise: Optional[str] = Field(None, description="도메인 전문성")
+    institution_type: Optional[str] = Field(None, description="Institution type")
+    learner_age: Optional[str] = Field(None, description="Learner age")
+    learner_education: Optional[str] = Field(None, description="Learner education level")
+    learner_role: Optional[str] = Field(None, description="Learner role")
+    domain_expertise: Optional[str] = Field(None, description="Domain expertise")
 
 
 class Constraints(BaseModel):
     """제약 조건"""
-    budget: Optional[str] = Field(None, description="예산 수준")
-    resources: Optional[list[str]] = Field(None, description="사용 가능한 자료")
-    accessibility: Optional[Any] = Field(None, description="접근성 요구사항")
-    language: str = Field(default="ko", description="콘텐츠 언어")
+    budget: Optional[str] = Field(None, description="Budget level")
+    resources: Optional[list[str]] = Field(None, description="Available materials")
+    accessibility: Optional[Any] = Field(None, description="Accessibility requirements")
+    language: str = Field(default="ko", description="Content language")
     # IDLD 시나리오 추가 필드
-    tech_requirements: Optional[str] = Field(None, description="기술 요구사항")
-    assessment_type: Optional[str] = Field(None, description="평가 유형")
+    tech_requirements: Optional[str] = Field(None, description="Technical requirements")
+    assessment_type: Optional[str] = Field(None, description="Assessment type")
 
 
 class ScenarioInput(BaseModel):
     """교수설계 시나리오 입력"""
-    scenario_id: str = Field(..., description="시나리오 고유 식별자")
-    variant_type: Optional[str] = Field(None, description="시나리오 유형")
-    title: str = Field(..., description="시나리오 제목")
-    context: ContextInfo = Field(..., description="학습 맥락")
-    learning_goals: list[str] = Field(..., description="학습 목표")
-    constraints: Optional[Constraints] = Field(None, description="제약 조건")
-    difficulty: Optional[str] = Field(None, description="난이도")
-    domain: Optional[str] = Field(None, description="교육 도메인")
+    scenario_id: str = Field(..., description="Unique scenario identifier")
+    variant_type: Optional[str] = Field(None, description="Scenario type")
+    title: str = Field(..., description="Scenario title")
+    context: ContextInfo = Field(..., description="Learning context")
+    learning_goals: list[str] = Field(..., description="Learning objectives")
+    constraints: Optional[Constraints] = Field(None, description="Constraints")
+    difficulty: Optional[str] = Field(None, description="Difficulty")
+    domain: Optional[str] = Field(None, description="Instructional domain")
 
 
 class LearnerAnalysis(BaseModel):
@@ -63,9 +63,9 @@ class ContextAnalysis(BaseModel):
     resources: list[str] = Field(default_factory=list)
     technical_requirements: list[str] = Field(default_factory=list)
     # Item 6 확장: 물리적, 조직적, 기술적 환경 상세
-    physical_environment: Optional[str] = Field(default=None, description="물리적 환경 분석")
-    organizational_environment: Optional[str] = Field(default=None, description="조직적 환경 분석")
-    technology_environment: Optional[str] = Field(default=None, description="기술적 환경 분석")
+    physical_environment: Optional[str] = Field(default=None, description="Physical environment analysis")
+    organizational_environment: Optional[str] = Field(default=None, description="Organizational environment analysis")
+    technology_environment: Optional[str] = Field(default=None, description="Technology environment analysis")
 
 
 class TaskAnalysis(BaseModel):
@@ -74,25 +74,25 @@ class TaskAnalysis(BaseModel):
     subtopics: list[str] = Field(default_factory=list)
     prerequisites: list[str] = Field(default_factory=list)
     # Item 7: 초기 학습목표 분석
-    initial_learning_objectives: Optional[str] = Field(default=None, description="초기 학습목표 분석")
+    initial_learning_objectives: Optional[str] = Field(default=None, description="Initial learning objective analysis")
     # Item 8: 하위 기능 분석
-    sub_skills: list[str] = Field(default_factory=list, description="하위 기능/스킬 분석")
+    sub_skills: list[str] = Field(default_factory=list, description="Sub-skill/sub-function analysis")
     # Item 9: 출발점 행동 분석
-    entry_behaviors: Optional[str] = Field(default=None, description="출발점 행동 분석")
+    entry_behaviors: Optional[str] = Field(default=None, description="Entry behavior analysis")
     # Item 10: 과제분석 결과 검토·정리
-    task_analysis_review: Optional[str] = Field(default=None, description="과제분석 결과 검토 및 정리")
+    task_analysis_review: Optional[str] = Field(default=None, description="Task analysis result review and summary")
 
 
 class NeedsAnalysis(BaseModel):
     """요구분석 (Item 1-4)"""
     # Item 1: 문제 확인 및 정의
-    problem_definition: Optional[str] = Field(default=None, description="문제 확인 및 정의")
+    problem_definition: Optional[str] = Field(default=None, description="Problem identification and definition")
     # Item 2: 차이분석 (현재-목표 상태 격차)
-    gap_analysis: Optional[str] = Field(default=None, description="현재와 목표 성과 간 차이 분석")
+    gap_analysis: Optional[str] = Field(default=None, description="Gap analysis between current and target performance")
     # Item 3: 수행분석
-    performance_analysis: Optional[str] = Field(default=None, description="수행분석 결과")
+    performance_analysis: Optional[str] = Field(default=None, description="Performance analysis results")
     # Item 4: 요구 우선순위 결정
-    needs_prioritization: Optional[str] = Field(default=None, description="요구 우선순위 결정")
+    needs_prioritization: Optional[str] = Field(default=None, description="Needs prioritization")
 
 
 class Analysis(BaseModel):
@@ -101,13 +101,13 @@ class Analysis(BaseModel):
     context_analysis: ContextAnalysis
     task_analysis: TaskAnalysis
     # 요구분석 (Item 1-4) - 신규 추가
-    needs_analysis: Optional[NeedsAnalysis] = Field(default=None, description="요구분석 (Item 1-4)")
+    needs_analysis: Optional[NeedsAnalysis] = Field(default=None, description="Needs analysis (Items 1-4)")
 
 
 class LearningObjective(BaseModel):
     """학습 목표"""
     id: str
-    level: str = Field(..., description="Bloom's Taxonomy 수준")
+    level: str = Field(..., description="Bloom's Taxonomy level")
     statement: str
     bloom_verb: str
     measurable: bool = True
@@ -135,20 +135,20 @@ class InstructionalStrategy(BaseModel):
     methods: list[str] = Field(default_factory=list)
     # Item 13: 교수 내용 선정 (기존 methods로 커버)
     # Item 14: 교수적 전략 수립
-    instructional_strategies: Optional[str] = Field(default=None, description="교수적 전략 수립")
+    instructional_strategies: Optional[str] = Field(default=None, description="Instructional strategy development")
     # Item 15: 비교수적 전략 수립 (신규)
-    non_instructional_strategies: Optional[str] = Field(default=None, description="비교수적 전략 (동기부여, 자기주도학습 촉진 등)")
+    non_instructional_strategies: Optional[str] = Field(default=None, description="Non-instructional strategies (motivation, self-directed learning promotion, etc.)")
     # Item 16: 매체 선정과 활용 계획 (신규)
-    media_selection: list[str] = Field(default_factory=list, description="매체 선정 및 활용 계획")
+    media_selection: list[str] = Field(default_factory=list, description="Media selection and utilization plan")
     # Item 17: 학습활동 및 시간 구조화 (기존 sequence로 커버)
 
 
 class PrototypeDesign(BaseModel):
     """프로토타입 구조 설계 (Item 18)"""
     # Item 18: 스토리보드/화면 흐름 설계
-    storyboard: Optional[str] = Field(default=None, description="스토리보드 설계")
-    screen_flow: list[str] = Field(default_factory=list, description="화면 흐름 설계")
-    navigation_structure: Optional[str] = Field(default=None, description="네비게이션 구조")
+    storyboard: Optional[str] = Field(default=None, description="Storyboard design")
+    screen_flow: list[str] = Field(default_factory=list, description="Screen flow design")
+    navigation_structure: Optional[str] = Field(default=None, description="Navigation structure")
 
 
 class Design(BaseModel):
@@ -157,7 +157,7 @@ class Design(BaseModel):
     assessment_plan: AssessmentPlan
     instructional_strategy: InstructionalStrategy
     # Item 18: 프로토타입 구조 설계 (신규)
-    prototype_design: Optional[PrototypeDesign] = Field(default=None, description="프로토타입 구조 설계 (스토리보드/화면 흐름)")
+    prototype_design: Optional[PrototypeDesign] = Field(default=None, description="Prototype structure design (storyboard/screen flow)")
 
 
 class Activity(BaseModel):
@@ -184,11 +184,11 @@ class LessonPlan(BaseModel):
 
 class SlideContent(BaseModel):
     """개별 슬라이드 콘텐츠"""
-    slide_number: int = Field(..., description="슬라이드 번호")
-    title: str = Field(..., description="슬라이드 제목")
-    bullet_points: list[str] = Field(default_factory=list, description="핵심 내용 (3-5개)")
-    speaker_notes: Optional[str] = Field(default=None, description="발표자 노트")
-    visual_suggestion: Optional[str] = Field(default=None, description="권장 시각 자료")
+    slide_number: int = Field(..., description="Slide number")
+    title: str = Field(..., description="Slide title")
+    bullet_points: list[str] = Field(default_factory=list, description="Key content (3-5 items)")
+    speaker_notes: Optional[str] = Field(default=None, description="Speaker notes")
+    visual_suggestion: Optional[str] = Field(default=None, description="Recommended visual materials")
 
 
 class Material(BaseModel):
@@ -200,8 +200,8 @@ class Material(BaseModel):
     duration: Optional[str] = None
     questions: Optional[int] = None
     pages: Optional[int] = None
-    content: Optional[str] = Field(default=None, description="실제 학습 자료 내용 (유인물 텍스트, 슬라이드 개요 등)")
-    slide_contents: Optional[list[SlideContent]] = Field(default=None, description="슬라이드별 상세 콘텐츠 (PPT인 경우)")
+    content: Optional[str] = Field(default=None, description="Actual learning material content (handout text, slide outline, etc.)")
+    slide_contents: Optional[list[SlideContent]] = Field(default=None, description="Detailed content per slide (for presentations)")
 
 
 class Development(BaseModel):
@@ -210,13 +210,13 @@ class Development(BaseModel):
     # Item 19: 학습자용 자료 개발 (기존 materials)
     materials: list[Material] = Field(default_factory=list)
     # Item 20: 교수자용 매뉴얼 개발 (신규)
-    facilitator_manual: Optional[str] = Field(default=None, description="교수자용 매뉴얼")
+    facilitator_manual: Optional[str] = Field(default=None, description="Instructor manual")
     # Item 21: 운영자용 매뉴얼 개발 (신규)
-    operator_manual: Optional[str] = Field(default=None, description="운영자용 매뉴얼")
+    operator_manual: Optional[str] = Field(default=None, description="Operator manual")
     # Item 22: 평가 도구·문항 개발 (evaluation 단계로 이동, 여기서는 평가 도구 명세)
-    assessment_tools: list[str] = Field(default_factory=list, description="평가 도구 명세")
+    assessment_tools: list[str] = Field(default_factory=list, description="Assessment tool specification")
     # Item 23: 전문가 검토 (신규)
-    expert_review_plan: Optional[str] = Field(default=None, description="전문가 검토 계획 및 피드백 반영 방안")
+    expert_review_plan: Optional[str] = Field(default=None, description="Expert review plan and feedback implementation approach")
 
 
 class Implementation(BaseModel):
@@ -227,13 +227,13 @@ class Implementation(BaseModel):
     technical_requirements: list[str] = Field(default_factory=list)
     support_plan: Optional[str] = None
     # Item 24: 교수자·운영자 오리엔테이션 (신규)
-    orientation_plan: Optional[str] = Field(default=None, description="교수자·운영자 오리엔테이션 계획")
+    orientation_plan: Optional[str] = Field(default=None, description="Instructor/operator orientation plan")
     # Item 25: 시스템/환경 점검 (신규)
-    system_check_plan: Optional[str] = Field(default=None, description="시스템/환경 점검 계획")
+    system_check_plan: Optional[str] = Field(default=None, description="System/environment check plan")
     # Item 26: 프로토타입 실행 (신규)
-    pilot_execution_plan: Optional[str] = Field(default=None, description="프로토타입/파일럿 실행 계획")
+    pilot_execution_plan: Optional[str] = Field(default=None, description="Prototype/pilot execution plan")
     # Item 27: 운영 모니터링 및 지원 (신규)
-    monitoring_plan: Optional[str] = Field(default=None, description="운영 모니터링 및 지원 계획")
+    monitoring_plan: Optional[str] = Field(default=None, description="Operation monitoring and support plan")
 
 
 class QuizItem(BaseModel):
@@ -260,16 +260,16 @@ class Evaluation(BaseModel):
     rubric: Optional[Rubric] = None
     feedback_plan: Optional[str] = None
     # Item 28: 파일럿/초기 실행 중 자료 수집 (신규)
-    pilot_data_collection: Optional[str] = Field(default=None, description="파일럿/초기 실행 중 자료 수집 계획")
+    pilot_data_collection: Optional[str] = Field(default=None, description="Data collection plan during pilot/initial execution")
     # Item 29: 형성평가 결과 기반 1차 프로그램 개선 (신규)
-    formative_improvement: Optional[str] = Field(default=None, description="형성평가 결과 기반 1차 프로그램 개선 계획")
+    formative_improvement: Optional[str] = Field(default=None, description="First program improvement plan based on formative evaluation results")
     # Item 30: 총괄 평가 문항 개발 (quiz_items로 커버)
     # Item 31: 총괄평가 시행 및 프로그램 효과 분석 (신규)
-    summative_evaluation_plan: Optional[str] = Field(default=None, description="총괄평가 시행 및 프로그램 효과 분석 계획")
+    summative_evaluation_plan: Optional[str] = Field(default=None, description="Summative evaluation implementation and program effectiveness analysis plan")
     # Item 32: 프로그램 채택 여부 결정 (신규)
-    adoption_decision_criteria: Optional[str] = Field(default=None, description="프로그램 채택 여부 결정 기준")
+    adoption_decision_criteria: Optional[str] = Field(default=None, description="Program adoption decision criteria")
     # Item 33: 프로그램 개선 (신규)
-    program_improvement: Optional[str] = Field(default=None, description="프로그램 개선 및 환류 계획")
+    program_improvement: Optional[str] = Field(default=None, description="Program improvement and feedback loop plan")
 
 
 class ADDIEOutput(BaseModel):
@@ -330,7 +330,7 @@ class ADDIEOutput(BaseModel):
                 # [9] 출발점 행동 분석
                 "prerequisites": ta.prerequisites,
                 # [10] 과제분석 결과 검토·정리
-                "review_summary": ta.task_analysis_review or f"주요 주제: {', '.join(ta.main_topics[:3])}",
+                "review_summary": ta.task_analysis_review or f"Main topics: {', '.join(ta.main_topics[:3])}",
             },
         }
 
@@ -377,7 +377,7 @@ class ADDIEOutput(BaseModel):
             "instructional_strategies": {
                 "methods": ist.methods,
                 "activities": [e.activity for e in ist.sequence[:5]],
-                "rationale": ist.instructional_strategies or f"모델: {ist.model}",
+                "rationale": ist.instructional_strategies or f"Model: {ist.model}",
             },
             # [15] 비교수적 전략 수립
             "non_instructional_strategies": {
@@ -411,7 +411,7 @@ class ADDIEOutput(BaseModel):
                 "title": mat.title,
                 "type": mat.type,
                 "content": mat.description or "",
-                "format": "PDF/PPT" if mat.slides or mat.pages else "기타",
+                "format": "PDF/PPT" if mat.slides or mat.pages else "Other",
             })
 
         development_dict = {
@@ -421,21 +421,21 @@ class ADDIEOutput(BaseModel):
             "instructor_guide": {
                 "overview": dev.facilitator_manual or "",
                 "session_guides": [mod.title for mod in dev.lesson_plan.modules],
-                "facilitation_tips": ["학습자 참여 유도", "질문 활용"],
-                "troubleshooting": ["기술적 문제 대응"],
+                "facilitation_tips": ["Encourage learner participation", "Use questioning"],
+                "troubleshooting": ["Responding to technical problems"],
             },
             # [21] 운영자용 매뉴얼 개발
             "operator_manual": {
-                "system_setup": dev.operator_manual or "시스템 설정 가이드",
-                "operation_procedures": ["등록 관리", "출석 관리"],
-                "support_procedures": ["학습자 문의 대응"],
-                "escalation_process": "문제 발생 시 담당자에게 보고",
+                "system_setup": dev.operator_manual or "System setup guide",
+                "operation_procedures": ["Registration management", "Attendance management"],
+                "support_procedures": ["Responding to learner inquiries"],
+                "escalation_process": "Report to the person in charge when an issue occurs",
             },
             # [22] 평가 도구·문항 개발
             "assessment_tools": [
                 {
                     "item_id": tool,
-                    "type": "평가 도구",
+                    "type": "Assessment tool",
                     "question": tool,
                     "aligned_objective": "",
                     "scoring_criteria": "",
@@ -444,8 +444,8 @@ class ADDIEOutput(BaseModel):
             ],
             # [23] 전문가 검토
             "expert_review": {
-                "reviewers": ["내용 전문가"],
-                "review_criteria": ["내용 정확성", "교수 설계 적절성"],
+                "reviewers": ["Content expert"],
+                "review_criteria": ["Content accuracy", "Instructional design appropriateness"],
                 "feedback_summary": dev.expert_review_plan or "",
                 "revisions_made": [],
             },
@@ -457,28 +457,28 @@ class ADDIEOutput(BaseModel):
         implementation_dict = {
             # [24] 교수자·운영자 오리엔테이션
             "instructor_orientation": {
-                "orientation_objectives": ["프로그램 이해", "운영 절차 숙지"],
-                "schedule": impl.orientation_plan or "사전 1주일 전",
-                "materials": ["교수자 가이드", "운영 매뉴얼"],
-                "competency_checklist": ["내용 이해도", "진행 능력"],
+                "orientation_objectives": ["Understanding the program", "Familiarity with operation procedures"],
+                "schedule": impl.orientation_plan or "One week in advance",
+                "materials": ["Facilitator guide", "Operation manual"],
+                "competency_checklist": ["Content comprehension", "Facilitation ability"],
             },
             # [25] 시스템/환경 점검
             "system_check": {
-                "checklist": impl.technical_requirements or ["네트워크 연결", "장비 점검"],
-                "technical_validation": impl.system_check_plan or "시스템 테스트 완료",
-                "contingency_plans": ["비상 대응 계획 수립"],
+                "checklist": impl.technical_requirements or ["Network connection", "Equipment check"],
+                "technical_validation": impl.system_check_plan or "System testing completed",
+                "contingency_plans": ["Establish contingency response plan"],
             },
             # [26] 프로토타입 실행
             "prototype_execution": {
-                "pilot_scope": impl.pilot_execution_plan or "소규모 파일럿 테스트",
-                "participants": "10명 내외",
+                "pilot_scope": impl.pilot_execution_plan or "Small-scale pilot test",
+                "participants": "Around 10 people",
                 "execution_log": [],
                 "issues_encountered": [],
             },
             # [27] 운영 모니터링 및 지원
             "monitoring": {
-                "monitoring_criteria": [impl.monitoring_plan] if impl.monitoring_plan else ["학습 진도", "참여율"],
-                "support_channels": ["이메일", "전화"],
+                "monitoring_criteria": [impl.monitoring_plan] if impl.monitoring_plan else ["Learning progress", "Participation rate"],
+                "support_channels": ["Email", "Phone"],
                 "issue_resolution_log": [],
                 "real_time_adjustments": [],
             },
@@ -503,7 +503,7 @@ class ADDIEOutput(BaseModel):
             "formative": {
                 # [28] 파일럿/초기 실행 중 자료 수집
                 "data_collection": {
-                    "methods": ["설문", "관찰", "면담"],
+                    "methods": ["Survey", "Observation", "Interview"],
                     "learner_feedback": [],
                     "performance_data": {},
                     "observations": [ev.pilot_data_collection] if ev.pilot_data_collection else [],
@@ -511,9 +511,9 @@ class ADDIEOutput(BaseModel):
                 # [29] 형성평가 결과 기반 1차 프로그램 개선
                 "improvements": [
                     {
-                        "issue_identified": ev.formative_improvement or "개선 필요 사항 식별",
-                        "improvement_action": "개선 조치 실행",
-                        "priority": "높음",
+                        "issue_identified": ev.formative_improvement or "Identify items requiring improvement",
+                        "improvement_action": "Execute improvement actions",
+                        "priority": "High",
                     }
                 ] if ev.formative_improvement else [],
             },
@@ -533,7 +533,7 @@ class ADDIEOutput(BaseModel):
                     "decision": "",
                     "rationale": ev.adoption_decision_criteria or "",
                     "conditions": [],
-                    "stakeholder_approval": "승인 대기",
+                    "stakeholder_approval": "Awaiting approval",
                 },
             },
             # [33] E3: 프로그램 개선 및 환류
@@ -541,7 +541,7 @@ class ADDIEOutput(BaseModel):
                 "feedback_summary": ev.feedback_plan or "",
                 "improvement_areas": [ev.program_improvement] if ev.program_improvement else [],
                 "action_items": [],
-                "feedback_loop": "평가 결과를 바탕으로 다음 교육 과정에 반영",
+                "feedback_loop": "Reflect evaluation results in the next iteration of the course",
                 "next_iteration_goals": [],
             },
         }
@@ -604,9 +604,9 @@ class EvaluationFeedback(BaseModel):
     suggestions: list[str] = Field(default_factory=list)
     addie_scores: dict[str, float] = Field(
         default_factory=dict,
-        description="ADDIE Rubric 13항목 점수 (A1-A3, D1-D3, Dev1-Dev2, I1-I2, E1-E3)"
+        description="ADDIE Rubric 13-item scores (A1-A3, D1-D3, Dev1-Dev2, I1-I2, E1-E3)"
     )
     weighted_score: Optional[float] = Field(
         default=None,
-        description="가중치 적용 점수 (0-100)"
+        description="Weighted score (0-100)"
     )

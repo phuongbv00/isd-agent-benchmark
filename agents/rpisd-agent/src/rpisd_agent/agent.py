@@ -204,59 +204,59 @@ class RPISDAgent:
         # 동적 임계값: 반복 횟수가 증가할수록 기준 완화
         quality_threshold = max(base_threshold - (iteration - 1) * 0.05, 0.60)
 
-        self._log(f"분기 결정: source={loop_source}, quality={current_quality:.2f}, threshold={quality_threshold:.2f} (base={base_threshold})")
+        self._log(f"Branch decision: source={loop_source}, quality={current_quality:.2f}, threshold={quality_threshold:.2f} (base={base_threshold})")
         self._log(f"  prototype_iter={prototype_iteration}, dev_iter={development_iteration}, max={max_iterations}")
 
         if loop_source == "prototype":
             # 프로토타입 루프
             # 조기 종료: 첫 반복에서 early_exit_threshold(0.7) 이상이면 즉시 개발로 (#78)
             if prototype_iteration == 1 and current_quality >= early_exit_threshold:
-                self._log(f"조기 종료: 첫 반복 품질 {current_quality:.2f} >= {early_exit_threshold} → 개발로 진행")
+                self._log(f"Early exit: first-iteration quality {current_quality:.2f} >= {early_exit_threshold} → proceed to development")
                 return "development"
             elif current_quality >= quality_threshold:
-                self._log("프로토타입 품질 충족 → 개발로 진행")
+                self._log("Prototype quality met → proceed to development")
                 return "development"
             elif prototype_iteration >= max_iterations:
-                self._log("프로토타입 최대 반복 도달 → 개발로 진행")
+                self._log("Prototype max iterations reached → proceed to development")
                 return "development"
             else:
-                self._log("프로토타입 품질 미달 → 설계로 회귀")
+                self._log("Prototype quality not met → return to design")
                 return "design"
         else:
             # 개발 루프
             # 조기 종료: 첫 반복에서 early_exit_threshold(0.7) 이상이면 즉시 실행으로 (#78)
             if development_iteration == 1 and current_quality >= early_exit_threshold:
-                self._log(f"조기 종료: 첫 반복 품질 {current_quality:.2f} >= {early_exit_threshold} → 실행으로 진행")
+                self._log(f"Early exit: first-iteration quality {current_quality:.2f} >= {early_exit_threshold} → proceed to implementation")
                 return "implementation"
             elif current_quality >= quality_threshold:
-                self._log("개발 품질 충족 → 실행으로 진행")
+                self._log("Development quality met → proceed to implementation")
                 return "implementation"
             elif development_iteration >= max_iterations:
-                self._log("개발 최대 반복 도달 → 실행으로 진행")
+                self._log("Development max iterations reached → proceed to implementation")
                 return "implementation"
             else:
-                self._log("개발 품질 미달 → 재개발 필요 (implementation으로 진행)")
+                self._log("Development quality not met → redevelopment needed (proceeding to implementation)")
                 # 개발 루프에서 품질 미달 시 실행으로 진행 (무한 루프 방지)
                 return "implementation"
 
     # ========== 1단계: 프로젝트 착수 ==========
     def _kickoff_node(self, state: RPISDState) -> dict:
         """프로젝트 착수 회의"""
-        self._log("1단계: 프로젝트 착수 회의 시작")
+        self._log("Stage 1: Project kickoff meeting started")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         tool_calls = list(state.get("tool_calls", []))
         reasoning_steps = list(state.get("reasoning_steps", []))
         errors = list(state.get("errors", []))
 
-        reasoning_steps.append("Step 1: 프로젝트 착수 회의 - 범위 정의, 역할 공식화")
+        reasoning_steps.append("Step 1: Project kickoff meeting - scope definition, role formalization")
 
         start_time = datetime.now()
         try:
             kickoff_result = kickoff_meeting.invoke({
-                "project_title": scenario.get("title", "교육 프로그램"),
+                "project_title": scenario.get("title", "Training Program"),
                 "learning_goals": scenario.get("learning_goals", []),
-                "target_audience": context.get("target_audience", "일반 학습자"),
+                "target_audience": context.get("target_audience", "General learners"),
                 "duration": context.get("duration"),
                 "stakeholders": scenario.get("stakeholders"),
                 "constraints": scenario.get("constraints", {}).get("resources"),
@@ -264,14 +264,14 @@ class RPISDAgent:
             tool_calls.append(self._record_tool_call(
                 state, "kickoff_meeting",
                 {"project_title": scenario.get("title", "")},
-                f"착수 회의 완료: {len(kickoff_result.get('success_criteria', []))}개 성공 기준",
+                f"Kickoff meeting complete: {len(kickoff_result.get('success_criteria', []))} success criteria",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"kickoff_meeting 실패: {str(e)}")
+            errors.append(f"kickoff_meeting failed: {str(e)}")
             kickoff_result = {}
 
-        self._log(f"1단계 완료: {kickoff_result.get('project_title', '')}")
+        self._log(f"Stage 1 complete: {kickoff_result.get('project_title', '')}")
 
         return {
             "kickoff_result": kickoff_result,
@@ -284,14 +284,14 @@ class RPISDAgent:
     # ========== 2단계: 분석 ==========
     def _analysis_node(self, state: RPISDState) -> dict:
         """빠른 분석 (Gap, Performance, Learner, Task) - 4개 분석 병렬 실행 (#78)"""
-        self._log("2단계: 분석 시작 (병렬 실행)")
+        self._log("Stage 2: Analysis started (parallel execution)")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         tool_calls = list(state.get("tool_calls", []))
         reasoning_steps = list(state.get("reasoning_steps", []))
         errors = list(state.get("errors", []))
 
-        reasoning_steps.append("Step 2: 분석 - 차이, 수행, 학습자, 과제 분석 (병렬)")
+        reasoning_steps.append("Step 2: Analysis - gap, performance, learner, task analysis (parallel)")
 
         # 분석 4단계 병렬 실행 (#78 성능 최적화)
         parallel_start_time = datetime.now()
@@ -316,7 +316,7 @@ class RPISDAgent:
 
         def invoke_learner():
             return analyze_learner_characteristics.invoke({
-                "target_audience": context.get("target_audience", "일반 학습자"),
+                "target_audience": context.get("target_audience", "General learners"),
                 "prior_knowledge": context.get("prior_knowledge"),
                 "learning_environment": context.get("learning_environment"),
                 "additional_context": context.get("additional_context"),
@@ -345,7 +345,7 @@ class RPISDAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "analyze_gap",
                             {"learning_goals": scenario.get("learning_goals", [])[:2]},
-                            f"Gap 분석 완료: {len(gap_result.get('gaps', []))}개 갭",
+                            f"Gap analysis complete: {len(gap_result.get('gaps', []))} gaps",
                             parallel_start_time,
                         ))
                     elif analysis_type == "performance":
@@ -353,7 +353,7 @@ class RPISDAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "analyze_performance",
                             {},
-                            f"수행 분석 완료: training_solution={performance_result.get('is_training_solution', True)}",
+                            f"Performance analysis complete: training_solution={performance_result.get('is_training_solution', True)}",
                             parallel_start_time,
                         ))
                     elif analysis_type == "learner":
@@ -361,7 +361,7 @@ class RPISDAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "analyze_learner_characteristics",
                             {"target_audience": context.get("target_audience", "")},
-                            f"학습자 분석 완료: {len(learner_result.get('learning_preferences', []))}개 선호도",
+                            f"Learner analysis complete: {len(learner_result.get('learning_preferences', []))} preferences",
                             parallel_start_time,
                         ))
                     elif analysis_type == "task":
@@ -369,13 +369,13 @@ class RPISDAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "analyze_initial_task",
                             {"learning_goals": scenario.get("learning_goals", [])[:2]},
-                            f"과제 분석 완료: {len(task_result.get('main_topics', []))}개 주제",
+                            f"Task analysis complete: {len(task_result.get('main_topics', []))} topics",
                             parallel_start_time,
                         ))
                 except Exception as e:
-                    errors.append(f"analyze_{analysis_type} 실패: {str(e)}")
+                    errors.append(f"analyze_{analysis_type} failed: {str(e)}")
 
-        self._log(f"2단계 완료: gap={len(gap_result.get('gaps', []))}, learner={len(learner_result.get('challenges', []))}")
+        self._log(f"Stage 2 complete: gap={len(gap_result.get('gaps', []))}, learner={len(learner_result.get('challenges', []))}")
 
         return {
             "analysis_result": {
@@ -394,7 +394,7 @@ class RPISDAgent:
     def _design_node(self, state: RPISDState) -> dict:
         """설계 및 프로토타입 개발"""
         prototype_iteration = state.get("prototype_iteration", 0) + 1
-        self._log(f"3단계: 설계 시작 (프로토타입 v{prototype_iteration})")
+        self._log(f"Stage 3: Design started (prototype v{prototype_iteration})")
 
         scenario = state["scenario"]
         context = scenario.get("context", {})
@@ -417,7 +417,7 @@ class RPISDAgent:
             focus_areas = usability.get("improvement_areas", [])
             focus_areas = [area.get("area") if isinstance(area, dict) else area for area in focus_areas]
 
-        reasoning_steps.append(f"Step 3: 설계 (v{prototype_iteration}) - 교수설계, 프로토타입 개발")
+        reasoning_steps.append(f"Step 3: Design (v{prototype_iteration}) - instructional design, prototype development")
 
         # 교수설계 (첫 번째 반복 시)
         design_result = state.get("design_result", {})
@@ -433,11 +433,11 @@ class RPISDAgent:
                 tool_calls.append(self._record_tool_call(
                     state, "design_instruction",
                     {"learning_goals": scenario.get("learning_goals", [])[:2]},
-                    f"교수설계 완료: {len(design_result.get('objectives', []))}개 목표",
+                    f"Instructional design complete: {len(design_result.get('objectives', []))} objectives",
                     start_time,
                 ))
             except Exception as e:
-                errors.append(f"design_instruction 실패: {str(e)}")
+                errors.append(f"design_instruction failed: {str(e)}")
 
         # 프로토타입 개발
         start_time = datetime.now()
@@ -451,7 +451,7 @@ class RPISDAgent:
             tool_calls.append(self._record_tool_call(
                 state, "develop_prototype",
                 {"version": prototype_iteration},
-                f"프로토타입 v{prototype_iteration} 개발 완료: {len(prototype_result.get('modules', []))}개 모듈",
+                f"Prototype v{prototype_iteration} development complete: {len(prototype_result.get('modules', []))} modules",
                 start_time,
             ))
 
@@ -465,7 +465,7 @@ class RPISDAgent:
             prototype_versions.append(new_version)
 
         except Exception as e:
-            errors.append(f"develop_prototype 실패: {str(e)}")
+            errors.append(f"develop_prototype failed: {str(e)}")
             prototype_result = {}
 
         # 상세 과제 분석 (첫 번째 반복 후)
@@ -480,13 +480,13 @@ class RPISDAgent:
                 tool_calls.append(self._record_tool_call(
                     state, "analyze_task_detailed",
                     {},
-                    f"상세 과제 분석 완료: {len(task_detailed.get('refined_topics', []))}개 주제",
+                    f"Detailed task analysis complete: {len(task_detailed.get('refined_topics', []))} topics",
                     start_time,
                 ))
             except Exception as e:
-                errors.append(f"analyze_task_detailed 실패: {str(e)}")
+                errors.append(f"analyze_task_detailed failed: {str(e)}")
 
-        self._log(f"3단계 완료: v{prototype_iteration}, modules={len(prototype_result.get('modules', []))}")
+        self._log(f"Stage 3 complete: v{prototype_iteration}, modules={len(prototype_result.get('modules', []))}")
 
         return {
             "design_result": design_result,
@@ -504,7 +504,7 @@ class RPISDAgent:
         """사용성 평가 (의뢰인, 전문가, 학습자)"""
         loop_source = state.get("loop_source", "prototype")
         iteration = state.get("prototype_iteration", 1) if loop_source == "prototype" else state.get("development_iteration", 1)
-        self._log(f"4단계: 사용성 평가 ({loop_source} v{iteration})")
+        self._log(f"Stage 4: Usability evaluation ({loop_source} v{iteration})")
 
         scenario = state["scenario"]
         context = scenario.get("context", {})
@@ -522,7 +522,7 @@ class RPISDAgent:
         else:
             eval_target = state.get("development_result", {})
 
-        reasoning_steps.append(f"Step 4: 사용성 평가 ({loop_source}) - 의뢰인, 전문가, 학습자 (병렬)")
+        reasoning_steps.append(f"Step 4: Usability evaluation ({loop_source}) - client, expert, learner (parallel)")
 
         # 사용성평가 3단계 병렬 실행 (#73 성능 최적화)
         parallel_start_time = datetime.now()
@@ -566,7 +566,7 @@ class RPISDAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "evaluate_with_client",
                             {},
-                            f"의뢰인 평가 완료: {client_result.get('overall_score', 0):.2f}",
+                            f"Client evaluation complete: {client_result.get('overall_score', 0):.2f}",
                             parallel_start_time,
                         ))
                     elif eval_type == "expert":
@@ -574,7 +574,7 @@ class RPISDAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "evaluate_with_expert",
                             {},
-                            f"전문가 평가 완료: {expert_result.get('overall_score', 0):.2f}",
+                            f"Expert evaluation complete: {expert_result.get('overall_score', 0):.2f}",
                             parallel_start_time,
                         ))
                     elif eval_type == "learner":
@@ -582,11 +582,11 @@ class RPISDAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "evaluate_with_learner",
                             {},
-                            f"학습자 평가 완료: {learner_result.get('overall_score', 0):.2f}",
+                            f"Learner evaluation complete: {learner_result.get('overall_score', 0):.2f}",
                             parallel_start_time,
                         ))
                 except Exception as e:
-                    errors.append(f"evaluate_with_{eval_type} 실패: {str(e)}")
+                    errors.append(f"evaluate_with_{eval_type} failed: {str(e)}")
 
         # 피드백 통합
         start_time = datetime.now()
@@ -600,11 +600,11 @@ class RPISDAgent:
             tool_calls.append(self._record_tool_call(
                 state, "aggregate_feedback",
                 {"quality_threshold": state.get("quality_threshold", self.quality_threshold)},
-                f"피드백 통합 완료: {aggregated.get('aggregated_score', 0):.2f}, pass={aggregated.get('pass_threshold', False)}",
+                f"Feedback aggregation complete: {aggregated.get('aggregated_score', 0):.2f}, pass={aggregated.get('pass_threshold', False)}",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"aggregate_feedback 실패: {str(e)}")
+            errors.append(f"aggregate_feedback failed: {str(e)}")
             aggregated = {"aggregated_score": 0.72, "pass_threshold": False}
 
         current_quality = aggregated.get("aggregated_score", 0.0)
@@ -616,7 +616,7 @@ class RPISDAgent:
                 versions[-1]["feedback"] = [client_result, expert_result, learner_result]
                 versions[-1]["quality_score"] = current_quality
 
-        self._log(f"4단계 완료: quality={current_quality:.2f}, threshold={state.get('quality_threshold', self.quality_threshold)}")
+        self._log(f"Stage 4 complete: quality={current_quality:.2f}, threshold={state.get('quality_threshold', self.quality_threshold)}")
 
         return {
             "usability_feedback": {
@@ -639,7 +639,7 @@ class RPISDAgent:
     def _development_node(self, state: RPISDState) -> dict:
         """최종 프로그램 개발"""
         development_iteration = state.get("development_iteration", 0) + 1
-        self._log(f"5단계: 개발 시작 (v{development_iteration})")
+        self._log(f"Stage 5: Development started (v{development_iteration})")
 
         scenario = state["scenario"]
         design = state.get("design_result", {})
@@ -651,7 +651,7 @@ class RPISDAgent:
 
         final_prototype = versions[-1].get("content", {}) if versions else {}
 
-        reasoning_steps.append(f"Step 5: 개발 (v{development_iteration}) - 최종 프로그램 개발")
+        reasoning_steps.append(f"Step 5: Development (v{development_iteration}) - final program development")
 
         start_time = datetime.now()
         try:
@@ -664,14 +664,14 @@ class RPISDAgent:
             tool_calls.append(self._record_tool_call(
                 state, "develop_final_program",
                 {"project_title": scenario.get("title", "")},
-                f"최종 개발 완료: {len(development_result.get('modules', []))}개 모듈, {len(development_result.get('materials', []))}개 자료",
+                f"Final development complete: {len(development_result.get('modules', []))} modules, {len(development_result.get('materials', []))} materials",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"develop_final_program 실패: {str(e)}")
+            errors.append(f"develop_final_program failed: {str(e)}")
             development_result = {}
 
-        self._log(f"5단계 완료: modules={len(development_result.get('modules', []))}")
+        self._log(f"Stage 5 complete: modules={len(development_result.get('modules', []))}")
 
         return {
             "development_result": development_result,
@@ -686,7 +686,7 @@ class RPISDAgent:
     # ========== 6단계: 실행 ==========
     def _implementation_node(self, state: RPISDState) -> dict:
         """프로그램 실행 및 유지관리"""
-        self._log("6단계: 실행 시작")
+        self._log("Stage 6: Implementation started")
 
         scenario = state["scenario"]
         context = scenario.get("context", {})
@@ -695,7 +695,7 @@ class RPISDAgent:
         reasoning_steps = list(state.get("reasoning_steps", []))
         errors = list(state.get("errors", []))
 
-        reasoning_steps.append("Step 6: 실행 - 프로그램 실행 및 유지관리 계획")
+        reasoning_steps.append("Step 6: Implementation - program delivery and maintenance plan")
 
         start_time = datetime.now()
         try:
@@ -708,14 +708,14 @@ class RPISDAgent:
             tool_calls.append(self._record_tool_call(
                 state, "implement_program",
                 {"project_title": scenario.get("title", "")},
-                f"실행 계획 완료: {implementation_result.get('delivery_method', '')}",
+                f"Implementation plan complete: {implementation_result.get('delivery_method', '')}",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"implement_program 실패: {str(e)}")
+            errors.append(f"implement_program failed: {str(e)}")
             implementation_result = {}
 
-        self._log(f"6단계 완료: {implementation_result.get('delivery_method', '')}")
+        self._log(f"Stage 6 complete: {implementation_result.get('delivery_method', '')}")
 
         return {
             "implementation_result": implementation_result,
@@ -728,7 +728,7 @@ class RPISDAgent:
     # ========== 7단계: 평가 ==========
     def _evaluation_node(self, state: RPISDState) -> dict:
         """평가 문항, 루브릭, 프로그램 평가 생성"""
-        self._log("7단계: 평가 시작")
+        self._log("Stage 7: Evaluation started")
 
         scenario = state["scenario"]
         context = scenario.get("context", {})
@@ -739,7 +739,7 @@ class RPISDAgent:
         reasoning_steps = list(state.get("reasoning_steps", []))
         errors = list(state.get("errors", []))
 
-        reasoning_steps.append("Step 7: 평가 - 퀴즈 문항, 루브릭, 프로그램 평가 계획 수립")
+        reasoning_steps.append("Step 7: Evaluation - quiz items, rubric, program evaluation plan")
 
         objectives = design.get("objectives", [])
         main_topics = analysis.get("initial_task", {}).get("main_topics", [])
@@ -766,11 +766,11 @@ class RPISDAgent:
             tool_calls.append(self._record_tool_call(
                 state, "create_quiz_items",
                 {"num_items": 10},
-                f"퀴즈 문항 생성 완료: {len(quiz_items)}개 문항",
+                f"Quiz items created: {len(quiz_items)} items",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"create_quiz_items 실패: {str(e)}")
+            errors.append(f"create_quiz_items failed: {str(e)}")
             quiz_items = []
 
         # 2. 평가 루브릭 생성
@@ -778,23 +778,23 @@ class RPISDAgent:
         try:
             rubric = create_rubric.invoke({
                 "objectives": objectives,
-                "assessment_type": "종합 평가",
+                "assessment_type": "comprehensive assessment",
             })
             tool_calls.append(self._record_tool_call(
                 state, "create_rubric",
-                {"assessment_type": "종합 평가"},
-                f"루브릭 생성 완료: {len(rubric.get('criteria', []))}개 기준",
+                {"assessment_type": "comprehensive assessment"},
+                f"Rubric created: {len(rubric.get('criteria', []))} criteria",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"create_rubric 실패: {str(e)}")
+            errors.append(f"create_rubric failed: {str(e)}")
             rubric = {}
 
         # 3. 프로그램 평가 계획 생성 (Kirkpatrick 4단계)
         start_time = datetime.now()
         try:
             program_evaluation = create_program_evaluation.invoke({
-                "program_title": scenario.get("title", "교육 프로그램"),
+                "program_title": scenario.get("title", "Training Program"),
                 "objectives": objectives,
                 "target_audience": context.get("target_audience"),
                 "prototype_history": prototype_history,
@@ -802,18 +802,18 @@ class RPISDAgent:
             tool_calls.append(self._record_tool_call(
                 state, "create_program_evaluation",
                 {"program_title": scenario.get("title", "")},
-                f"프로그램 평가 계획 완료: {program_evaluation.get('evaluation_model', '')}",
+                f"Program evaluation plan complete: {program_evaluation.get('evaluation_model', '')}",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"create_program_evaluation 실패: {str(e)}")
+            errors.append(f"create_program_evaluation failed: {str(e)}")
             program_evaluation = {}
 
         # 채택 결정 및 개선 계획 추출
         adoption_decision = program_evaluation.get("adoption_decision", {})
         improvement_plan = program_evaluation.get("improvement_plan", {})
 
-        self._log(f"7단계 완료: quiz={len(quiz_items)}개, rubric={len(rubric.get('criteria', []))}개 기준")
+        self._log(f"Stage 7 complete: quiz={len(quiz_items)} items, rubric={len(rubric.get('criteria', []))} criteria")
 
         return {
             "evaluation_result": {
@@ -891,9 +891,9 @@ class RPISDAgent:
             },
         }
 
-        self._log(f"RPISD 완료: {execution_time:.2f}초, {len(final_state.get('tool_calls', []))}개 도구 호출")
-        self._log(f"  프로토타입 반복: {final_state.get('prototype_iteration', 0)}회")
-        self._log(f"  개발 반복: {final_state.get('development_iteration', 0)}회")
-        self._log(f"  최종 품질: {final_state.get('current_quality', 0.0):.2f}")
+        self._log(f"RPISD complete: {execution_time:.2f}s, {len(final_state.get('tool_calls', []))} tool calls")
+        self._log(f"  Prototype iterations: {final_state.get('prototype_iteration', 0)}")
+        self._log(f"  Development iterations: {final_state.get('development_iteration', 0)}")
+        self._log(f"  Final quality: {final_state.get('current_quality', 0.0):.2f}")
 
         return result

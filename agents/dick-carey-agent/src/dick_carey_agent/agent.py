@@ -163,60 +163,60 @@ class DickCareyAgent:
         quality_threshold = state.get("quality_threshold", self.quality_threshold)
         score_history = state.get("quality_score_history", [])
 
-        self._log(f"품질 점수: {quality_score}, 반복: {iteration_count}/{max_iterations}, 기준: {quality_threshold}")
+        self._log(f"Quality score: {quality_score}, iteration: {iteration_count}/{max_iterations}, threshold: {quality_threshold}")
 
         # 탈출 조건 (#73 + #80 성능 최적화)
         # 1. 품질 기준 충족
         if quality_score >= quality_threshold:
-            self._log("품질 기준 충족 → 총괄평가 진행")
+            self._log("Quality threshold met → proceeding to summative evaluation")
             return "summative_evaluation"
         # 2. 최대 반복 도달
         elif iteration_count >= max_iterations:
-            self._log("최대 반복 도달 → 총괄평가 진행")
+            self._log("Max iterations reached → proceeding to summative evaluation")
             return "summative_evaluation"
         # 3. 준수한 점수 달성 시 조기 종료 (#80 성능 최적화)
         elif quality_score >= 6.0:
-            self._log(f"준수 점수 달성 ({quality_score:.2f} >= 6.0) → 총괄평가 진행")
+            self._log(f"Acceptable score reached ({quality_score:.2f} >= 6.0) → proceeding to summative evaluation")
             return "summative_evaluation"
         # 4. 점수 개선 없음 (#73)
         elif len(score_history) >= 2 and quality_score <= score_history[-2]:
-            self._log(f"점수 개선 없음 ({score_history[-2]:.2f} → {quality_score:.2f}) → 총괄평가 진행")
+            self._log(f"No score improvement ({score_history[-2]:.2f} → {quality_score:.2f}) → proceeding to summative evaluation")
             return "summative_evaluation"
         else:
-            self._log("품질 미달 → 수정 단계로")
+            self._log("Quality below threshold → proceeding to revision")
             return "revision"
 
     # ========== 1단계: 교수목적 설정 ==========
     def _goal_node(self, state: DickCareyState) -> dict:
         """1단계: 교수목적 설정"""
-        self._log("1단계: 교수목적 설정 시작")
+        self._log("Step 1: Identify instructional goal - start")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         tool_calls = state.get("tool_calls", [])
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append("Step 1: 교수목적 설정 - 학습 종료 후 달성 목표 정의")
+        reasoning_steps.append("Step 1: Identify instructional goal - define what learners can perform after instruction")
 
         start_time = datetime.now()
         try:
             goal_result = set_instructional_goal.invoke({
                 "learning_goals": scenario.get("learning_goals", []),
-                "target_audience": context.get("target_audience", "일반 학습자"),
+                "target_audience": context.get("target_audience", "general learners"),
                 "current_state": context.get("prior_knowledge"),
                 "desired_state": None,
             })
             tool_calls.append(self._record_tool_call(
                 state, "set_instructional_goal",
                 {"learning_goals": scenario.get("learning_goals", [])},
-                f"교수목적 설정 완료: {goal_result.get('goal_statement', '')[:50]}...",
+                f"Instructional goal identified: {goal_result.get('goal_statement', '')[:50]}...",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"set_instructional_goal 실패: {str(e)}")
+            errors.append(f"set_instructional_goal failed: {str(e)}")
             goal_result = {}
 
-        self._log(f"1단계 완료: {goal_result.get('goal_statement', '')[:50]}...")
+        self._log(f"Step 1 complete: {goal_result.get('goal_statement', '')[:50]}...")
 
         return {
             "goal": goal_result,
@@ -229,14 +229,14 @@ class DickCareyAgent:
     # ========== 2단계: 교수분석 ==========
     def _instructional_analysis_node(self, state: DickCareyState) -> dict:
         """2단계: 교수분석"""
-        self._log("2단계: 교수분석 시작")
+        self._log("Step 2: Instructional analysis - start")
         scenario = state["scenario"]
         goal = state.get("goal", {})
         tool_calls = state.get("tool_calls", [])
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append("Step 2: 교수분석 - 하위 기능 및 절차 분석")
+        reasoning_steps.append("Step 2: Instructional analysis - analyze sub-skills and procedures")
 
         start_time = datetime.now()
         try:
@@ -248,14 +248,14 @@ class DickCareyAgent:
             tool_calls.append(self._record_tool_call(
                 state, "analyze_instruction",
                 {"instructional_goal": goal.get("goal_statement", "")[:50]},
-                f"교수분석 완료: {len(analysis_result.get('sub_skills', []))}개 하위 기능",
+                f"Instructional analysis complete: {len(analysis_result.get('sub_skills', []))} sub-skills",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"analyze_instruction 실패: {str(e)}")
+            errors.append(f"analyze_instruction failed: {str(e)}")
             analysis_result = {}
 
-        self._log(f"2단계 완료: {len(analysis_result.get('sub_skills', []))}개 하위 기능")
+        self._log(f"Step 2 complete: {len(analysis_result.get('sub_skills', []))} sub-skills")
 
         return {
             "instructional_analysis": analysis_result,
@@ -268,7 +268,7 @@ class DickCareyAgent:
     # ========== 3단계: 학습자/환경 분석 (병렬화 #80) ==========
     def _learner_context_node(self, state: DickCareyState) -> dict:
         """3단계: 학습자/환경 분석 (병렬 실행으로 최적화)"""
-        self._log("3단계: 학습자/환경 분석 시작 (병렬 실행)")
+        self._log("Step 3: Learner/context analysis - start (parallel execution)")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         analysis = state.get("instructional_analysis", {})
@@ -276,7 +276,7 @@ class DickCareyAgent:
         reasoning_steps = list(state.get("reasoning_steps", []))
         errors = list(state.get("errors", []))
 
-        reasoning_steps.append("Step 3: 학습자/환경 분석 - 출발점 행동, 환경 분석 (병렬 실행)")
+        reasoning_steps.append("Step 3: Learner/context analysis - entry behaviours, context analysis (parallel execution)")
 
         # class_size 파싱 (문자열인 경우 숫자 추출)
         import re
@@ -297,7 +297,7 @@ class DickCareyAgent:
         def run_learner_analysis():
             start = datetime.now()
             result = analyze_entry_behaviors.invoke({
-                "target_audience": context.get("target_audience", "일반 학습자"),
+                "target_audience": context.get("target_audience", "general learners"),
                 "prior_knowledge": context.get("prior_knowledge"),
                 "entry_skills": analysis.get("entry_skills", []),
             })
@@ -306,8 +306,8 @@ class DickCareyAgent:
         def run_context_analysis():
             start = datetime.now()
             result = analyze_context.invoke({
-                "learning_environment": context.get("learning_environment", "미지정"),
-                "duration": context.get("duration", "미지정"),
+                "learning_environment": context.get("learning_environment", "Unspecified"),
+                "duration": context.get("duration", "Unspecified"),
                 "performance_context": context.get("additional_context"),
                 "class_size": parsed_class_size,
                 "resources": scenario.get("constraints", {}).get("resources"),
@@ -332,7 +332,7 @@ class DickCareyAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "analyze_entry_behaviors",
                             {"target_audience": context.get("target_audience", "")},
-                            f"학습자 분석 완료: {len(result.get('entry_behaviors', []))}개 출발점 행동",
+                            f"Learner analysis complete: {len(result.get('entry_behaviors', []))} entry behaviours",
                             start_time,
                         ))
                     else:  # context
@@ -340,26 +340,26 @@ class DickCareyAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "analyze_context",
                             {"learning_environment": context.get("learning_environment", "")},
-                            f"환경 분석 완료: {len(result.get('constraints', []))}개 제약조건",
+                            f"Context analysis complete: {len(result.get('constraints', []))} constraints",
                             start_time,
                         ))
                 except Exception as e:
                     error_msg = str(e)
                     if "learner" in error_msg.lower() or "entry" in error_msg.lower():
-                        errors.append(f"analyze_entry_behaviors 실패: {error_msg}")
+                        errors.append(f"analyze_entry_behaviors failed: {error_msg}")
                     else:
-                        errors.append(f"analyze_context 실패: {error_msg}")
+                        errors.append(f"analyze_context failed: {error_msg}")
                         # 환경 분석 폴백
                         from dick_carey_agent.tools.goal_analysis import _fallback_analyze_context
                         context_result = _fallback_analyze_context(
-                            learning_environment=context.get("learning_environment", "미지정"),
-                            duration=context.get("duration", "미지정"),
+                            learning_environment=context.get("learning_environment", "Unspecified"),
+                            duration=context.get("duration", "Unspecified"),
                             performance_context=context.get("additional_context"),
                             class_size=None,
                             resources=scenario.get("constraints", {}).get("resources"),
                         )
 
-        self._log(f"3단계 완료 (병렬): learner={len(learner_result.get('entry_behaviors', []))}, context={len(context_result.get('constraints', []))}")
+        self._log(f"Step 3 complete (parallel): learner={len(learner_result.get('entry_behaviors', []))}, context={len(context_result.get('constraints', []))}")
 
         return {
             "learner_context": {
@@ -375,7 +375,7 @@ class DickCareyAgent:
     # ========== 4단계: 수행목표 진술 ==========
     def _performance_objectives_node(self, state: DickCareyState) -> dict:
         """4단계: 수행목표 진술"""
-        self._log("4단계: 수행목표 진술 시작")
+        self._log("Step 4: Write performance objectives - start")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         goal = state.get("goal", {})
@@ -384,27 +384,27 @@ class DickCareyAgent:
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append("Step 4: 수행목표 진술 - ABCD 형식 목표 작성")
+        reasoning_steps.append("Step 4: Write performance objectives - author objectives in ABCD format")
 
         start_time = datetime.now()
         try:
             objectives_result = write_performance_objectives.invoke({
                 "instructional_goal": goal.get("goal_statement", ""),
                 "sub_skills": analysis.get("sub_skills", []),
-                "target_audience": context.get("target_audience", "일반 학습자"),
+                "target_audience": context.get("target_audience", "general learners"),
             })
             enabling_count = len(objectives_result.get("enabling_objectives", []))
             tool_calls.append(self._record_tool_call(
                 state, "write_performance_objectives",
                 {"instructional_goal": goal.get("goal_statement", "")[:50]},
-                f"수행목표 진술 완료: 1개 최종 + {enabling_count}개 가능 목표",
+                f"Performance objectives written: 1 terminal + {enabling_count} enabling objectives",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"write_performance_objectives 실패: {str(e)}")
+            errors.append(f"write_performance_objectives failed: {str(e)}")
             objectives_result = {}
 
-        self._log(f"4단계 완료: {len(objectives_result.get('enabling_objectives', []))}개 목표")
+        self._log(f"Step 4 complete: {len(objectives_result.get('enabling_objectives', []))} objectives")
 
         return {
             "performance_objectives": objectives_result,
@@ -417,7 +417,7 @@ class DickCareyAgent:
     # ========== 5-6단계: 평가도구 + 교수전략 개발 (병렬화 #80) ==========
     def _assessment_and_strategy_node(self, state: DickCareyState) -> dict:
         """5-6단계: 평가도구 개발 + 교수전략 개발 (병렬 실행)"""
-        self._log("5-6단계: 평가도구/교수전략 개발 시작 (병렬 실행)")
+        self._log("Steps 5-6: Develop assessment instruments/instructional strategy - start (parallel execution)")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         objectives = state.get("performance_objectives", {})
@@ -426,15 +426,15 @@ class DickCareyAgent:
         reasoning_steps = list(state.get("reasoning_steps", []))
         errors = list(state.get("errors", []))
 
-        reasoning_steps.append("Step 5-6: 평가도구 개발 + 교수전략 개발 (병렬 실행)")
+        reasoning_steps.append("Step 5-6: Develop assessment instruments + develop instructional strategy (parallel execution)")
 
         # 병렬 실행을 위한 함수 정의
         def run_assessment():
             start = datetime.now()
             result = develop_assessment_instruments.invoke({
                 "performance_objectives": objectives,
-                "learning_environment": context.get("learning_environment", "미지정"),
-                "duration": context.get("duration", "미지정"),
+                "learning_environment": context.get("learning_environment", "Unspecified"),
+                "duration": context.get("duration", "Unspecified"),
             })
             return ("assessment", result, start)
 
@@ -443,8 +443,8 @@ class DickCareyAgent:
             result = develop_instructional_strategy.invoke({
                 "performance_objectives": objectives,
                 "learner_analysis": learner_context.get("learner", {}),
-                "learning_environment": context.get("learning_environment", "미지정"),
-                "duration": context.get("duration", "미지정"),
+                "learning_environment": context.get("learning_environment", "Unspecified"),
+                "duration": context.get("duration", "Unspecified"),
             })
             return ("strategy", result, start)
 
@@ -467,7 +467,7 @@ class DickCareyAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "develop_assessment_instruments",
                             {"objectives_count": len(objectives.get("enabling_objectives", []))},
-                            f"평가도구 개발 완료: {post_count}개 사후평가 문항",
+                            f"Assessment instruments developed: {post_count} post-test items",
                             start_time,
                         ))
                     else:  # strategy
@@ -475,17 +475,17 @@ class DickCareyAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "develop_instructional_strategy",
                             {"learning_environment": context.get("learning_environment", "")},
-                            f"교수전략 개발 완료: {result.get('delivery_method', '')}",
+                            f"Instructional strategy developed: {result.get('delivery_method', '')}",
                             start_time,
                         ))
                 except Exception as e:
                     error_msg = str(e)
                     if "assessment" in error_msg.lower():
-                        errors.append(f"develop_assessment_instruments 실패: {error_msg}")
+                        errors.append(f"develop_assessment_instruments failed: {error_msg}")
                     else:
-                        errors.append(f"develop_instructional_strategy 실패: {error_msg}")
+                        errors.append(f"develop_instructional_strategy failed: {error_msg}")
 
-        self._log(f"5-6단계 완료 (병렬): assessment={len(assessment_result.get('post_test', []))}, strategy={strategy_result.get('delivery_method', '')}")
+        self._log(f"Steps 5-6 complete (parallel): assessment={len(assessment_result.get('post_test', []))}, strategy={strategy_result.get('delivery_method', '')}")
 
         return {
             "assessment_instruments": assessment_result,
@@ -499,7 +499,7 @@ class DickCareyAgent:
     # ========== 7단계: 교수자료 개발 ==========
     def _instructional_materials_node(self, state: DickCareyState) -> dict:
         """7단계: 교수자료 개발"""
-        self._log("7단계: 교수자료 개발 시작")
+        self._log("Step 7: Develop instructional materials - start")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         objectives = state.get("performance_objectives", {})
@@ -508,30 +508,30 @@ class DickCareyAgent:
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append("Step 7: 교수자료 개발 - 교수자 가이드, 학습자 자료, 미디어")
+        reasoning_steps.append("Step 7: Develop instructional materials - instructor guide, learner materials, media")
 
         start_time = datetime.now()
         try:
             materials_result = develop_instructional_materials.invoke({
                 "instructional_strategy": strategy,
                 "performance_objectives": objectives,
-                "learning_environment": context.get("learning_environment", "미지정"),
-                "duration": context.get("duration", "미지정"),
-                "topic_title": scenario.get("title", "교육 프로그램"),
+                "learning_environment": context.get("learning_environment", "Unspecified"),
+                "duration": context.get("duration", "Unspecified"),
+                "topic_title": scenario.get("title", "Training program"),
             })
             learner_count = len(materials_result.get("learner_materials", []))
             slide_count = len(materials_result.get("slide_contents", []))
             tool_calls.append(self._record_tool_call(
                 state, "develop_instructional_materials",
                 {"topic_title": scenario.get("title", "")},
-                f"교수자료 개발 완료: {learner_count}종 자료, {slide_count}개 슬라이드",
+                f"Instructional materials developed: {learner_count} material types, {slide_count} slides",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"develop_instructional_materials 실패: {str(e)}")
+            errors.append(f"develop_instructional_materials failed: {str(e)}")
             materials_result = {}
 
-        self._log(f"7단계 완료: {len(materials_result.get('learner_materials', []))}종 자료")
+        self._log(f"Step 7 complete: {len(materials_result.get('learner_materials', []))} material types")
 
         return {
             "instructional_materials": materials_result,
@@ -545,7 +545,7 @@ class DickCareyAgent:
     def _formative_evaluation_node(self, state: DickCareyState) -> dict:
         """8단계: 형성평가 실시"""
         iteration = state.get("iteration_count", 0) + 1
-        self._log(f"8단계: 형성평가 실시 ({iteration}차)")
+        self._log(f"Step 8: Conduct formative evaluation (round {iteration})")
 
         materials = state.get("instructional_materials", {})
         objectives = state.get("performance_objectives", {})
@@ -554,7 +554,7 @@ class DickCareyAgent:
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append(f"Step 8: 형성평가 실시 ({iteration}차) - 일대일, 소집단, 현장 평가")
+        reasoning_steps.append(f"Step 8: Conduct formative evaluation (round {iteration}) - one-to-one, small group, field trial")
 
         start_time = datetime.now()
         try:
@@ -568,14 +568,14 @@ class DickCareyAgent:
             tool_calls.append(self._record_tool_call(
                 state, "conduct_formative_evaluation",
                 {"iteration": iteration},
-                f"형성평가 완료: 품질 점수 {quality_score}",
+                f"Formative evaluation complete: quality score {quality_score}",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"conduct_formative_evaluation 실패: {str(e)}")
+            errors.append(f"conduct_formative_evaluation failed: {str(e)}")
             formative_result = {"quality_score": 5.0}
 
-        self._log(f"8단계 완료: 품질 점수 {formative_result.get('quality_score', 0)}")
+        self._log(f"Step 8 complete: quality score {formative_result.get('quality_score', 0)}")
 
         # 점수 이력 업데이트 (#73 성능 최적화)
         score_history = list(state.get("quality_score_history", []))
@@ -595,7 +595,7 @@ class DickCareyAgent:
     def _revision_node(self, state: DickCareyState) -> dict:
         """9단계: 교수프로그램 수정"""
         iteration = state.get("iteration_count", 1)
-        self._log(f"9단계: 교수프로그램 수정 ({iteration}차)")
+        self._log(f"Step 9: Revise instruction (round {iteration})")
 
         formative = state.get("formative_evaluation", {})
         tool_calls = state.get("tool_calls", [])
@@ -603,7 +603,7 @@ class DickCareyAgent:
         errors = state.get("errors", [])
         revision_log = state.get("revision_log", [])
 
-        reasoning_steps.append(f"Step 9: 교수프로그램 수정 ({iteration}차) - 형성평가 기반 개선")
+        reasoning_steps.append(f"Step 9: Revise instruction (round {iteration}) - improvement based on formative evaluation")
 
         start_time = datetime.now()
         try:
@@ -619,16 +619,16 @@ class DickCareyAgent:
             tool_calls.append(self._record_tool_call(
                 state, "revise_instruction",
                 {"iteration": iteration},
-                f"수정 완료: {revision_count}개 항목",
+                f"Revision complete: {revision_count} items",
                 start_time,
             ))
             # 수정 이력 추가
             revision_log.append(revision_result)
         except Exception as e:
-            errors.append(f"revise_instruction 실패: {str(e)}")
-            revision_result = {"iteration": iteration, "revision_items": [], "summary": "수정 실패"}
+            errors.append(f"revise_instruction failed: {str(e)}")
+            revision_result = {"iteration": iteration, "revision_items": [], "summary": "Revision failed"}
 
-        self._log(f"9단계 완료: {len(revision_result.get('revision_items', []))}개 항목 수정")
+        self._log(f"Step 9 complete: {len(revision_result.get('revision_items', []))} items revised")
 
         return {
             "revision_log": revision_log,
@@ -642,7 +642,7 @@ class DickCareyAgent:
     # ========== 10단계: 총괄평가 실시 ==========
     def _summative_evaluation_node(self, state: DickCareyState) -> dict:
         """10단계: 총괄평가 실시"""
-        self._log("10단계: 총괄평가 실시")
+        self._log("Step 10: Conduct summative evaluation")
 
         objectives = state.get("performance_objectives", {})
         iteration_count = state.get("iteration_count", 1)
@@ -650,7 +650,7 @@ class DickCareyAgent:
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append(f"Step 10: 총괄평가 실시 - 최종 효과성 평가 (총 {iteration_count}회 형성평가)")
+        reasoning_steps.append(f"Step 10: Conduct summative evaluation - final effectiveness evaluation ({iteration_count} formative evaluation rounds in total)")
 
         start_time = datetime.now()
         try:
@@ -666,14 +666,14 @@ class DickCareyAgent:
             tool_calls.append(self._record_tool_call(
                 state, "conduct_summative_evaluation",
                 {"total_iterations": iteration_count},
-                f"총괄평가 완료: 효과성 {summative_result.get('effectiveness_score', 0)}, 결정: {summative_result.get('decision', '')}",
+                f"Summative evaluation complete: effectiveness {summative_result.get('effectiveness_score', 0)}, decision: {summative_result.get('decision', '')}",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"conduct_summative_evaluation 실패: {str(e)}")
-            summative_result = {"effectiveness_score": 7.0, "decision": "조건부채택"}
+            errors.append(f"conduct_summative_evaluation failed: {str(e)}")
+            summative_result = {"effectiveness_score": 7.0, "decision": "conditional_adopt"}
 
-        self._log(f"10단계 완료: {summative_result.get('decision', '')}")
+        self._log(f"Step 10 complete: {summative_result.get('decision', '')}")
 
         return {
             "summative_evaluation": summative_result,
@@ -746,6 +746,6 @@ class DickCareyAgent:
             },
         }
 
-        self._log(f"Dick & Carey 완료: {execution_time:.2f}초, {len(final_state.get('tool_calls', []))}개 도구 호출, {final_state.get('iteration_count', 0)}회 반복")
+        self._log(f"Dick & Carey complete: {execution_time:.2f}s, {len(final_state.get('tool_calls', []))} tool calls, {final_state.get('iteration_count', 0)} iterations")
 
         return result

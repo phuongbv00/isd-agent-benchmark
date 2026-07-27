@@ -15,26 +15,26 @@ ADDIEPhase = Literal["analysis", "design", "development", "implementation", "eva
 
 class ToolCall(TypedDict, total=False):
     """도구 호출 기록 (trajectory_schema.json 준수)"""
-    step: int                    # 호출 순서
-    tool: str                    # 도구 이름
-    args: dict                   # 도구 인자
-    result: str                  # 실행 결과 요약
-    result_detail: dict          # 실행 결과 상세
-    timestamp: str               # 호출 시각 (ISO 8601)
-    duration_ms: int             # 실행 시간 (밀리초)
-    tokens_used: int             # 사용 토큰 수
-    success: bool                # 성공 여부
-    error: str                   # 오류 메시지
+    step: int                    # Call order
+    tool: str                    # Tool name
+    args: dict                   # Tool arguments
+    result: str                  # Execution result summary
+    result_detail: dict          # Execution result detail
+    timestamp: str               # Call timestamp (ISO 8601)
+    duration_ms: int             # Execution time (milliseconds)
+    tokens_used: int             # Number of tokens used
+    success: bool                # Success flag
+    error: str                   # Error message
 
 
 class LearnerAnalysis(TypedDict, total=False):
     """학습자 분석 결과"""
     target_audience: str
-    characteristics: List[str]   # 최소 5개
+    characteristics: List[str]   # at least 5
     prior_knowledge: str
     learning_preferences: List[str]
-    motivation: str              # 2-3문장
-    challenges: List[str]        # 최소 3개
+    motivation: str              # 2-3 sentences
+    challenges: List[str]        # at least 3
 
 
 class ContextAnalysis(TypedDict, total=False):
@@ -48,11 +48,11 @@ class ContextAnalysis(TypedDict, total=False):
 
 class TaskAnalysis(TypedDict, total=False):
     """과제 분석 결과"""
-    main_topics: List[str]       # 최소 3개
-    subtopics: List[str]         # 최소 6개
+    main_topics: List[str]       # at least 3
+    subtopics: List[str]         # at least 6
     prerequisites: List[str]
     knowledge_structure: dict
-    review_summary: str          # A-10: 과제분석 결과 검토/정리
+    review_summary: str          # A-10: Review/organize task analysis results
 
 
 class NeedsAnalysis(TypedDict, total=False):
@@ -62,7 +62,7 @@ class NeedsAnalysis(TypedDict, total=False):
     training_needs: List[str]
     non_training_solutions: List[str]
     priority: str
-    priority_matrix: dict        # A-4: 요구 우선순위 결정 확장
+    priority_matrix: dict        # A-4: Needs prioritization decision extension
     recommendation: str
 
 
@@ -76,8 +76,8 @@ class AnalysisResult(TypedDict, total=False):
 
 class LearningObjective(TypedDict, total=False):
     """학습 목표"""
-    id: str                      # LO-001 형식
-    level: str                   # Bloom's Taxonomy 수준
+    id: str                      # LO-001 format
+    level: str                   # Bloom's Taxonomy level
     statement: str
     bloom_verb: str
     measurable: bool
@@ -85,9 +85,9 @@ class LearningObjective(TypedDict, total=False):
 
 class AssessmentPlan(TypedDict, total=False):
     """평가 계획"""
-    diagnostic: List[str]        # 최소 2개
-    formative: List[str]         # 최소 2개
-    summative: List[str]         # 최소 2개
+    diagnostic: List[str]        # at least 2
+    formative: List[str]         # at least 2
+    summative: List[str]         # at least 2
 
 
 class InstructionalEvent(TypedDict, total=False):
@@ -101,13 +101,13 @@ class InstructionalEvent(TypedDict, total=False):
 class InstructionalStrategy(TypedDict, total=False):
     """교수 전략"""
     model: str                   # Gagné's 9 Events
-    sequence: List[InstructionalEvent]  # 9개 필수
+    sequence: List[InstructionalEvent]  # 9 required
     methods: List[str]
 
 
 class DesignResult(TypedDict, total=False):
     """Design 단계 산출물"""
-    learning_objectives: List[LearningObjective]  # 최소 5개
+    learning_objectives: List[LearningObjective]  # at least 5
     assessment_plan: AssessmentPlan
     instructional_strategy: InstructionalStrategy
 
@@ -124,14 +124,14 @@ class Module(TypedDict, total=False):
     """레슨 모듈"""
     title: str
     duration: str
-    objectives: List[str]        # LO-xxx 참조
-    activities: List[Activity]   # 최소 3개
+    objectives: List[str]        # LO-xxx reference
+    activities: List[Activity]   # at least 3
 
 
 class LessonPlan(TypedDict, total=False):
     """레슨 플랜"""
     total_duration: str
-    modules: List[Module]        # 최소 3개
+    modules: List[Module]        # at least 3
 
 
 class SlideContent(TypedDict, total=False):
@@ -155,7 +155,7 @@ class StoryboardFrame(TypedDict, total=False):
 
 class Material(TypedDict, total=False):
     """학습 자료"""
-    type: str                    # PPT, 동영상, 퀴즈, 워크시트 등
+    type: str                    # PPT, video, quiz, worksheet, etc.
     title: str
     description: str
     slides: int
@@ -163,13 +163,13 @@ class Material(TypedDict, total=False):
     pages: int
     questions: int
     slide_contents: List[SlideContent]
-    storyboard: List[StoryboardFrame]  # D-18: 스토리보드/화면 흐름 설계
+    storyboard: List[StoryboardFrame]  # D-18: Storyboard / screen flow design
 
 
 class DevelopmentResult(TypedDict, total=False):
     """Development 단계 산출물"""
     lesson_plan: LessonPlan
-    materials: List[Material]    # 최소 5개
+    materials: List[Material]    # at least 5
 
 
 class MaintenancePlan(TypedDict, total=False):
@@ -196,32 +196,32 @@ class PilotPlan(TypedDict, total=False):
 class ImplementationResult(TypedDict, total=False):
     """Implementation 단계 산출물"""
     delivery_method: str
-    facilitator_guide: str       # 200자 이상
-    learner_guide: str           # 200자 이상
-    technical_requirements: List[str]  # 2개 이상
+    facilitator_guide: str       # 200+ characters
+    learner_guide: str           # 200+ characters
+    technical_requirements: List[str]  # 2 or more
     support_plan: str
     schedule: dict
-    operator_guide: str          # Dev-21: 운영자용 매뉴얼
-    orientation_plan: str        # I-24: 교수자/운영자 오리엔테이션
-    pilot_plan: PilotPlan        # I-26: 프로토타입 실행
-    maintenance_plan: MaintenancePlan  # 유지관리 계획
+    operator_guide: str          # Dev-21: Operator manual
+    orientation_plan: str        # I-24: Instructor/operator orientation
+    pilot_plan: PilotPlan        # I-26: Prototype execution
+    maintenance_plan: MaintenancePlan  # Maintenance plan
 
 
 class QuizItem(TypedDict, total=False):
     """퀴즈 문항"""
     id: str
     question: str
-    type: str                    # 객관식, 주관식, OX 등
-    options: List[str]           # 객관식일 경우 4개
+    type: str                    # multiple choice, short answer, true/false, etc.
+    options: List[str]           # 4 if multiple choice
     answer: str
     explanation: str
-    objective_id: str            # LO-xxx 참조
-    difficulty: str              # 쉬움, 보통, 어려움
+    objective_id: str            # LO-xxx reference
+    difficulty: str              # easy, medium, hard
 
 
 class Rubric(TypedDict, total=False):
     """평가 루브릭"""
-    criteria: List[str]          # 최소 5개
+    criteria: List[str]          # at least 5
     levels: dict                 # excellent, good, needs_improvement
 
 
@@ -241,15 +241,15 @@ class ProgramEvaluation(TypedDict, total=False):
     roi_calculation: dict
     evaluation_schedule: List[dict]
     success_criteria: dict
-    adoption_decision: AdoptionDecision  # E-32: 프로그램 채택 여부 결정
+    adoption_decision: AdoptionDecision  # E-32: Program adoption decision
 
 
 class EvaluationResult(TypedDict, total=False):
     """Evaluation 단계 산출물"""
-    quiz_items: List[QuizItem]   # 최소 10개
+    quiz_items: List[QuizItem]   # at least 10
     rubric: Rubric
     feedback_plan: str
-    program_evaluation: ProgramEvaluation  # 성과평가 계획
+    program_evaluation: ProgramEvaluation  # Program evaluation plan
 
 
 class ScenarioContext(TypedDict, total=False):

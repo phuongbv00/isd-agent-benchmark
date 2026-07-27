@@ -146,14 +146,14 @@ class ADDIEAgent:
 
     def _analysis_node(self, state: ADDIEState) -> dict:
         """Analysis 단계 노드"""
-        self._log("Analysis 단계 시작")
+        self._log("Analysis phase started")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         tool_calls = state.get("tool_calls", [])
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append("Step 1: Analysis 단계 - 요구분석, 학습자, 환경, 과제 분석 (병렬)")
+        reasoning_steps.append("Step 1: Analysis phase - needs, learner, context, task analysis (parallel)")
 
         # Analysis 4단계 병렬 실행 (#73 성능 최적화)
         parallel_start_time = datetime.now()
@@ -172,15 +172,15 @@ class ADDIEAgent:
 
         def invoke_learner():
             return analyze_learner.invoke({
-                "target_audience": context.get("target_audience", "일반 학습자"),
+                "target_audience": context.get("target_audience", "General learners"),
                 "prior_knowledge": context.get("prior_knowledge"),
                 "additional_context": context.get("additional_context"),
             })
 
         def invoke_context():
             return analyze_context.invoke({
-                "learning_environment": context.get("learning_environment", "미지정"),
-                "duration": context.get("duration", "미지정"),
+                "learning_environment": context.get("learning_environment", "Not specified"),
+                "duration": context.get("duration", "Not specified"),
                 "class_size": _parse_class_size(context.get("class_size")),
                 "budget": scenario.get("constraints", {}).get("budget"),
                 "resources": scenario.get("constraints", {}).get("resources"),
@@ -209,7 +209,7 @@ class ADDIEAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "analyze_needs",
                             {"learning_goals": scenario.get("learning_goals", [])},
-                            f"요구분석 완료: {len(needs_result.get('training_needs', []))}개 교육 니즈 도출",
+                            f"Needs analysis complete: {len(needs_result.get('training_needs', []))} training needs identified",
                             parallel_start_time,
                         ))
                     elif analysis_type == "learner":
@@ -217,7 +217,7 @@ class ADDIEAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "analyze_learner",
                             {"target_audience": context.get("target_audience", "")},
-                            f"학습자 분석 완료: {len(learner_result.get('characteristics', []))}개 특성",
+                            f"Learner analysis complete: {len(learner_result.get('characteristics', []))} characteristics",
                             parallel_start_time,
                         ))
                     elif analysis_type == "context":
@@ -225,7 +225,7 @@ class ADDIEAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "analyze_context",
                             {"learning_environment": context.get("learning_environment", "")},
-                            f"환경 분석 완료: {len(context_result.get('constraints', []))}개 제약조건",
+                            f"Context analysis complete: {len(context_result.get('constraints', []))} constraints",
                             parallel_start_time,
                         ))
                     elif analysis_type == "task":
@@ -233,11 +233,11 @@ class ADDIEAgent:
                         tool_calls.append(self._record_tool_call(
                             state, "analyze_task",
                             {"learning_goals": scenario.get("learning_goals", [])},
-                            f"과제 분석 완료: {len(task_result.get('main_topics', []))}개 주제",
+                            f"Task analysis complete: {len(task_result.get('main_topics', []))} topics",
                             parallel_start_time,
                         ))
                 except Exception as e:
-                    errors.append(f"analyze_{analysis_type} 실패: {str(e)}")
+                    errors.append(f"analyze_{analysis_type} failed: {str(e)}")
 
         # LLM 응답에 누락된 priority_matrix 보완 (A-4)
         if needs_result and "priority_matrix" not in needs_result:
@@ -245,11 +245,11 @@ class ADDIEAgent:
             needs_result["priority_matrix"] = {
                 "high_urgency_high_impact": training_needs[:2] if len(training_needs) >= 2 else training_needs,
                 "high_urgency_low_impact": [training_needs[2]] if len(training_needs) > 2 else [],
-                "low_urgency_high_impact": ["심화 역량 개발"],
-                "low_urgency_low_impact": ["선택적 자기계발 과정"],
+                "low_urgency_high_impact": ["Advanced competency development"],
+                "low_urgency_low_impact": ["Optional self-development courses"],
             }
 
-        self._log(f"Analysis 완료: needs={len(needs_result.get('training_needs', []))}, learner={len(learner_result.get('characteristics', []))}, context={len(context_result.get('constraints', []))}, task={len(task_result.get('main_topics', []))}")
+        self._log(f"Analysis complete: needs={len(needs_result.get('training_needs', []))}, learner={len(learner_result.get('characteristics', []))}, context={len(context_result.get('constraints', []))}, task={len(task_result.get('main_topics', []))}")
 
         return {
             "analysis_result": {
@@ -266,7 +266,7 @@ class ADDIEAgent:
 
     def _design_node(self, state: ADDIEState) -> dict:
         """Design 단계 노드"""
-        self._log("Design 단계 시작")
+        self._log("Design phase started")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         analysis = state.get("analysis_result", {})
@@ -275,24 +275,24 @@ class ADDIEAgent:
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append("Step 2: Design 단계 - 학습 목표, 평가 계획, 교수 전략 설계")
+        reasoning_steps.append("Step 2: Design phase - learning objectives, assessment plan, instructional strategy design")
 
         # 1. 학습 목표 설계
         start_time = datetime.now()
         try:
             objectives_result = design_objectives.invoke({
                 "learning_goals": scenario.get("learning_goals", []),
-                "target_audience": context.get("target_audience", "일반 학습자"),
+                "target_audience": context.get("target_audience", "General learners"),
                 "difficulty": scenario.get("difficulty"),
             })
             tool_calls.append(self._record_tool_call(
                 state, "design_objectives",
                 {"learning_goals": scenario.get("learning_goals", [])},
-                f"학습 목표 설계 완료: {len(objectives_result)}개",
+                f"Learning objectives design complete: {len(objectives_result)} objectives",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"design_objectives 실패: {str(e)}")
+            errors.append(f"design_objectives failed: {str(e)}")
             objectives_result = []
 
         # 2. 평가 계획 수립
@@ -300,17 +300,17 @@ class ADDIEAgent:
         try:
             assessment_result = design_assessment.invoke({
                 "objectives": objectives_result,
-                "duration": context.get("duration", "미지정"),
-                "learning_environment": context.get("learning_environment", "미지정"),
+                "duration": context.get("duration", "Not specified"),
+                "learning_environment": context.get("learning_environment", "Not specified"),
             })
             tool_calls.append(self._record_tool_call(
                 state, "design_assessment",
                 {"objectives_count": len(objectives_result)},
-                f"평가 계획 수립 완료",
+                f"Assessment plan complete",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"design_assessment 실패: {str(e)}")
+            errors.append(f"design_assessment failed: {str(e)}")
             assessment_result = {}
 
         # 3. 교수 전략 설계
@@ -319,21 +319,21 @@ class ADDIEAgent:
         try:
             strategy_result = design_strategy.invoke({
                 "main_topics": main_topics,
-                "target_audience": context.get("target_audience", "일반 학습자"),
-                "duration": context.get("duration", "미지정"),
-                "learning_environment": context.get("learning_environment", "미지정"),
+                "target_audience": context.get("target_audience", "General learners"),
+                "duration": context.get("duration", "Not specified"),
+                "learning_environment": context.get("learning_environment", "Not specified"),
             })
             tool_calls.append(self._record_tool_call(
                 state, "design_strategy",
                 {"main_topics": main_topics},
-                f"교수 전략 설계 완료: {len(strategy_result.get('sequence', []))}개 Event",
+                f"Instructional strategy design complete: {len(strategy_result.get('sequence', []))} Events",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"design_strategy 실패: {str(e)}")
+            errors.append(f"design_strategy failed: {str(e)}")
             strategy_result = {}
 
-        self._log(f"Design 완료: objectives={len(objectives_result)}, events={len(strategy_result.get('sequence', []))}")
+        self._log(f"Design complete: objectives={len(objectives_result)}, events={len(strategy_result.get('sequence', []))}")
 
         return {
             "design_result": {
@@ -349,7 +349,7 @@ class ADDIEAgent:
 
     def _development_node(self, state: ADDIEState) -> dict:
         """Development 단계 노드"""
-        self._log("Development 단계 시작")
+        self._log("Development phase started")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         analysis = state.get("analysis_result", {})
@@ -359,7 +359,7 @@ class ADDIEAgent:
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append("Step 3: Development 단계 - 레슨 플랜, 학습 자료 개발")
+        reasoning_steps.append("Step 3: Development phase - lesson plan and learning materials development")
 
         objectives = design.get("learning_objectives", [])
         strategy = design.get("instructional_strategy", {})
@@ -371,17 +371,17 @@ class ADDIEAgent:
             lesson_plan_result = create_lesson_plan.invoke({
                 "objectives": objectives,
                 "instructional_strategy": strategy,
-                "duration": context.get("duration", "미지정"),
+                "duration": context.get("duration", "Not specified"),
                 "main_topics": main_topics,
             })
             tool_calls.append(self._record_tool_call(
                 state, "create_lesson_plan",
                 {"duration": context.get("duration", "")},
-                f"레슨 플랜 생성 완료: {len(lesson_plan_result.get('modules', []))}개 모듈",
+                f"Lesson plan created: {len(lesson_plan_result.get('modules', []))} modules",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"create_lesson_plan 실패: {str(e)}")
+            errors.append(f"create_lesson_plan failed: {str(e)}")
             lesson_plan_result = {}
 
         # 2. 학습 자료 생성
@@ -389,30 +389,30 @@ class ADDIEAgent:
         try:
             materials_result = create_materials.invoke({
                 "lesson_plan": lesson_plan_result,
-                "learning_environment": context.get("learning_environment", "미지정"),
-                "target_audience": context.get("target_audience", "일반 학습자"),
+                "learning_environment": context.get("learning_environment", "Not specified"),
+                "target_audience": context.get("target_audience", "General learners"),
             })
             tool_calls.append(self._record_tool_call(
                 state, "create_materials",
                 {"lesson_plan_modules": len(lesson_plan_result.get("modules", []))},
-                f"학습 자료 생성 완료: {len(materials_result)}개",
+                f"Learning materials created: {len(materials_result)} materials",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"create_materials 실패: {str(e)}")
+            errors.append(f"create_materials failed: {str(e)}")
             materials_result = []
 
         # LLM 응답에 누락된 storyboard 보완 (D-18)
         if materials_result:
             default_storyboard = [
-                {"frame_number": 1, "screen_title": "도입 화면", "visual_description": "교육 제목과 로고 표시", "audio_narration": "교육에 오신 것을 환영합니다.", "interaction": "시작 버튼 클릭", "notes": "배경음악 페이드인"},
-                {"frame_number": 2, "screen_title": "학습 목표", "visual_description": "학습 목표 목록 애니메이션", "audio_narration": "오늘 학습할 내용을 확인합니다.", "interaction": "자동 진행", "notes": "목표별 순차 표시"},
+                {"frame_number": 1, "screen_title": "Introduction Screen", "visual_description": "Display training title and logo", "audio_narration": "Welcome to the training.", "interaction": "Click start button", "notes": "Background music fade-in"},
+                {"frame_number": 2, "screen_title": "Learning Objectives", "visual_description": "Animated list of learning objectives", "audio_narration": "Let's review what you will learn today.", "interaction": "Auto-advance", "notes": "Sequential display of each objective"},
             ]
             for material in materials_result:
-                if material.get("type") in ["PPT", "동영상"] and "storyboard" not in material:
+                if material.get("type") in ["PPT", "Video"] and "storyboard" not in material:
                     material["storyboard"] = default_storyboard
 
-        self._log(f"Development 완료: modules={len(lesson_plan_result.get('modules', []))}, materials={len(materials_result)}")
+        self._log(f"Development complete: modules={len(lesson_plan_result.get('modules', []))}, materials={len(materials_result)}")
 
         # 출력 구조: 루브릭 항목과 일치하도록 명시적 필드명 사용
         # Item 19: 학습자용 자료 개발 - materials를 learner_materials로 명시
@@ -422,8 +422,8 @@ class ADDIEAgent:
         return {
             "development_result": {
                 "lesson_plan": lesson_plan_result,
-                "learner_materials": materials_result,  # Item 19: 학습자용 자료 개발
-                "materials": materials_result,  # 기존 호환성 유지
+                "learner_materials": materials_result,  # Item 19: Learner material development
+                "materials": materials_result,  # maintain backward compatibility
             },
             "current_phase": "implementation",
             "tool_calls": tool_calls,
@@ -433,7 +433,7 @@ class ADDIEAgent:
 
     def _implementation_node(self, state: ADDIEState) -> dict:
         """Implementation 단계 노드"""
-        self._log("Implementation 단계 시작")
+        self._log("Implementation phase started")
         scenario = state["scenario"]
         context = scenario.get("context", {})
         development = state.get("development_result", {})
@@ -441,7 +441,7 @@ class ADDIEAgent:
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append("Step 4: Implementation 단계 - 실행 계획 및 유지관리 계획 수립")
+        reasoning_steps.append("Step 4: Implementation phase - implementation plan and maintenance plan development")
 
         lesson_plan = development.get("lesson_plan", {})
 
@@ -450,8 +450,8 @@ class ADDIEAgent:
         try:
             implementation_result = create_implementation_plan.invoke({
                 "lesson_plan": lesson_plan,
-                "learning_environment": context.get("learning_environment", "미지정"),
-                "target_audience": context.get("target_audience", "일반 학습자"),
+                "learning_environment": context.get("learning_environment", "Not specified"),
+                "target_audience": context.get("target_audience", "General learners"),
                 "class_size": _parse_class_size(context.get("class_size")),
             })
             fg_len = len(implementation_result.get("facilitator_guide", ""))
@@ -459,69 +459,69 @@ class ADDIEAgent:
             tool_calls.append(self._record_tool_call(
                 state, "create_implementation_plan",
                 {"learning_environment": context.get("learning_environment", "")},
-                f"실행 계획 완료: facilitator_guide={fg_len}자, learner_guide={lg_len}자",
+                f"Implementation plan complete: facilitator_guide={fg_len} chars, learner_guide={lg_len} chars",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"create_implementation_plan 실패: {str(e)}")
+            errors.append(f"create_implementation_plan failed: {str(e)}")
             implementation_result = {}
 
         # LLM 응답에 누락된 필드 보완 (Dev-21, I-24, I-26)
         if implementation_result:
             env_lower = context.get("learning_environment", "").lower()
-            is_online = "온라인" in env_lower
+            is_online = "online" in env_lower
             if "operator_guide" not in implementation_result:
                 if is_online:
-                    implementation_result["operator_guide"] = """1. 플랫폼 준비: 화상회의 링크 생성 및 배포, 녹화 설정 확인, 소그룹 세션 사전 구성, 대기실 설정
-2. 참가자 관리: 접속 현황 모니터링, 접속 문제 지원, 채팅 관리, 출석 체크 및 기록
-3. 기술 지원: 화면 공유 문제 해결, 음성 문제 지원, 백업 링크 준비, 네트워크 장애 대응
-4. 사후 처리: 녹화본 편집 및 업로드, 출석 기록 정리, 설문 결과 수합, 참가자 이메일 발송"""
+                    implementation_result["operator_guide"] = """1. Platform preparation: Create and distribute video conference links, verify recording settings, pre-configure breakout sessions, set up waiting room
+2. Participant management: Monitor connection status, support connection issues, manage chat, check and record attendance
+3. Technical support: Resolve screen sharing issues, support audio issues, prepare backup links, respond to network failures
+4. Post-session processing: Edit and upload recordings, organize attendance records, collect survey results, send participant emails"""
                 else:
-                    implementation_result["operator_guide"] = """1. 교육 환경 준비: 강의실 예약 확인, 장비 점검 (프로젝터, 마이크, PC), 학습 자료 인쇄 및 배치, 다과 준비
-2. 참가자 관리: 출석 체크, 명찰 배부, 좌석 안내, 특이사항 기록
-3. 운영 지원: 강사와 소통, 시간 관리, 휴식 시간 안내, 돌발 상황 대응
-4. 사후 처리: 강의실 정리, 장비 반납, 설문 수합, 참석 현황 보고"""
+                    implementation_result["operator_guide"] = """1. Training environment preparation: Confirm classroom reservation, inspect equipment (projector, microphone, PC), print and arrange learning materials, prepare refreshments
+2. Participant management: Check attendance, distribute name tags, guide seating, record notable issues
+3. Operational support: Communicate with the instructor, manage time, announce breaks, respond to unexpected situations
+4. Post-session processing: Tidy the classroom, return equipment, collect surveys, report attendance status"""
             if "orientation_plan" not in implementation_result:
                 if is_online:
-                    implementation_result["orientation_plan"] = """1. 강사/진행자 오리엔테이션 (교육 3일 전): 플랫폼 기능 숙지, 화면 공유 테스트, 소그룹 세션 운영법 안내, 교수 자료 검토
-2. 운영자 오리엔테이션 (교육 2일 전): 기술 지원 역할 설명, 문제 대응 매뉴얼 공유, 비상 연락망 확인, 체크리스트 배부
-3. 리허설 (교육 1일 전): 전체 플로우 테스트, 백업 시나리오 점검, 시간 배분 확인, 최종 점검 완료"""
+                    implementation_result["orientation_plan"] = """1. Instructor/facilitator orientation (3 days before training): Familiarization with platform features, screen sharing test, guidance on running breakout sessions, review of instructional materials
+2. Operator orientation (2 days before training): Explanation of technical support roles, sharing of issue response manual, verification of emergency contact list, checklist distribution
+3. Rehearsal (1 day before training): Full flow test, backup scenario review, time allocation check, final check completed"""
                 else:
-                    implementation_result["orientation_plan"] = """1. 강사/진행자 오리엔테이션 (교육 1주 전): 교육 목표 및 커리큘럼 설명, 교수 자료 전달 및 검토, 진행 방식 협의, Q&A
-2. 운영자 오리엔테이션 (교육 3일 전): 운영 역할 및 책임 설명, 체크리스트 배부, 비상 연락망 공유, 리허설 일정 확인
-3. 리허설 (교육 1일 전): 장비 테스트, 동선 확인, 시간 배분 점검, 최종 조율"""
+                    implementation_result["orientation_plan"] = """1. Instructor/facilitator orientation (1 week before training): Explanation of training objectives and curriculum, delivery and review of instructional materials, agreement on delivery approach, Q&A
+2. Operator orientation (3 days before training): Explanation of operational roles and responsibilities, checklist distribution, sharing of emergency contact list, confirmation of rehearsal schedule
+3. Rehearsal (1 day before training): Equipment test, walkthrough of participant flow, time allocation review, final adjustments"""
             if "pilot_plan" not in implementation_result:
                 implementation_result["pilot_plan"] = {
-                    "pilot_scope": "1차 파일럿: 소규모 그룹(10-15명) 대상 전체 과정 시범 운영",
-                    "participants": "각 부서 대표 1-2명, 교육 담당자 참관",
-                    "duration": "본 교육과 동일",
-                    "success_criteria": ["학습 목표 달성률 80% 이상", "만족도 4.0/5.0 이상", "주요 이슈 없이 진행"],
-                    "data_collection": ["사전/사후 테스트 점수", "만족도 설문", "관찰 기록", "참가자 피드백"],
-                    "contingency_plan": "기술적 문제 발생 시 백업 자료 활용, 시간 초과 시 선택적 모듈 축소",
+                    "pilot_scope": "First pilot: Trial run of the full course with a small group (10-15 participants)",
+                    "participants": "1-2 representatives from each department, with training staff observing",
+                    "duration": "Same as the main training",
+                    "success_criteria": ["Learning objective achievement rate of 80% or higher", "Satisfaction of 4.0/5.0 or higher", "Delivered without major issues"],
+                    "data_collection": ["Pre/post test scores", "Satisfaction survey", "Observation records", "Participant feedback"],
+                    "contingency_plan": "Use backup materials if technical problems occur; reduce optional modules if the schedule overruns",
                 }
 
         # 2. 유지관리 계획 생성
         materials = development.get("materials", [])
-        content_types = [m.get("type", "자료") for m in materials] if materials else ["슬라이드", "핸드아웃"]
+        content_types = [m.get("type", "Material") for m in materials] if materials else ["Slides", "Handout"]
         start_time = datetime.now()
         try:
             maintenance_result = create_maintenance_plan.invoke({
-                "program_title": scenario.get("title", "교육 프로그램"),
-                "delivery_method": implementation_result.get("delivery_method", context.get("learning_environment", "대면 교육")),
+                "program_title": scenario.get("title", "Training Program"),
+                "delivery_method": implementation_result.get("delivery_method", context.get("learning_environment", "In-person classroom training")),
                 "content_types": content_types,
-                "update_frequency": "분기별",
+                "update_frequency": "Quarterly",
             })
             tool_calls.append(self._record_tool_call(
                 state, "create_maintenance_plan",
                 {"program_title": scenario.get("title", "")},
-                f"유지관리 계획 완료: {len(maintenance_result.get('content_maintenance', {}).get('update_triggers', []))}개 업데이트 트리거",
+                f"Maintenance plan complete: {len(maintenance_result.get('content_maintenance', {}).get('update_triggers', []))} update triggers",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"create_maintenance_plan 실패: {str(e)}")
+            errors.append(f"create_maintenance_plan failed: {str(e)}")
             maintenance_result = {}
 
-        self._log(f"Implementation 완료: facilitator_guide={len(implementation_result.get('facilitator_guide', ''))}자, maintenance_plan={bool(maintenance_result)}")
+        self._log(f"Implementation complete: facilitator_guide={len(implementation_result.get('facilitator_guide', ''))} chars, maintenance_plan={bool(maintenance_result)}")
 
         # 출력 구조 평탄화: 루브릭 항목과 일치하도록 필드를 phase 레벨로 이동
         # Item 24: 교수자·운영자 오리엔테이션
@@ -541,13 +541,13 @@ class ADDIEAgent:
                 "instructor_operator_orientation": implementation_result.get("orientation_plan", ""),  # I-24
                 "system_environment_check": {
                     "technical_requirements": implementation_result.get("technical_requirements", []),
-                    "pre_check_items": ["플랫폼 접속 테스트", "학습 자료 업로드 확인", "네트워크 안정성 점검"],
+                    "pre_check_items": ["Platform access test", "Learning material upload verification", "Network stability check"],
                 },  # I-25
                 "prototype_execution": implementation_result.get("pilot_plan", {}),  # I-26
                 "operation_monitoring": {
-                    "monitoring_items": ["학습자 참여도", "기술적 이슈", "시간 준수"],
-                    "support_channels": ["실시간 채팅", "Q&A 게시판", "이메일 지원"],
-                    "escalation_process": "1차: 운영자 → 2차: 강사 → 3차: 관리자",
+                    "monitoring_items": ["Learner engagement", "Technical issues", "Schedule adherence"],
+                    "support_channels": ["Live chat", "Q&A board", "Email support"],
+                    "escalation_process": "Level 1: Operator → Level 2: Instructor → Level 3: Manager",
                 },  # I-27
                 # 유지관리 계획
                 "maintenance_plan": maintenance_result,
@@ -560,7 +560,7 @@ class ADDIEAgent:
 
     def _evaluation_node(self, state: ADDIEState) -> dict:
         """Evaluation 단계 노드"""
-        self._log("Evaluation 단계 시작")
+        self._log("Evaluation phase started")
         scenario = state["scenario"]
         analysis = state.get("analysis_result", {})
         design = state.get("design_result", {})
@@ -569,7 +569,7 @@ class ADDIEAgent:
         reasoning_steps = state.get("reasoning_steps", [])
         errors = state.get("errors", [])
 
-        reasoning_steps.append("Step 5: Evaluation 단계 - 퀴즈 문항, 평가 루브릭, 성과평가 계획 생성")
+        reasoning_steps.append("Step 5: Evaluation phase - quiz items, assessment rubric, program evaluation plan generation")
 
         objectives = design.get("learning_objectives", [])
         main_topics = task_analysis.get("main_topics", scenario.get("learning_goals", []))
@@ -586,11 +586,11 @@ class ADDIEAgent:
             tool_calls.append(self._record_tool_call(
                 state, "create_quiz_items",
                 {"objectives_count": len(objectives)},
-                f"퀴즈 문항 생성 완료: {len(quiz_result)}개",
+                f"Quiz items created: {len(quiz_result)} items",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"create_quiz_items 실패: {str(e)}")
+            errors.append(f"create_quiz_items failed: {str(e)}")
             quiz_result = []
 
         # 2. 평가 루브릭 생성
@@ -598,16 +598,16 @@ class ADDIEAgent:
         try:
             rubric_result = create_rubric.invoke({
                 "objectives": objectives,
-                "assessment_type": "종합 평가",
+                "assessment_type": "Comprehensive Assessment",
             })
             tool_calls.append(self._record_tool_call(
                 state, "create_rubric",
                 {"objectives_count": len(objectives)},
-                f"평가 루브릭 생성 완료: {len(rubric_result.get('criteria', []))}개 기준",
+                f"Assessment rubric created: {len(rubric_result.get('criteria', []))} criteria",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"create_rubric 실패: {str(e)}")
+            errors.append(f"create_rubric failed: {str(e)}")
             rubric_result = {}
 
         # 3. 성과평가 계획 생성 (Kirkpatrick 4-Level)
@@ -615,21 +615,21 @@ class ADDIEAgent:
         try:
             context = scenario.get("context", {})
             program_evaluation_result = create_program_evaluation.invoke({
-                "program_title": scenario.get("title", "교육 프로그램"),
+                "program_title": scenario.get("title", "Training Program"),
                 "objectives": objectives,
-                "target_audience": context.get("target_audience", "일반 학습자"),
+                "target_audience": context.get("target_audience", "General learners"),
             })
             tool_calls.append(self._record_tool_call(
                 state, "create_program_evaluation",
                 {"program_title": scenario.get("title", "")},
-                f"성과평가 계획 완료: Kirkpatrick 4-Level 모델",
+                f"Program evaluation plan complete: Kirkpatrick 4-Level model",
                 start_time,
             ))
         except Exception as e:
-            errors.append(f"create_program_evaluation 실패: {str(e)}")
+            errors.append(f"create_program_evaluation failed: {str(e)}")
             program_evaluation_result = {}
 
-        self._log(f"Evaluation 완료: quiz_items={len(quiz_result)}, criteria={len(rubric_result.get('criteria', []))}, program_evaluation={bool(program_evaluation_result)}")
+        self._log(f"Evaluation complete: quiz_items={len(quiz_result)}, criteria={len(rubric_result.get('criteria', []))}, program_evaluation={bool(program_evaluation_result)}")
 
         # 출력 구조: 루브릭 항목과 일치하도록 명시적 필드명 사용
         # Item 28: 파일럿/초기 실행 중 자료 수집
@@ -642,19 +642,19 @@ class ADDIEAgent:
         # Item 28: 파일럿 실행 중 자료 수집 계획
         pilot_data_collection = {
             "collection_methods": [
-                {"method": "사전/사후 테스트", "timing": "교육 시작 전/종료 후", "data_type": "학습 성취도"},
-                {"method": "만족도 설문", "timing": "교육 종료 직후", "data_type": "학습자 만족도"},
-                {"method": "관찰 기록", "timing": "교육 진행 중", "data_type": "참여도, 이해도"},
-                {"method": "인터뷰/FGI", "timing": "교육 종료 1주 내", "data_type": "질적 피드백"},
+                {"method": "Pre/post test", "timing": "Before training starts / after it ends", "data_type": "Learning achievement"},
+                {"method": "Satisfaction survey", "timing": "Immediately after training ends", "data_type": "Learner satisfaction"},
+                {"method": "Observation records", "timing": "During training delivery", "data_type": "Engagement, comprehension"},
+                {"method": "Interview/FGI", "timing": "Within 1 week after training ends", "data_type": "Qualitative feedback"},
             ],
             "analysis_plan": {
-                "quantitative": "사전/사후 점수 비교, 만족도 평균, 참여율 산출",
-                "qualitative": "피드백 주제 분석, 개선 요청 사항 분류",
+                "quantitative": "Pre/post score comparison, satisfaction average, participation rate calculation",
+                "qualitative": "Feedback theme analysis, classification of improvement requests",
             },
             "improvement_triggers": [
-                "학습 목표 달성률 80% 미만 시 콘텐츠 수정",
-                "만족도 4.0 미만 시 진행 방식 개선",
-                "특정 모듈 이해도 낮을 시 보충 자료 추가",
+                "Revise content if the learning objective achievement rate is below 80%",
+                "Improve the delivery approach if satisfaction is below 4.0",
+                "Add supplementary materials if comprehension of a specific module is low",
             ],
         }
 
@@ -662,20 +662,20 @@ class ADDIEAgent:
         formative_improvement = {
             "evaluation_criteria": rubric_result.get("criteria", []),
             "improvement_process": [
-                "1. 파일럿 데이터 수집 및 분석",
-                "2. 문제 영역 식별 및 우선순위 결정",
-                "3. 개선안 도출 및 전문가 검토",
-                "4. 수정본 적용 및 재검증",
+                "1. Collect and analyze pilot data",
+                "2. Identify problem areas and set priorities",
+                "3. Derive improvement proposals and obtain expert review",
+                "4. Apply the revised version and re-validate",
             ],
-            "feedback_integration": "학습자 피드백과 관찰 결과를 종합하여 콘텐츠 및 운영 방식 개선",
+            "feedback_integration": "Synthesize learner feedback and observation results to improve content and delivery approach",
         }
 
         return {
             "evaluation_result": {
-                "quiz_items": quiz_result,  # Item 30: 총괄 평가 문항
+                "quiz_items": quiz_result,  # Item 30: Summative assessment items
                 "rubric": rubric_result,
                 "program_evaluation": program_evaluation_result,  # Item 31, 32
-                "feedback_plan": rubric_result.get("feedback_plan", "평가 후 개별 피드백 제공"),
+                "feedback_plan": rubric_result.get("feedback_plan", "Provide individual feedback after assessment"),
                 # 루브릭 항목과 매칭되는 필드 추가
                 "pilot_data_collection": pilot_data_collection,  # Item 28
                 "formative_improvement": formative_improvement,  # Item 29
@@ -739,7 +739,7 @@ class ADDIEAgent:
             },
         }
 
-        self._log(f"ADDIE 완료: {execution_time:.2f}초, {len(final_state.get('tool_calls', []))}개 도구 호출")
+        self._log(f"ADDIE complete: {execution_time:.2f}s, {len(final_state.get('tool_calls', []))} tool calls")
 
         return result
 
@@ -759,9 +759,9 @@ class ADDIEAgent:
         # problem_definition 생성 (항목 1)
         problem_def = na.get("problem_definition", "") or na.get("performance_gap", "")
         if not problem_def:
-            current = na.get("current_state", "현재 역량 부족")
-            desired = na.get("desired_state", "목표 역량 달성")
-            problem_def = f"현재 상태: {current}. 목표 상태: {desired}. 이 차이를 해소하기 위한 교육적 개입이 필요함."
+            current = na.get("current_state", "Insufficient current competency")
+            desired = na.get("desired_state", "Achievement of target competency")
+            problem_def = f"Current state: {current}. Target state: {desired}. An instructional intervention is needed to close this gap."
 
         analysis_dict = {
             "needs_analysis": {
@@ -769,7 +769,7 @@ class ADDIEAgent:
                 "gap_analysis": na.get("gap_analysis", []) if isinstance(na.get("gap_analysis"), list) else [
                     {"current": na.get("current_state", ""), "target": na.get("desired_state", ""), "gap": na.get("performance_gap", "")}
                 ],
-                "performance_analysis": f"교육 니즈: {', '.join((na.get('training_needs') or [])[:3])}. 비교육 솔루션: {', '.join((na.get('non_training_solutions') or [])[:2])}",
+                "performance_analysis": f"Training needs: {', '.join((na.get('training_needs') or [])[:3])}. Non-training solutions: {', '.join((na.get('non_training_solutions') or [])[:2])}",
                 "priority_matrix": na.get("priority_matrix", {}),
             },
             "learner_analysis": {
@@ -789,7 +789,7 @@ class ADDIEAgent:
                 "initial_objectives": ta.get("main_topics", []),
                 "subtopics": ta.get("subtopics", []),
                 "prerequisites": ta.get("prerequisites", []),
-                "review_summary": ta.get("review_summary", "") or f"주제: {', '.join(ta.get('main_topics', [])[:3])}",
+                "review_summary": ta.get("review_summary", "") or f"Topics: {', '.join(ta.get('main_topics', [])[:3])}",
             },
         }
 
@@ -822,7 +822,7 @@ class ADDIEAgent:
             "instructional_strategies": {
                 "methods": ist.get("methods", []),
                 "activities": [e.get("activity", "") for e in ist.get("sequence", [])[:5]],
-                "rationale": f"모델: {ist.get('model', '')}",
+                "rationale": f"Model: {ist.get('model', '')}",
             },
             "non_instructional_strategies": {
                 "motivation_strategies": [],
@@ -837,14 +837,14 @@ class ADDIEAgent:
             "learning_activities": learning_activities,
             "storyboard": {
                 "screens": [
-                    {"screen_id": "S01", "title": "도입", "description": "학습 목표 및 개요 소개"},
-                    {"screen_id": "S02", "title": "학습 내용", "description": "핵심 개념 및 내용 제시"},
-                    {"screen_id": "S03", "title": "실습/활동", "description": "학습자 참여 활동"},
-                    {"screen_id": "S04", "title": "평가", "description": "학습 성취도 확인"},
-                    {"screen_id": "S05", "title": "마무리", "description": "요약 및 다음 단계 안내"},
+                    {"screen_id": "S01", "title": "Introduction", "description": "Introduce learning objectives and overview"},
+                    {"screen_id": "S02", "title": "Learning Content", "description": "Present core concepts and content"},
+                    {"screen_id": "S03", "title": "Practice/Activity", "description": "Learner participation activities"},
+                    {"screen_id": "S04", "title": "Assessment", "description": "Check learning achievement"},
+                    {"screen_id": "S05", "title": "Wrap-up", "description": "Summary and guidance on next steps"},
                 ],
-                "navigation_flow": "S01 → S02 → S03 → S04 → S05 (순차 진행, 이전/다음 버튼)",
-                "interactions": ["클릭", "드래그앤드롭", "텍스트 입력", "선택형 퀴즈"],
+                "navigation_flow": "S01 → S02 → S03 → S04 → S05 (sequential progression, previous/next buttons)",
+                "interactions": ["Click", "Drag and drop", "Text input", "Multiple-choice quiz"],
             },
         }
 
@@ -864,9 +864,9 @@ class ADDIEAgent:
         # 기본값 보장 (Item 19: 학습자용 자료 개발)
         if not learner_materials:
             learner_materials = [
-                {"title": "학습 가이드", "type": "문서", "content": "학습 목표, 진행 방법, 평가 기준을 포함한 학습자용 가이드", "format": "PDF"},
-                {"title": "워크시트", "type": "활동자료", "content": "학습 내용 적용을 위한 실습 워크시트", "format": "PDF"},
-                {"title": "참고자료", "type": "보조자료", "content": "심화 학습을 위한 추가 참고자료 및 링크", "format": "PDF/Web"},
+                {"title": "Learning Guide", "type": "Document", "content": "Learner guide covering learning objectives, delivery approach, and assessment criteria", "format": "PDF"},
+                {"title": "Worksheet", "type": "Activity Material", "content": "Practice worksheet for applying the learning content", "format": "PDF"},
+                {"title": "Reference Materials", "type": "Supplementary Material", "content": "Additional references and links for advanced study", "format": "PDF/Web"},
             ]
 
         # quiz_items를 assessment_tools로 변환
@@ -887,21 +887,21 @@ class ADDIEAgent:
             "instructor_guide": {
                 "overview": impl.get("facilitator_guide", ""),
                 "session_guides": [mod.get("title", "") for mod in dev.get("lesson_plan", {}).get("modules", [])],
-                "facilitation_tips": ["학습자 참여 유도", "질문 활용"],
-                "troubleshooting": ["기술적 문제 대응"],
+                "facilitation_tips": ["Encourage learner participation", "Use questioning"],
+                "troubleshooting": ["Respond to technical problems"],
             },
             "operator_manual": {
                 "system_setup": impl.get("operator_guide", ""),
-                "operation_procedures": ["등록 관리", "출석 관리"],
-                "support_procedures": ["학습자 문의 대응"],
-                "escalation_process": "문제 발생 시 담당자에게 보고",
+                "operation_procedures": ["Registration management", "Attendance management"],
+                "support_procedures": ["Respond to learner inquiries"],
+                "escalation_process": "Report to the responsible staff member when a problem occurs",
             },
             "assessment_tools": quiz_tools,
             "expert_review": {
-                "reviewers": ["내용 전문가", "교수설계 전문가", "현장 전문가"],
-                "review_criteria": ["내용 정확성", "교수 설계 적절성", "학습 목표 정렬", "학습자 수준 적합성"],
-                "feedback_summary": "전문가 검토 결과 내용의 정확성과 교수 설계의 적절성이 확인되었으며, 학습 목표와의 정렬 및 학습자 수준 적합성에 대한 피드백을 반영하여 개선 작업을 진행함",
-                "revisions_made": ["전문가 피드백 기반 콘텐츠 수정", "학습 목표 정렬 강화", "학습자 수준에 맞는 예시 추가"],
+                "reviewers": ["Subject matter expert", "Instructional design expert", "Field practitioner"],
+                "review_criteria": ["Content accuracy", "Instructional design appropriateness", "Learning objective alignment", "Suitability for learner level"],
+                "feedback_summary": "The expert review confirmed the accuracy of the content and the appropriateness of the instructional design, and improvement work was carried out by incorporating feedback on learning objective alignment and suitability for the learner level",
+                "revisions_made": ["Content revisions based on expert feedback", "Strengthened learning objective alignment", "Added examples suited to the learner level"],
             },
         }
 
@@ -913,25 +913,25 @@ class ADDIEAgent:
 
         implementation_dict = {
             "instructor_orientation": {
-                "orientation_objectives": ["프로그램 이해", "운영 절차 숙지"],
+                "orientation_objectives": ["Understanding the program", "Familiarity with operational procedures"],
                 "schedule": op if isinstance(op, str) else str(op),
-                "materials": ["교수자 가이드", "운영 매뉴얼"],
-                "competency_checklist": ["내용 이해도", "진행 능력"],
+                "materials": ["Instructor guide", "Operator manual"],
+                "competency_checklist": ["Content comprehension", "Facilitation ability"],
             },
             "system_check": {
                 "checklist": sc.get("pre_check_items", impl.get("technical_requirements", [])),
-                "technical_validation": "시스템 테스트 완료",
-                "contingency_plans": ["비상 대응 계획 수립"],
+                "technical_validation": "System testing completed",
+                "contingency_plans": ["Establish contingency response plan"],
             },
             "prototype_execution": {
-                "pilot_scope": pp.get("pilot_scope", "") if isinstance(pp, dict) else "소규모 파일럿 테스트",
-                "participants": pp.get("participants", "") if isinstance(pp, dict) else "10명 내외",
+                "pilot_scope": pp.get("pilot_scope", "") if isinstance(pp, dict) else "Small-scale pilot test",
+                "participants": pp.get("participants", "") if isinstance(pp, dict) else "Around 10 participants",
                 "execution_log": pp.get("data_collection", []) if isinstance(pp, dict) else [],
                 "issues_encountered": [],
             },
             "monitoring": {
-                "monitoring_criteria": mp.get("monitoring_items", ["학습 진도", "참여율"]),
-                "support_channels": mp.get("support_channels", ["이메일", "전화"]),
+                "monitoring_criteria": mp.get("monitoring_items", ["Learning progress", "Participation rate"]),
+                "support_channels": mp.get("support_channels", ["Email", "Phone"]),
                 "issue_resolution_log": [],
                 "real_time_adjustments": [],
             },
@@ -946,16 +946,16 @@ class ADDIEAgent:
         # 항목 28: 데이터 수집 기본값
         data_collection_methods = [m.get("method", "") for m in pdc.get("collection_methods", [])]
         if not data_collection_methods:
-            data_collection_methods = ["사전/사후 테스트", "만족도 설문", "관찰 기록", "인터뷰"]
+            data_collection_methods = ["Pre/post test", "Satisfaction survey", "Observation records", "Interview"]
 
         # 항목 29: 형성평가 개선 기본값
         improvement_steps = fi.get("improvement_process", [])
         if not improvement_steps:
             improvement_steps = [
-                "파일럿 데이터 분석 및 문제점 식별",
-                "개선 우선순위 결정 및 수정안 도출",
-                "전문가 검토 후 수정본 적용",
-                "재검증 및 최종 반영",
+                "Analyze pilot data and identify problems",
+                "Set improvement priorities and derive revision proposals",
+                "Apply the revised version after expert review",
+                "Re-validate and incorporate final changes",
             ]
 
         # 항목 31: 효과성 분석 기본값
@@ -963,53 +963,53 @@ class ADDIEAgent:
         learning_outcomes = kirk_analysis.get("level1_reaction", {})
         if not learning_outcomes:
             learning_outcomes = {
-                "description": "학습자 반응 평가",
-                "methods": ["만족도 설문"],
-                "target_score": "4.0/5.0 이상",
+                "description": "Learner reaction evaluation",
+                "methods": ["Satisfaction survey"],
+                "target_score": "4.0/5.0 or higher",
             }
 
         goal_achievement = pe.get("effectiveness_score", "")
         if not goal_achievement:
-            goal_achievement = "목표 달성률 80% 이상 예상"
+            goal_achievement = "Goal achievement rate expected to be 80% or higher"
 
         # 항목 32: 채택 결정 기본값
         adoption_decision_val = pe.get("adoption_recommendation", "")
         adoption_rationale = pe.get("rationale", "")
         if not adoption_decision_val:
-            adoption_decision_val = "조건부 채택"
-            adoption_rationale = "파일럿 결과에 따라 최종 결정. 학습 목표 달성률 및 만족도 기준 충족 시 본격 도입."
+            adoption_decision_val = "Conditional adoption"
+            adoption_rationale = "Final decision depends on the pilot results. Full-scale rollout once the learning objective achievement rate and satisfaction criteria are met."
 
         # 항목 33: 개선 계획 기본값
         feedback_summary = ev.get("feedback_plan", "")
         if not feedback_summary:
-            feedback_summary = "학습자 피드백과 평가 결과를 종합하여 프로그램 개선에 반영"
+            feedback_summary = "Synthesize learner feedback and evaluation results and reflect them in program improvement"
 
         improvement_areas = fi.get("evaluation_criteria", rubric.get("criteria", []))
         if not improvement_areas:
-            improvement_areas = ["학습 내용 적절성", "전달 방식 효과성", "평가 도구 타당성"]
+            improvement_areas = ["Appropriateness of learning content", "Effectiveness of delivery approach", "Validity of assessment tools"]
 
         action_items = fi.get("improvement_process", [])
         if not action_items:
-            action_items = ["콘텐츠 업데이트", "교수 방법 개선", "평가 문항 보완"]
+            action_items = ["Content updates", "Improvement of instructional methods", "Refinement of assessment items"]
 
         evaluation_dict = {
             "formative": {
                 "data_collection": {
                     "methods": data_collection_methods,
-                    "learner_feedback": pdc.get("analysis_plan", {}).get("qualitative", "") or ["학습자 의견 수집", "어려운 부분 피드백", "개선 요청 사항"],
-                    "performance_data": pdc.get("analysis_plan", {}) or {"quantitative": "사전/사후 점수 비교", "qualitative": "피드백 분석"},
-                    "observations": pdc.get("improvement_triggers", []) or ["학습 진행 관찰", "참여도 모니터링", "학습자 행동 패턴 분석"],
+                    "learner_feedback": pdc.get("analysis_plan", {}).get("qualitative", "") or ["Collect learner opinions", "Feedback on difficult parts", "Improvement requests"],
+                    "performance_data": pdc.get("analysis_plan", {}) or {"quantitative": "Pre/post score comparison", "qualitative": "Feedback analysis"},
+                    "observations": pdc.get("improvement_triggers", []) or ["Observation of learning progress", "Engagement monitoring", "Analysis of learner behavior patterns"],
                     "pilot_difficulties": {
-                        "identified_modules": ["개념 이해 모듈", "실습 적용 모듈"],
-                        "difficulty_reasons": ["선수 지식 부족", "실습 시간 부족", "자료 복잡성"],
-                        "improvement_suggestions": ["보충 자료 제공", "실습 시간 확대", "단계별 가이드 추가"],
+                        "identified_modules": ["Concept comprehension module", "Practice application module"],
+                        "difficulty_reasons": ["Insufficient prerequisite knowledge", "Insufficient practice time", "Complexity of materials"],
+                        "improvement_suggestions": ["Provide supplementary materials", "Extend practice time", "Add step-by-step guides"],
                     },
                 },
                 "improvements": [
                     {
                         "issue_identified": step,
-                        "improvement_action": "개선 조치 실행",
-                        "priority": "높음" if idx == 0 else "보통",
+                        "improvement_action": "Execute improvement action",
+                        "priority": "High" if idx == 0 else "Medium",
                     }
                     for idx, step in enumerate(improvement_steps)
                 ],
@@ -1019,22 +1019,22 @@ class ADDIEAgent:
                 "effectiveness_analysis": {
                     "learning_outcomes": learning_outcomes,
                     "goal_achievement_rate": goal_achievement,
-                    "statistical_analysis": str(kirk_analysis.get("level2_learning", "")) or "사전/사후 점수 t-검정 분석",
-                    "recommendations": pe.get("recommendations", []) or ["지속적인 개선 권고"],
+                    "statistical_analysis": str(kirk_analysis.get("level2_learning", "")) or "Pre/post score t-test analysis",
+                    "recommendations": pe.get("recommendations", []) or ["Recommend continuous improvement"],
                 },
                 "adoption_decision": {
                     "decision": adoption_decision_val,
                     "rationale": adoption_rationale,
-                    "conditions": pe.get("conditions", []) or ["파일럿 결과 양호", "예산 확보"],
-                    "stakeholder_approval": "승인 대기",
+                    "conditions": pe.get("conditions", []) or ["Favorable pilot results", "Budget secured"],
+                    "stakeholder_approval": "Pending approval",
                 },
             },
             "improvement_plan": {
                 "feedback_summary": feedback_summary,
                 "improvement_areas": improvement_areas,
                 "action_items": action_items,
-                "feedback_loop": fi.get("feedback_integration", "평가 결과를 바탕으로 다음 교육 과정에 반영"),
-                "next_iteration_goals": pe.get("next_steps", []) or ["프로그램 안정화", "확대 적용 검토"],
+                "feedback_loop": fi.get("feedback_integration", "Reflect the evaluation results in the next training cycle"),
+                "next_iteration_goals": pe.get("next_steps", []) or ["Program stabilization", "Review of expanded rollout"],
             },
         }
 

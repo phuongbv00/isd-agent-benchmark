@@ -171,12 +171,12 @@ class BaselineGenerator:
             result = json.loads(json_str)
             return self._ensure_required_fields(result)
         except json.JSONDecodeError as e:
-            print(f"[DEBUG] JSON 파싱 실패: {e}", file=sys.stderr)
-            print(f"[DEBUG] 응답 길이: {len(content)}", file=sys.stderr)
-            print(f"[DEBUG] 응답 시작 200자: {content[:200]}", file=sys.stderr)
+            print(f"[DEBUG] JSON parsing failed: {e}", file=sys.stderr)
+            print(f"[DEBUG] Response length: {len(content)}", file=sys.stderr)
+            print(f"[DEBUG] First 200 chars of response: {content[:200]}", file=sys.stderr)
 
         # 파싱 실패 시 기본 구조 반환
-        print("[DEBUG] 기본 출력 반환", file=sys.stderr)
+        print("[DEBUG] Returning default output", file=sys.stderr)
         return self._create_default_output()
 
     def _extract_content(self, content: Any) -> str:
@@ -223,7 +223,7 @@ class BaselineGenerator:
                 },
                 # A-5: 학습자 분석
                 "learner_analysis": {
-                    "target_audience": "미지정",
+                    "target_audience": "Not specified",
                     "characteristics": [],
                     "prior_knowledge": None,
                     "learning_preferences": [],
@@ -232,8 +232,8 @@ class BaselineGenerator:
                 },
                 # A-6: 환경분석
                 "context_analysis": {
-                    "environment": "미지정",
-                    "duration": "미지정",
+                    "environment": "Not specified",
+                    "duration": "Not specified",
                     "constraints": [],
                     "resources": [],
                     "technical_requirements": [],
@@ -273,33 +273,33 @@ class BaselineGenerator:
             "development": {
                 # Dev-19: 학습자용 자료 개발
                 "lesson_plan": {
-                    "total_duration": "미지정",
+                    "total_duration": "Not specified",
                     "modules": [],
                 },
                 "materials": [
                     {
-                        "type": "프레젠테이션",
-                        "title": "교육 슬라이드",
-                        "description": "학습 내용을 시각적으로 전달하는 슬라이드 자료",
+                        "type": "Presentation",
+                        "title": "Training Slides",
+                        "description": "Slide materials that deliver the learning content visually",
                         "slides": 10,
                         "slide_contents": [
-                            {"slide_number": 1, "title": "교육 소개", "bullet_points": ["환영 인사", "학습 목표", "일정 안내"], "speaker_notes": "참가자들을 환영하며 교육 목표를 안내합니다."},
-                            {"slide_number": 2, "title": "핵심 개념 1", "bullet_points": ["개념 정의", "주요 특성", "적용 사례"], "speaker_notes": "첫 번째 핵심 개념을 예시와 함께 설명합니다."},
-                            {"slide_number": 3, "title": "핵심 개념 2", "bullet_points": ["개념 정의", "주요 특성", "적용 사례"], "speaker_notes": "두 번째 핵심 개념을 예시와 함께 설명합니다."},
-                            {"slide_number": 4, "title": "실습 안내", "bullet_points": ["실습 목표", "실습 절차", "주의사항"], "speaker_notes": "실습 활동을 안내합니다."},
-                            {"slide_number": 5, "title": "정리 및 Q&A", "bullet_points": ["핵심 내용 요약", "질의응답", "다음 단계 안내"], "speaker_notes": "학습 내용을 정리하고 질문을 받습니다."},
+                            {"slide_number": 1, "title": "Training Introduction", "bullet_points": ["Welcome", "Learning objectives", "Schedule overview"], "speaker_notes": "Welcome the participants and introduce the training objectives."},
+                            {"slide_number": 2, "title": "Core Concept 1", "bullet_points": ["Concept definition", "Key characteristics", "Application examples"], "speaker_notes": "Explain the first core concept with examples."},
+                            {"slide_number": 3, "title": "Core Concept 2", "bullet_points": ["Concept definition", "Key characteristics", "Application examples"], "speaker_notes": "Explain the second core concept with examples."},
+                            {"slide_number": 4, "title": "Practice Guidance", "bullet_points": ["Practice objectives", "Practice procedure", "Precautions"], "speaker_notes": "Guide the hands-on practice activity."},
+                            {"slide_number": 5, "title": "Wrap-up and Q&A", "bullet_points": ["Summary of key content", "Q&A", "Next steps"], "speaker_notes": "Summarize the learning content and take questions."},
                         ],
                     },
                     {
-                        "type": "유인물",
-                        "title": "학습자용 핸드아웃",
-                        "description": "학습 내용 정리 및 참고 자료",
+                        "type": "Handout",
+                        "title": "Learner Handout",
+                        "description": "Summary of the learning content and reference materials",
                         "pages": 5,
                     },
                     {
-                        "type": "실습 자료",
-                        "title": "실습 가이드",
-                        "description": "실습 활동을 위한 단계별 가이드",
+                        "type": "Practice materials",
+                        "title": "Practice Guide",
+                        "description": "Step-by-step guide for the hands-on practice activity",
                         "pages": 3,
                     },
                 ],
@@ -315,7 +315,7 @@ class BaselineGenerator:
                 },
             },
             "implementation": {
-                "delivery_method": "미지정",
+                "delivery_method": "Not specified",
                 "facilitator_guide": None,
                 "learner_guide": None,
                 # I-25: 시스템/환경 점검
@@ -339,92 +339,92 @@ class BaselineGenerator:
                 "quiz_items": [
                     {
                         "id": "Q-01",
-                        "question": "본 교육의 주요 학습 내용에 대한 이해도를 확인하는 문항입니다.",
+                        "question": "This item checks understanding of the main learning content of this training.",
                         "type": "multiple_choice",
-                        "options": ["선택지 A (정답)", "선택지 B", "선택지 C", "선택지 D"],
-                        "answer": "선택지 A (정답)",
-                        "explanation": "핵심 개념을 정확히 이해했는지 확인하는 문항입니다.",
+                        "options": ["Option A (correct answer)", "Option B", "Option C", "Option D"],
+                        "answer": "Option A (correct answer)",
+                        "explanation": "This item checks whether the core concepts are accurately understood.",
                         "objective_id": "OBJ-01",
                         "difficulty": "easy",
                     },
                     {
                         "id": "Q-02",
-                        "question": "학습 내용을 실제 상황에 적용할 수 있는지 확인하는 문항입니다.",
+                        "question": "This item checks whether the learning content can be applied to real situations.",
                         "type": "multiple_choice",
-                        "options": ["선택지 A", "선택지 B (정답)", "선택지 C", "선택지 D"],
-                        "answer": "선택지 B (정답)",
-                        "explanation": "학습 내용의 실제 적용 능력을 평가합니다.",
+                        "options": ["Option A", "Option B (correct answer)", "Option C", "Option D"],
+                        "answer": "Option B (correct answer)",
+                        "explanation": "Assesses the ability to apply the learning content in practice.",
                         "objective_id": "OBJ-02",
                         "difficulty": "medium",
                     },
                     {
                         "id": "Q-03",
-                        "question": "핵심 개념 간의 관계를 분석하는 문항입니다.",
+                        "question": "This item analyzes the relationships among the core concepts.",
                         "type": "multiple_choice",
-                        "options": ["선택지 A", "선택지 B", "선택지 C (정답)", "선택지 D"],
-                        "answer": "선택지 C (정답)",
-                        "explanation": "분석적 사고력을 평가하는 문항입니다.",
+                        "options": ["Option A", "Option B", "Option C (correct answer)", "Option D"],
+                        "answer": "Option C (correct answer)",
+                        "explanation": "This item assesses analytical thinking.",
                         "objective_id": "OBJ-03",
                         "difficulty": "medium",
                     },
                     {
                         "id": "Q-04",
-                        "question": "학습 내용의 장단점을 비교 분석하시오.",
+                        "question": "Compare and analyze the advantages and disadvantages of the learning content.",
                         "type": "short_answer",
                         "options": [],
-                        "answer": "장점과 단점을 구체적으로 제시하고 비교 분석",
-                        "explanation": "비판적 사고력과 분석 능력을 평가합니다.",
+                        "answer": "State the advantages and disadvantages concretely and compare and analyze them",
+                        "explanation": "Assesses critical thinking and analytical ability.",
                         "objective_id": "OBJ-04",
                         "difficulty": "hard",
                     },
                     {
                         "id": "Q-05",
-                        "question": "배운 내용을 바탕으로 문제 해결 방안을 제시하시오.",
+                        "question": "Based on what you have learned, propose a solution to the problem.",
                         "type": "essay",
                         "options": [],
-                        "answer": "학습 내용을 종합하여 창의적인 해결 방안 제시",
-                        "explanation": "종합적 사고력과 문제 해결 능력을 평가합니다.",
+                        "answer": "Synthesize the learning content and propose a creative solution",
+                        "explanation": "Assesses integrative thinking and problem-solving ability.",
                         "objective_id": "OBJ-05",
                         "difficulty": "hard",
                     },
                 ],
                 # E-28: 파일럿 자료 수집
                 "pilot_data_collection": {
-                    "title": "파일럿/초기 실행 자료 수집 계획",
+                    "title": "Pilot / initial implementation data collection plan",
                     "data_types": {
                         "quantitative": [
-                            {"type": "사전 테스트 점수", "purpose": "기초선 측정", "source": "학습자"},
-                            {"type": "사후 테스트 점수", "purpose": "학습 성과 측정", "source": "학습자"},
-                            {"type": "만족도 점수", "purpose": "반응 평가", "source": "학습자"},
-                            {"type": "참여율/완주율", "purpose": "참여도 측정", "source": "시스템"},
+                            {"type": "Pre-test scores", "purpose": "Baseline measurement", "source": "Learners"},
+                            {"type": "Post-test scores", "purpose": "Learning outcome measurement", "source": "Learners"},
+                            {"type": "Satisfaction scores", "purpose": "Reaction evaluation", "source": "Learners"},
+                            {"type": "Participation/completion rate", "purpose": "Engagement measurement", "source": "System"},
                         ],
                         "qualitative": [
-                            {"type": "개방형 피드백", "purpose": "심층 의견 수집", "source": "학습자"},
-                            {"type": "관찰 기록", "purpose": "행동 패턴 파악", "source": "관찰자"},
-                            {"type": "인터뷰 응답", "purpose": "심층 이해", "source": "학습자/강사"},
+                            {"type": "Open-ended feedback", "purpose": "In-depth opinion collection", "source": "Learners"},
+                            {"type": "Observation records", "purpose": "Behavior pattern identification", "source": "Observers"},
+                            {"type": "Interview responses", "purpose": "In-depth understanding", "source": "Learners/Instructors"},
                         ],
                     },
                     "collection_methods": [
-                        {"method": "온라인 설문", "timing": "교육 직후", "tool": "설문 플랫폼"},
-                        {"method": "시험/퀴즈", "timing": "교육 전/후", "tool": "LMS"},
-                        {"method": "관찰", "timing": "교육 중", "tool": "관찰 체크리스트"},
-                        {"method": "인터뷰", "timing": "교육 후 1주 내", "tool": "인터뷰 가이드"},
+                        {"method": "Online survey", "timing": "Immediately after training", "tool": "Survey platform"},
+                        {"method": "Test/quiz", "timing": "Before/after training", "tool": "LMS"},
+                        {"method": "Observation", "timing": "During training", "tool": "Observation checklist"},
+                        {"method": "Interview", "timing": "Within 1 week after training", "tool": "Interview guide"},
                     ],
                     "instruments": [
-                        {"name": "사전-사후 테스트", "type": "지식 평가", "items": 20},
-                        {"name": "만족도 설문", "type": "반응 평가", "items": 15},
-                        {"name": "관찰 체크리스트", "type": "행동 관찰", "items": 10},
+                        {"name": "Pre-post test", "type": "Knowledge assessment", "items": 20},
+                        {"name": "Satisfaction survey", "type": "Reaction evaluation", "items": 15},
+                        {"name": "Observation checklist", "type": "Behavior observation", "items": 10},
                     ],
                     "timeline": [
-                        {"phase": "사전", "timing": "D-1 ~ D-Day", "activities": ["사전 테스트", "기초 정보 수집"]},
-                        {"phase": "중간", "timing": "교육 중", "activities": ["실시간 관찰", "형성 평가"]},
-                        {"phase": "직후", "timing": "D+0", "activities": ["사후 테스트", "만족도 설문"]},
-                        {"phase": "추적", "timing": "D+7 ~ D+30", "activities": ["인터뷰", "현업 적용도 조사"]},
+                        {"phase": "Before", "timing": "D-1 ~ D-Day", "activities": ["Pre-test", "Baseline information collection"]},
+                        {"phase": "Midpoint", "timing": "During training", "activities": ["Real-time observation", "Formative assessment"]},
+                        {"phase": "Immediately after", "timing": "D+0", "activities": ["Post-test", "Satisfaction survey"]},
+                        {"phase": "Follow-up", "timing": "D+7 ~ D+30", "activities": ["Interview", "On-the-job application survey"]},
                     ],
                     "data_management": {
-                        "storage": "보안 저장소",
-                        "retention_period": "3년",
-                        "access_control": "교육팀 및 평가팀으로 제한",
+                        "storage": "Secure storage",
+                        "retention_period": "3 years",
+                        "access_control": "Restricted to the training team and the evaluation team",
                     },
                 },
                 # E-29: 형성평가 기반 개선
@@ -463,39 +463,39 @@ class BaselineGenerator:
         steps = []
 
         # 시나리오 분석 단계
-        target = scenario.get("context", {}).get("target_audience", "학습자")
+        target = scenario.get("context", {}).get("target_audience", "Learners")
         goals = scenario.get("learning_goals", [])
-        duration = scenario.get("context", {}).get("duration", "미지정")
+        duration = scenario.get("context", {}).get("duration", "Not specified")
 
-        steps.append(f"Step 1 (Analysis): 학습자 분석 - 대상: {target}")
-        steps.append(f"Step 2 (Analysis): 학습 목표 파악 - {len(goals)}개 목표 식별")
+        steps.append(f"Step 1 (Analysis): Learner analysis - target audience: {target}")
+        steps.append(f"Step 2 (Analysis): Identify learning goals - {len(goals)} goals identified")
 
         # 설계 단계
         if addie_output.get("design"):
             objectives = addie_output.get("design", {}).get("learning_objectives", [])
-            steps.append(f"Step 3 (Design): 학습 목표 설계 - {len(objectives)}개 세부 목표 수립")
-            steps.append("Step 4 (Design): 평가 계획 및 교수 전략 설계")
+            steps.append(f"Step 3 (Design): Design learning objectives - {len(objectives)} detailed objectives established")
+            steps.append("Step 4 (Design): Design the assessment plan and instructional strategy")
 
         # 개발 단계
         if addie_output.get("development"):
             modules = addie_output.get("development", {}).get("lesson_plan", {}).get("modules", [])
-            steps.append(f"Step 5 (Development): 레슨 플랜 개발 - {len(modules)}개 모듈 구성")
-            steps.append("Step 6 (Development): 학습 자료 및 콘텐츠 개발")
+            steps.append(f"Step 5 (Development): Develop the lesson plan - {len(modules)} modules organized")
+            steps.append("Step 6 (Development): Develop learning materials and content")
 
         # 실행 단계
         if addie_output.get("implementation"):
-            delivery = addie_output.get("implementation", {}).get("delivery_method", "미지정")
-            steps.append(f"Step 7 (Implementation): 전달 방법 결정 - {delivery}")
-            steps.append("Step 8 (Implementation): 운영 가이드 작성")
+            delivery = addie_output.get("implementation", {}).get("delivery_method", "Not specified")
+            steps.append(f"Step 7 (Implementation): Determine the delivery method - {delivery}")
+            steps.append("Step 8 (Implementation): Write the operations guide")
 
         # 평가 단계
         if addie_output.get("evaluation"):
             quiz_items = addie_output.get("evaluation", {}).get("quiz_items", [])
-            steps.append(f"Step 9 (Evaluation): 평가 문항 개발 - {len(quiz_items)}개 문항")
-            steps.append("Step 10 (Evaluation): 피드백 계획 수립")
+            steps.append(f"Step 9 (Evaluation): Develop assessment items - {len(quiz_items)} items")
+            steps.append("Step 10 (Evaluation): Establish the feedback plan")
 
         # 최종 결론
-        steps.append(f"결론: ADDIE 프레임워크 기반 {duration} 교육과정 설계 완료")
+        steps.append(f"Conclusion: ADDIE-framework-based {duration} curriculum design completed")
 
         return steps
 

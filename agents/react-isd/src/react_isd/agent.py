@@ -70,10 +70,10 @@ class ReActISDAgent:
 
         # 시나리오 정보 추출
         context = scenario.get("context", {})
-        title = scenario.get("title", "교육 프로그램")
-        target_audience = context.get("target_audience", "일반 학습자")
-        learning_environment = context.get("learning_environment", "미지정")
-        duration = context.get("duration", "미지정")
+        title = scenario.get("title", "Training program")
+        target_audience = context.get("target_audience", "general learners")
+        learning_environment = context.get("learning_environment", "not specified")
+        duration = context.get("duration", "not specified")
         prior_knowledge = context.get("prior_knowledge")
         learning_goals = scenario.get("learning_goals", [])
         class_size = self._parse_class_size(context.get("class_size"))

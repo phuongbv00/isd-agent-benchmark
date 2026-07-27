@@ -44,10 +44,10 @@ def load_scenario(input_path: Path) -> dict:
         with open(input_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        typer.echo(f"오류: 입력 파일을 찾을 수 없습니다: {input_path}", err=True)
+        typer.echo(f"Error: input file not found: {input_path}", err=True)
         raise typer.Exit(code=1)
     except json.JSONDecodeError as e:
-        typer.echo(f"오류: JSON 파싱 실패: {e}", err=True)
+        typer.echo(f"Error: JSON parsing failed: {e}", err=True)
         raise typer.Exit(code=1)
 
 
@@ -58,14 +58,14 @@ def save_output(output_path: Path, data: dict) -> None:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2, default=str)
     except Exception as e:
-        typer.echo(f"오류: 출력 파일 저장 실패: {e}", err=True)
+        typer.echo(f"Error: failed to save output file: {e}", err=True)
         raise typer.Exit(code=1)
 
 
 def export_slides_to_marp(
     addie_output: dict,
     output_path: Path,
-    title: str = "교육 슬라이드",
+    title: str = "Training Slides",
     verbose: bool = False,
 ) -> Optional[str]:
     """ADDIE 출력에서 슬라이드를 추출하여 Marp Markdown 파일로 저장"""
@@ -93,7 +93,7 @@ def export_slides_to_marp(
 
         if not all_slides:
             if verbose:
-                typer.echo("  슬라이드 콘텐츠가 없어 Marp 파일을 생성하지 않습니다.")
+                typer.echo("  No slide content, so no Marp file is generated.")
             return None
 
         # 출력 파일 경로 생성
@@ -113,7 +113,7 @@ def export_slides_to_marp(
 
     except Exception as e:
         if verbose:
-            typer.echo(f"  슬라이드 파일 생성 실패: {e}", err=True)
+            typer.echo(f"  Slide file generation failed: {e}", err=True)
         return None
 
 
@@ -123,7 +123,7 @@ def run(
         ...,
         "--input",
         "-i",
-        help="입력 시나리오 JSON 파일 경로",
+        help="Path to the input scenario JSON file",
         exists=True,
         file_okay=True,
         dir_okay=False,
@@ -133,13 +133,13 @@ def run(
         ...,
         "--output",
         "-o",
-        help="출력 결과 JSON 파일 경로",
+        help="Path to the output result JSON file",
     ),
     trajectory_file: Optional[Path] = typer.Option(
         None,
         "--trajectory",
         "-t",
-        help="궤적(trajectory) JSON 파일 경로 (선택)",
+        help="Path to the trajectory JSON file (optional)",
     ),
     model: str = typer.Option(
         None,
@@ -149,7 +149,7 @@ def run(
     temperature: float = typer.Option(
         0.7,
         "--temperature",
-        help="생성 온도 (0.0-2.0)",
+        help="Generation temperature (0.0-2.0)",
         min=0.0,
         max=2.0,
     ),
@@ -157,7 +157,7 @@ def run(
         False,
         "--verbose",
         "-v",
-        help="상세 출력 모드",
+        help="Verbose output mode",
     ),
 ) -> None:
     """
@@ -169,38 +169,38 @@ def run(
     """
     if verbose:
         typer.echo("Baseline ISD Agent running")
-        typer.echo(f"  입력: {input_file}")
-        typer.echo(f"  출력: {output_file}")
-        typer.echo(f"  모델: {model}")
-        typer.echo(f"  온도: {temperature}")
+        typer.echo(f"  Input: {input_file}")
+        typer.echo(f"  Output: {output_file}")
+        typer.echo(f"  Model: {model}")
+        typer.echo(f"  Temperature: {temperature}")
         typer.echo()
 
     # 시나리오 로드
     if verbose:
-        typer.echo("시나리오 로드 중...")
+        typer.echo("Loading scenario...")
     scenario = load_scenario(input_file)
 
     if verbose:
-        typer.echo(f"  시나리오 ID: {scenario.get('scenario_id', 'unknown')}")
-        typer.echo(f"  제목: {scenario.get('title', '제목 없음')}")
+        typer.echo(f"  Scenario ID: {scenario.get('scenario_id', 'unknown')}")
+        typer.echo(f"  Title: {scenario.get('title', 'No title')}")
         typer.echo()
 
     # 생성기 초기화
     if verbose:
-        typer.echo("생성기 초기화 중...")
+        typer.echo("Initializing generator...")
 
     llm_config = llm_config_from_env(model=model, temperature=temperature, max_tokens=32768)
     generator = BaselineGenerator(llm_config=llm_config)
 
     # 실행
     if verbose:
-        typer.echo("교수설계 생성 중...")
+        typer.echo("Generating instructional design...")
         typer.echo()
 
     try:
         result = generator.generate(scenario)
     except Exception as e:
-        typer.echo(f"오류: 생성 실패: {e}", err=True)
+        typer.echo(f"Error: generation failed: {e}", err=True)
         raise typer.Exit(code=1)
 
     # ADDIE 출력 저장
@@ -208,17 +208,17 @@ def run(
     save_output(output_file, addie_output)
 
     if verbose:
-        typer.echo(f"ADDIE 산출물 저장됨: {output_file}")
+        typer.echo(f"ADDIE output saved: {output_file}")
 
     # 슬라이드 Marp Markdown 파일 생성
     slide_path = export_slides_to_marp(
         addie_output=addie_output,
         output_path=output_file,
-        title=scenario.get("title", "교육 슬라이드"),
+        title=scenario.get("title", "Training Slides"),
         verbose=verbose,
     )
     if slide_path and verbose:
-        typer.echo(f"슬라이드 파일 저장됨: {slide_path}")
+        typer.echo(f"Slide file saved: {slide_path}")
 
     # Trajectory 저장 (선택)
     if trajectory_file:
@@ -232,23 +232,23 @@ def run(
         save_output(trajectory_file, trajectory_data)
 
         if verbose:
-            typer.echo(f"궤적 저장됨: {trajectory_file}")
+            typer.echo(f"Trajectory saved: {trajectory_file}")
 
     # 결과 요약 출력
     if verbose:
         metadata = result["metadata"]
         typer.echo()
-        typer.echo("=== 실행 결과 요약 ===")
-        typer.echo(f"  실행 시간: {metadata['execution_time_seconds']:.2f}초")
-        typer.echo(f"  총 토큰: {metadata['total_tokens']}")
-        typer.echo(f"  비용 (USD): ${metadata['cost_usd']:.6f}")
+        typer.echo("=== Run result summary ===")
+        typer.echo(f"  Execution time: {metadata['execution_time_seconds']:.2f}s")
+        typer.echo(f"  Total tokens: {metadata['total_tokens']}")
+        typer.echo(f"  Cost (USD): ${metadata['cost_usd']:.6f}")
 
         addie = result["addie_output"]
-        typer.echo(f"  학습 목표 수: {len(addie.get('design', {}).get('learning_objectives', []))}")
-        typer.echo(f"  모듈 수: {len(addie.get('development', {}).get('lesson_plan', {}).get('modules', []))}")
-        typer.echo(f"  퀴즈 문항 수: {len(addie.get('evaluation', {}).get('quiz_items', []))}")
+        typer.echo(f"  Number of learning objectives: {len(addie.get('design', {}).get('learning_objectives', []))}")
+        typer.echo(f"  Number of modules: {len(addie.get('development', {}).get('lesson_plan', {}).get('modules', []))}")
+        typer.echo(f"  Number of quiz items: {len(addie.get('evaluation', {}).get('quiz_items', []))}")
 
-    typer.echo("완료")
+    typer.echo("Done")
 
 
 @app.command()
@@ -257,7 +257,7 @@ def validate(
         ...,
         "--input",
         "-i",
-        help="검증할 시나리오 JSON 파일 경로",
+        help="Path to the scenario JSON file to validate",
         exists=True,
     ),
 ) -> None:
@@ -275,17 +275,17 @@ def validate(
         missing = [f for f in required_fields if f not in scenario]
 
         if missing:
-            typer.echo(f"유효하지 않음: 필수 필드 누락 - {missing}", err=True)
+            typer.echo(f"Invalid: missing required fields - {missing}", err=True)
             raise typer.Exit(code=1)
 
-        typer.echo("유효한 시나리오입니다.")
+        typer.echo("Valid scenario.")
         typer.echo(f"  ID: {scenario['scenario_id']}")
-        typer.echo(f"  제목: {scenario['title']}")
-        typer.echo(f"  대상: {scenario.get('context', {}).get('target_audience', '미지정')}")
-        typer.echo(f"  목표 수: {len(scenario.get('learning_goals', []))}")
+        typer.echo(f"  Title: {scenario['title']}")
+        typer.echo(f"  Target audience: {scenario.get('context', {}).get('target_audience', 'Not specified')}")
+        typer.echo(f"  Number of goals: {len(scenario.get('learning_goals', []))}")
 
     except Exception as e:
-        typer.echo(f"유효하지 않은 시나리오: {e}", err=True)
+        typer.echo(f"Invalid scenario: {e}", err=True)
         raise typer.Exit(code=1)
 
 

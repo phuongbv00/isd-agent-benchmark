@@ -65,7 +65,7 @@ class OptimizerAgent(BaseAgent):
 
     @property
     def role(self) -> str:
-        return "평가 피드백을 기반으로 교수설계를 개선합니다."
+        return "Improves the instructional design based on evaluation feedback."
 
     def run(
         self,
@@ -90,9 +90,9 @@ class OptimizerAgent(BaseAgent):
         """
         if self.debug:
             print("\n" + "="*60)
-            print("[Optimizer] 순차적 파이프라인 최적화 시작")
-            print(f"  현재 점수: {feedback.score:.1f}")
-            print(f"  가중 점수: {feedback.weighted_score}")
+            print("[Optimizer] Starting sequential pipeline optimization")
+            print(f"  Current score: {feedback.score:.1f}")
+            print(f"  Weighted score: {feedback.weighted_score}")
             print(f"  ADDIE Scores: {feedback.addie_scores}")
             print("="*60)
 
@@ -112,7 +112,7 @@ class OptimizerAgent(BaseAgent):
         weak_stages = self._identify_weak_stages(feedback.addie_scores)
 
         if self.debug:
-            print(f"\n[Optimizer] 개선 필요 단계: {weak_stages if weak_stages else '없음 (전체 최적화)'}")
+            print(f"\n[Optimizer] Stages needing improvement: {weak_stages if weak_stages else 'none (full optimization)'}")
 
         # 순차적 파이프라인 최적화
         optimized_data = self._optimize_sequential_pipeline(
@@ -130,7 +130,7 @@ class OptimizerAgent(BaseAgent):
         merged_output = self._selective_merge(addie_output, optimized_output)
 
         if self.debug:
-            print("\n[Optimizer] 최적화 완료")
+            print("\n[Optimizer] Optimization complete")
             print("="*60 + "\n")
 
         return merged_output
@@ -159,7 +159,7 @@ class OptimizerAgent(BaseAgent):
         weak_stages = []
         for stage, total in stage_scores.items():
             avg = total / stage_counts.get(stage, 1)
-            if avg < 7.0:  # 7점 미만이면 개선 필요
+            if avg < 7.0:  # below 7 points means improvement needed
                 weak_stages.append(stage)
 
         return weak_stages
@@ -192,7 +192,7 @@ class OptimizerAgent(BaseAgent):
                 continue
 
             if self.debug:
-                print(f"\n  [{stage.upper()}] 최적화 중...")
+                print(f"\n  [{stage.upper()}] Optimizing...")
 
             # 단계별 최적화 프롬프트 생성
             system_prompt = get_optimization_prompt(stage, feedback_summary)
@@ -200,21 +200,21 @@ class OptimizerAgent(BaseAgent):
             # 이전 단계 결과를 컨텍스트로 제공
             previous_context = self._build_previous_context(optimized, stage)
 
-            user_prompt = f"""## 시나리오 정보
+            user_prompt = f"""## Scenario Information
 {scenario_context or ''}
 
-## 학습자 프로필
+## Learner Profile
 {learner_context}
 
 {previous_context}
 
-## 현재 {stage.upper()} 단계 데이터
+## Current {stage.upper()} Stage Data
 ```json
 {json.dumps(optimized.get(stage, {}), ensure_ascii=False, indent=2)}
 ```
 
-위 데이터를 피드백에 맞게 개선하세요.
-기존 내용을 최대한 유지하면서 문제점만 수정하세요."""
+Improve the data above according to the feedback.
+Keep the existing content as much as possible and fix only the problems."""
 
             # LLM 호출
             response = self.llm.invoke([
@@ -231,7 +231,7 @@ class OptimizerAgent(BaseAgent):
                     if stage == "implementation":
                         fg_len = len(stage_data.get("facilitator_guide", ""))
                         lg_len = len(stage_data.get("learner_guide", ""))
-                        print(f"    → facilitator_guide: {fg_len}자, learner_guide: {lg_len}자")
+                        print(f"    → facilitator_guide: {fg_len} chars, learner_guide: {lg_len} chars")
 
         return optimized
 
@@ -243,7 +243,7 @@ class OptimizerAgent(BaseAgent):
         if current_idx == 0:
             return ""
 
-        parts = ["## 이전 단계 결과"]
+        parts = ["## Previous Stage Results"]
         for i in range(current_idx):
             prev_stage = stage_order[i]
             prev_data = data.get(prev_stage, {})
@@ -251,13 +251,13 @@ class OptimizerAgent(BaseAgent):
             # 요약 정보만 포함 (토큰 절약)
             if prev_stage == "analysis":
                 la = prev_data.get("learner_analysis", {})
-                parts.append(f"### Analysis\n- 대상: {la.get('target_audience', '')}")
+                parts.append(f"### Analysis\n- Target: {la.get('target_audience', '')}")
             elif prev_stage == "design":
                 objs = prev_data.get("learning_objectives", [])
-                parts.append(f"### Design\n- 학습 목표: {len(objs)}개")
+                parts.append(f"### Design\n- Learning objectives: {len(objs)}")
             elif prev_stage == "development":
                 modules = prev_data.get("lesson_plan", {}).get("modules", [])
-                parts.append(f"### Development\n- 모듈: {len(modules)}개")
+                parts.append(f"### Development\n- Modules: {len(modules)}")
 
         return "\n".join(parts)
 
@@ -267,12 +267,12 @@ class OptimizerAgent(BaseAgent):
         analysis_result: Optional[AnalysisResult] = None,
     ) -> str:
         """피드백을 요약 문자열로 변환"""
-        parts = [f"**현재 점수:** {feedback.score:.1f}/100"]
+        parts = [f"**Current score:** {feedback.score:.1f}/100"]
         if feedback.weighted_score:
-            parts.append(f"**가중 점수:** {feedback.weighted_score:.1f}/100")
+            parts.append(f"**Weighted score:** {feedback.weighted_score:.1f}/100")
 
         # ADDIE 단계별 점수 요약
-        parts.append("\n**ADDIE Rubric 점수:**")
+        parts.append("\n**ADDIE Rubric scores:**")
         stage_items = {
             "Analysis": ["A1", "A2", "A3"],
             "Design": ["D1", "D2", "D3"],
@@ -283,22 +283,22 @@ class OptimizerAgent(BaseAgent):
         for stage, items in stage_items.items():
             scores = [feedback.addie_scores.get(item, 0) for item in items]
             avg = sum(scores) / len(scores) if scores else 0
-            status = "⚠️ 개선필요" if avg < 7.0 else "✓"
+            status = "⚠️ Needs improvement" if avg < 7.0 else "✓"
             item_str = ", ".join(f"{item}:{feedback.addie_scores.get(item, 0):.1f}" for item in items)
-            parts.append(f"- {stage}: 평균 {avg:.1f}/10 {status} ({item_str})")
+            parts.append(f"- {stage}: average {avg:.1f}/10 {status} ({item_str})")
 
         if feedback.weaknesses:
-            parts.append("\n**약점:**")
+            parts.append("\n**Weaknesses:**")
             for w in feedback.weaknesses[:5]:
                 parts.append(f"- {w}")
 
         if feedback.suggestions:
-            parts.append("\n**개선 제안:**")
+            parts.append("\n**Improvement suggestions:**")
             for s in feedback.suggestions[:3]:
                 parts.append(f"- {s}")
 
         if analysis_result and analysis_result.errors:
-            parts.append("\n**오류:**")
+            parts.append("\n**Errors:**")
             for err in analysis_result.errors[:3]:
                 parts.append(f"- {err.get('description', '')}")
 
@@ -487,9 +487,9 @@ class OptimizerAgent(BaseAgent):
         for i, obj in enumerate(design_data.get("learning_objectives", [])):
             objectives.append(LearningObjective(
                 id=obj.get("id", f"OBJ-{i+1:02d}"),
-                level=obj.get("level", "이해"),
+                level=obj.get("level", "Understand"),
                 statement=obj.get("statement", ""),
-                bloom_verb=obj.get("bloom_verb", "설명하다"),
+                bloom_verb=obj.get("bloom_verb", "explain"),
                 measurable=obj.get("measurable", True),
             ))
         if not objectives:
@@ -812,7 +812,7 @@ class OptimizerAgent(BaseAgent):
         # 디버깅 출력
         if self.debug:
             print("\n" + "="*60)
-            print("[SELECTIVE_MERGE] 병합 결정 상세:")
+            print("[SELECTIVE_MERGE] Merge decision details:")
             print("="*60)
             for decision in merge_decisions:
                 status = "✓" if "APPLY" in decision else "✗"
@@ -821,7 +821,7 @@ class OptimizerAgent(BaseAgent):
             # REJECT된 항목 수 집계
             rejected = sum(1 for d in merge_decisions if "REJECT" in d)
             applied = sum(1 for d in merge_decisions if "APPLY" in d)
-            print(f"\n  총계: APPLY={applied}, REJECT={rejected}")
+            print(f"\n  Total: APPLY={applied}, REJECT={rejected}")
             print("="*60 + "\n")
 
         return result

@@ -553,26 +553,26 @@ def map_to_addie_output(state: DickCareyState) -> dict:
     pre_inst = instructional_strategy.get("pre_instructional", {})
     if pre_inst:
         learning_activities.append({
-            "activity_name": "교수 전 활동",
-            "duration": "15분",
-            "description": f"동기 유발: {pre_inst.get('motivation', '')}, 목표 제시: {pre_inst.get('objectives_info', '')}",
-            "materials": ["동기유발 자료"],
+            "activity_name": "Pre-instructional activities",
+            "duration": "15 minutes",
+            "description": f"Motivation: {pre_inst.get('motivation', '')}, Objective presentation: {pre_inst.get('objectives_info', '')}",
+            "materials": ["Motivational materials"],
         })
     content_pres = instructional_strategy.get("content_presentation", {})
     if content_pres:
         learning_activities.append({
-            "activity_name": "내용 제시",
-            "duration": "30분",
-            "description": f"예시: {', '.join(content_pres.get('examples', [])[:3])}",
+            "activity_name": "Content presentation",
+            "duration": "30 minutes",
+            "description": f"Examples: {', '.join(content_pres.get('examples', [])[:3])}",
             "materials": content_pres.get("sequence", [])[:3],
         })
     learner_part = instructional_strategy.get("learner_participation", {})
     if learner_part:
         learning_activities.append({
-            "activity_name": "학습자 참여 활동",
-            "duration": "25분",
-            "description": f"연습: {', '.join(learner_part.get('practice_activities', [])[:3])}",
-            "materials": ["연습 문제", "워크시트"],
+            "activity_name": "Learner participation activities",
+            "duration": "25 minutes",
+            "description": f"Practice: {', '.join(learner_part.get('practice_activities', [])[:3])}",
+            "materials": ["Practice exercises", "Worksheets"],
         })
 
     return {
@@ -580,13 +580,13 @@ def map_to_addie_output(state: DickCareyState) -> dict:
             # A1: 요구분석 (소항목 1-4)
             "needs_analysis": {
                 # [1] 문제 확인 및 정의
-                "problem_definition": goal.get("performance_gap", "") or f"현재 상태: {goal.get('current_state', '')}, 목표 상태: {goal.get('desired_state', '')}",
+                "problem_definition": goal.get("performance_gap", "") or f"Current state: {goal.get('current_state', '')}, Desired state: {goal.get('desired_state', '')}",
                 # [2] 차이분석
                 "gap_analysis": goal.get("needs_analysis", {}).get("gap_analysis", []) or [
                     {"current": goal.get("current_state", ""), "target": goal.get("desired_state", ""), "gap": goal.get("performance_gap", "")}
                 ],
                 # [3] 수행분석
-                "performance_analysis": f"근본 원인: {', '.join(goal.get('needs_analysis', {}).get('root_causes', []))}. 교육 필요: {', '.join(goal.get('needs_analysis', {}).get('training_needs', []))}",
+                "performance_analysis": f"Root causes: {', '.join(goal.get('needs_analysis', {}).get('root_causes', []))}. Training needs: {', '.join(goal.get('needs_analysis', {}).get('training_needs', []))}",
                 # [4] 요구 우선순위 결정
                 "priority_matrix": goal.get("needs_analysis", {}).get("priority_matrix", {
                     "high_priority": goal.get("needs_analysis", {}).get("training_needs", [])[:2],
@@ -617,7 +617,7 @@ def map_to_addie_output(state: DickCareyState) -> dict:
                 # [9] 출발점 행동 분석
                 "prerequisites": instructional_analysis.get("entry_skills", []) or learner_context.get("learner", {}).get("entry_behaviors", []),
                 # [10] 과제분석 결과 검토·정리
-                "review_summary": instructional_analysis.get("review_summary", "") or f"과제 유형: {instructional_analysis.get('task_type', '')}. 하위 기능 {len(instructional_analysis.get('sub_skills', []))}개 분석 완료.",
+                "review_summary": instructional_analysis.get("review_summary", "") or f"Task type: {instructional_analysis.get('task_type', '')}. Analysis completed for {len(instructional_analysis.get('sub_skills', []))} sub-skills.",
             },
         },
         "design": {
@@ -639,7 +639,7 @@ def map_to_addie_output(state: DickCareyState) -> dict:
             "instructional_strategies": {
                 "methods": [instructional_strategy.get("delivery_method", ""), instructional_strategy.get("grouping_strategy", "")],
                 "activities": instructional_strategy.get("learner_participation", {}).get("practice_activities", []),
-                "rationale": f"전달 방법: {instructional_strategy.get('delivery_method', '')}. {instructional_strategy.get('learner_participation', {}).get('feedback_strategy', '')}",
+                "rationale": f"Delivery method: {instructional_strategy.get('delivery_method', '')}. {instructional_strategy.get('learner_participation', {}).get('feedback_strategy', '')}",
             },
             # [15] 비교수적 전략 수립
             "non_instructional_strategies": {
@@ -658,8 +658,8 @@ def map_to_addie_output(state: DickCareyState) -> dict:
             # [18] 스토리보드/화면 흐름 설계
             "storyboard": {
                 "screens": _extract_storyboards(instructional_materials),
-                "navigation_flow": "순차적 진행",
-                "interactions": ["클릭", "드래그앤드롭", "텍스트 입력"],
+                "navigation_flow": "Sequential progression",
+                "interactions": ["Click", "Drag and drop", "Text input"],
             },
         },
         "development": {
@@ -677,15 +677,15 @@ def map_to_addie_output(state: DickCareyState) -> dict:
             "instructor_guide": {
                 "overview": instructional_materials.get("instructor_guide", {}).get("description", "") or instructional_materials.get("instructor_manual", ""),
                 "session_guides": instructional_materials.get("instructor_guide", {}).get("content_outline", []),
-                "facilitation_tips": ["학습자 참여 유도", "질문 활용", "피드백 제공"],
-                "troubleshooting": ["기술적 문제 대응", "학습 진도 조정"],
+                "facilitation_tips": ["Encourage learner participation", "Use questioning", "Provide feedback"],
+                "troubleshooting": ["Handle technical issues", "Adjust learning pace"],
             },
             # [21] 운영자용 매뉴얼 개발
             "operator_manual": {
-                "system_setup": instructional_materials.get("operator_manual", "") or "시스템 설정 가이드",
-                "operation_procedures": ["등록 관리", "출석 관리", "성적 관리"],
-                "support_procedures": ["학습자 문의 대응", "기술 지원"],
-                "escalation_process": "문제 발생 시 담당자에게 보고",
+                "system_setup": instructional_materials.get("operator_manual", "") or "System setup guide",
+                "operation_procedures": ["Registration management", "Attendance management", "Grade management"],
+                "support_procedures": ["Respond to learner inquiries", "Technical support"],
+                "escalation_process": "Report to the person in charge when an issue occurs",
             },
             # [22] 평가 도구·문항 개발
             "assessment_tools": [
@@ -700,8 +700,8 @@ def map_to_addie_output(state: DickCareyState) -> dict:
             ],
             # [23] 전문가 검토
             "expert_review": {
-                "reviewers": [instructional_materials.get("expert_review", {}).get("reviewer", "내용 전문가")],
-                "review_criteria": instructional_materials.get("expert_review", {}).get("review_areas", ["내용 정확성", "교수 설계 적절성"]),
+                "reviewers": [instructional_materials.get("expert_review", {}).get("reviewer", "Subject matter expert")],
+                "review_criteria": instructional_materials.get("expert_review", {}).get("review_areas", ["Content accuracy", "Instructional design appropriateness"]),
                 "feedback_summary": "; ".join(instructional_materials.get("expert_review", {}).get("findings", [])),
                 "revisions_made": instructional_materials.get("expert_review", {}).get("recommendations", []),
             },
@@ -709,28 +709,28 @@ def map_to_addie_output(state: DickCareyState) -> dict:
         "implementation": {
             # [24] 교수자·운영자 오리엔테이션
             "instructor_orientation": {
-                "orientation_objectives": formative_evaluation.get("orientation_plan", {}).get("schedule", []) or ["프로그램 이해", "운영 절차 숙지"],
-                "schedule": formative_evaluation.get("orientation_plan", {}).get("facilitator_orientation", "") or "사전 1주일 전",
-                "materials": ["교수자 가이드", "운영 매뉴얼"],
-                "competency_checklist": ["내용 이해도", "진행 능력", "기술 활용 능력"],
+                "orientation_objectives": formative_evaluation.get("orientation_plan", {}).get("schedule", []) or ["Understand the program", "Master operational procedures"],
+                "schedule": formative_evaluation.get("orientation_plan", {}).get("facilitator_orientation", "") or "One week in advance",
+                "materials": ["Instructor guide", "Operations manual"],
+                "competency_checklist": ["Content comprehension", "Facilitation ability", "Technology utilization ability"],
             },
             # [25] 시스템/환경 점검
             "system_check": {
-                "checklist": formative_evaluation.get("system_check", {}).get("checklist", ["네트워크 연결", "장비 점검", "자료 준비"]),
-                "technical_validation": "; ".join(formative_evaluation.get("system_check", {}).get("technical_tests", [])) or "시스템 테스트 완료",
-                "contingency_plans": [formative_evaluation.get("system_check", {}).get("contingency_plan", "비상 대응 계획 수립")],
+                "checklist": formative_evaluation.get("system_check", {}).get("checklist", ["Network connection", "Equipment check", "Material preparation"]),
+                "technical_validation": "; ".join(formative_evaluation.get("system_check", {}).get("technical_tests", [])) or "System testing completed",
+                "contingency_plans": [formative_evaluation.get("system_check", {}).get("contingency_plan", "Contingency plan established")],
             },
             # [26] 프로토타입 실행
             "prototype_execution": {
-                "pilot_scope": formative_evaluation.get("pilot_plan", {}).get("pilot_scope", "소규모 파일럿 테스트"),
-                "participants": formative_evaluation.get("pilot_plan", {}).get("participants", "10명 내외"),
+                "pilot_scope": formative_evaluation.get("pilot_plan", {}).get("pilot_scope", "Small-scale pilot test"),
+                "participants": formative_evaluation.get("pilot_plan", {}).get("participants", "About 10 participants"),
                 "execution_log": formative_evaluation.get("pilot_plan", {}).get("data_collection", []),
                 "issues_encountered": formative_evaluation.get("weaknesses", []),
             },
             # [27] 운영 모니터링 및 지원
             "monitoring": {
-                "monitoring_criteria": formative_evaluation.get("operation_monitoring", {}).get("monitoring_metrics", ["학습 진도", "참여율", "만족도"]),
-                "support_channels": formative_evaluation.get("operation_monitoring", {}).get("support_channels", ["이메일", "전화", "온라인 게시판"]),
+                "monitoring_criteria": formative_evaluation.get("operation_monitoring", {}).get("monitoring_metrics", ["Learning progress", "Participation rate", "Satisfaction"]),
+                "support_channels": formative_evaluation.get("operation_monitoring", {}).get("support_channels", ["Email", "Phone", "Online forum"]),
                 "issue_resolution_log": [],
                 "real_time_adjustments": formative_evaluation.get("revision_recommendations", []),
             },
@@ -740,7 +740,7 @@ def map_to_addie_output(state: DickCareyState) -> dict:
             "formative": {
                 # [28] 파일럿/초기 실행 중 자료 수집
                 "data_collection": {
-                    "methods": ["일대일 평가", "소집단 평가", "현장 평가"],
+                    "methods": ["One-to-one evaluation", "Small group evaluation", "Field trial"],
                     "learner_feedback": formative_evaluation.get("one_to_one_findings", []) + formative_evaluation.get("small_group_findings", []),
                     "performance_data": {
                         "quality_score": formative_evaluation.get("quality_score", 0),
@@ -753,8 +753,8 @@ def map_to_addie_output(state: DickCareyState) -> dict:
                 "improvements": [
                     {
                         "issue_identified": rec,
-                        "improvement_action": f"{rec}에 대한 개선 조치",
-                        "priority": "높음" if idx < 2 else "보통",
+                        "improvement_action": f"Improvement action for {rec}",
+                        "priority": "High" if idx < 2 else "Medium",
                     }
                     for idx, rec in enumerate(formative_evaluation.get("revision_recommendations", []))
                 ],
@@ -783,7 +783,7 @@ def map_to_addie_output(state: DickCareyState) -> dict:
                     "decision": summative_evaluation.get("adoption_decision", {}).get("recommendation", "") or summative_evaluation.get("decision", ""),
                     "rationale": summative_evaluation.get("adoption_decision", {}).get("rationale", ""),
                     "conditions": summative_evaluation.get("adoption_decision", {}).get("conditions", []),
-                    "stakeholder_approval": "승인 대기",
+                    "stakeholder_approval": "Pending approval",
                 },
             },
             # [33] E3: 프로그램 개선 및 환류
@@ -791,7 +791,7 @@ def map_to_addie_output(state: DickCareyState) -> dict:
                 "feedback_summary": summative_evaluation.get("learner_satisfaction", ""),
                 "improvement_areas": summative_evaluation.get("program_improvement", {}).get("improvement_areas", []),
                 "action_items": summative_evaluation.get("program_improvement", {}).get("improvement_actions", []),
-                "feedback_loop": "평가 결과를 바탕으로 다음 교육 과정에 반영",
+                "feedback_loop": "Reflect evaluation results in the next iteration of the program",
                 "next_iteration_goals": summative_evaluation.get("adoption_decision", {}).get("next_steps", []),
             },
         },

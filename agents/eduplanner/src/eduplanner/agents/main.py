@@ -63,236 +63,236 @@ from eduplanner.agents.prompts import (
 
 
 # 기존 통합 프롬프트 (Optimizer에서 사용 - 하위 호환성 유지용)
-GENERATOR_SYSTEM_PROMPT = """당신은 20년 경력의 교수설계 전문가입니다.
+GENERATOR_SYSTEM_PROMPT = """You are an instructional design expert with 20 years of experience.
 
-## 역할
-ADDIE 모델에 따라 체계적이고 **상세한** 교수설계 산출물을 생성합니다.
+## Role
+Generate systematic and **detailed** instructional design outputs according to the ADDIE model.
 
-## ⚠️ 중요: 최소 요구사항 (MINIMUM REQUIREMENTS)
+## ⚠️ Important: MINIMUM REQUIREMENTS
 
-아래 요구사항을 반드시 충족해야 합니다. 미충족 시 품질 기준 미달로 평가됩니다.
+The requirements below must be met. Failure to meet them is evaluated as falling short of the quality standard.
 
-### Analysis 단계
-- learner_analysis.characteristics: **최소 5개** 구체적 특성 (각 1문장 이상)
-- learner_analysis.learning_preferences: **최소 4개**
-- learner_analysis.challenges: **최소 3개** 예상 어려움
-- learner_analysis.motivation: **2-3문장**으로 동기 수준과 이유 설명
-- context_analysis.constraints: **최소 3개**
-- context_analysis.resources: **최소 3개**
-- context_analysis.technical_requirements: **최소 2개**
-- task_analysis.main_topics: **최소 3개**
-- task_analysis.subtopics: **최소 6개** (각 main_topic당 최소 2개)
-- task_analysis.prerequisites: **최소 2개**
+### Analysis Stage
+- learner_analysis.characteristics: **Minimum 5** specific characteristics (at least 1 sentence each)
+- learner_analysis.learning_preferences: **Minimum 4**
+- learner_analysis.challenges: **Minimum 3** anticipated difficulties
+- learner_analysis.motivation: Explain motivation level and reasons in **2-3 sentences**
+- context_analysis.constraints: **Minimum 3**
+- context_analysis.resources: **Minimum 3**
+- context_analysis.technical_requirements: **Minimum 2**
+- task_analysis.main_topics: **Minimum 3**
+- task_analysis.subtopics: **Minimum 6** (at least 2 per main_topic)
+- task_analysis.prerequisites: **Minimum 2**
 
-### Design 단계
-- learning_objectives: **최소 5개** (Bloom's 수준 분산 필수)
-  - 기억/이해: 1-2개
-  - 적용/분석: 2-3개
-  - 평가/창조: 1-2개
-- assessment_plan.diagnostic: **최소 2개** 방법
-- assessment_plan.formative: **최소 2개** 방법
-- assessment_plan.summative: **최소 2개** 방법
-- instructional_strategy.sequence: **9개 Event 모두** 포함 (필수!)
-- instructional_strategy.methods: **최소 3개**
+### Design Stage
+- learning_objectives: **Minimum 5** (Bloom's level distribution required)
+  - Remember/Understand: 1-2
+  - Apply/Analyze: 2-3
+  - Evaluate/Create: 1-2
+- assessment_plan.diagnostic: **Minimum 2** methods
+- assessment_plan.formative: **Minimum 2** methods
+- assessment_plan.summative: **Minimum 2** methods
+- instructional_strategy.sequence: Include **all 9 Events** (required!)
+- instructional_strategy.methods: **Minimum 3**
 
-### Development 단계
-- lesson_plan.modules: **최소 3개** 모듈
-- 각 module.activities: **최소 3개** 활동
-- materials: **최소 5개** 자료 (slides, pages 값 필수 입력 - null 금지)
-  - **content 필드 필수**: 각 자료의 실제 내용을 작성
-  - 유인물: 실제 배포할 텍스트 내용 (최소 500자)
-  - 퀴즈 자료: 문항과 선택지 포함
-  - **프레젠테이션/슬라이드 자료의 경우 slide_contents 필수** (반드시 포함!):
-    - 각 슬라이드별 상세 콘텐츠 (slide_number, title, bullet_points, speaker_notes)
-    - 슬라이드당 3-5개의 핵심 bullet_points
-    - speaker_notes에 발표자를 위한 상세 설명 포함
-    - 예시 형식:
+### Development Stage
+- lesson_plan.modules: **Minimum 3** modules
+- Each module.activities: **Minimum 3** activities
+- materials: **Minimum 5** materials (slides, pages values required - no null)
+  - **content field required**: Write the actual content of each material
+  - Handouts: Actual text content to be distributed (minimum 500 characters)
+  - Quiz materials: Include items and answer options
+  - **slide_contents required for presentation/slide materials** (must be included!):
+    - Detailed content for each slide (slide_number, title, bullet_points, speaker_notes)
+    - 3-5 key bullet_points per slide
+    - Include detailed explanations for the presenter in speaker_notes
+    - Example format:
     ```json
     {
-      "type": "프레젠테이션",
-      "title": "강의 슬라이드",
+      "type": "Presentation",
+      "title": "Lecture Slides",
       "slides": 10,
       "slide_contents": [
-        {"slide_number": 1, "title": "교육 소개", "bullet_points": ["환영 인사", "학습 목표", "일정 안내"], "speaker_notes": "참가자들을 환영하며 교육 목표를 안내합니다."},
-        {"slide_number": 2, "title": "핵심 개념", "bullet_points": ["개념 1 설명", "개념 2 설명", "실제 사례"], "speaker_notes": "핵심 개념을 예시와 함께 설명합니다."}
+        {"slide_number": 1, "title": "Training Introduction", "bullet_points": ["Welcome", "Learning objectives", "Schedule overview"], "speaker_notes": "Welcome the participants and introduce the training objectives."},
+        {"slide_number": 2, "title": "Core Concepts", "bullet_points": ["Explanation of concept 1", "Explanation of concept 2", "Real examples"], "speaker_notes": "Explain the core concepts together with examples."}
       ]
     }
     ```
 
-### Evaluation 단계
-- quiz_items: **최소 10개** (난이도별 분산)
-  - easy: 3-4개
-  - medium: 4-5개
-  - hard: 2-3개
-  - **options 필수**: 객관식의 경우 4개 선택지 제공
-  - **answer 필수**: 정답 명시
-  - **explanation 필수**: 정답 해설 제공
+### Evaluation Stage
+- quiz_items: **Minimum 10** (distributed by difficulty)
+  - easy: 3-4
+  - medium: 4-5
+  - hard: 2-3
+  - **options required**: Provide 4 answer options for multiple choice
+  - **answer required**: Specify the correct answer
+  - **explanation required**: Provide an answer explanation
 
-### Implementation 단계
-- facilitator_guide: **최소 200자** 상세 가이드 (구체적인 진행 지침)
-- learner_guide: **최소 200자** 상세 가이드 (학습 방법 안내)
-- technical_requirements: **최소 2개**
+### Implementation Stage
+- facilitator_guide: **Minimum 200 characters** detailed guide (specific facilitation instructions)
+- learner_guide: **Minimum 200 characters** detailed guide (guidance on how to learn)
+- technical_requirements: **Minimum 2**
 
-- rubric.criteria: **최소 5개** 평가 기준
-- rubric.levels: 각 수준(excellent/good/needs_improvement)별 **구체적 기준** 명시 (각 1-2문장)
-- feedback_plan: **2-3문장** 상세 계획
+- rubric.criteria: **Minimum 5** assessment criteria
+- rubric.levels: Specify **concrete criteria** for each level (excellent/good/needs_improvement) (1-2 sentences each)
+- feedback_plan: **2-3 sentence** detailed plan
 
-## ADDIE 프레임워크
+## ADDIE Framework
 
-### 1. 분석 (Analysis)
-- 학습자 분석: 대상, 특성, 사전지식, 선호도, 동기, 어려움
-- 환경 분석: 학습환경, 시간, 제약, 자원, 기술요구사항
-- 과제 분석: 주요주제, 세부주제, 선수학습
+### 1. Analysis
+- Learner analysis: Target audience, characteristics, prior knowledge, preferences, motivation, difficulties
+- Context analysis: Learning environment, time, constraints, resources, technical requirements
+- Task analysis: Main topics, subtopics, prerequisite learning
 
-### 2. 설계 (Design)
-- 학습 목표: Bloom's Taxonomy 수준별 목표 설정
-- 평가 계획: 진단/형성/총괄 평가 방법
-- 교수 전략: Gagné's 9 Events 기반 교수사태
+### 2. Design
+- Learning objectives: Set objectives by Bloom's Taxonomy level
+- Assessment plan: Diagnostic/formative/summative assessment methods
+- Instructional strategy: Instructional events based on Gagné's 9 Events
 
-### 3. 개발 (Development)
-- 레슨 플랜: 모듈별 구성, 시간 배분
-- 학습 자료: 필요한 교재, 슬라이드, 미디어
+### 3. Development
+- Lesson plan: Module-by-module structure, time allocation
+- Learning materials: Required textbooks, slides, media
 
-### 4. 실행 (Implementation)
-- 전달 방식, 진행자 가이드, 학습자 가이드
-- 기술 요구사항, 지원 계획
+### 4. Implementation
+- Delivery method, facilitator guide, learner guide
+- Technical requirements, support plan
 
-### 5. 평가 (Evaluation)
-- 퀴즈 문항, 평가 루브릭, 피드백 계획
+### 5. Evaluation
+- Quiz items, assessment rubric, feedback plan
 
-## Bloom's Taxonomy 동사
-- 기억: 정의하다, 나열하다, 인식하다, 회상하다, 명명하다
-- 이해: 설명하다, 요약하다, 해석하다, 분류하다, 예시하다
-- 적용: 적용하다, 시연하다, 사용하다, 실행하다, 구현하다
-- 분석: 분석하다, 비교하다, 구별하다, 조직하다, 귀인하다
-- 평가: 평가하다, 판단하다, 비평하다, 정당화하다, 검증하다
-- 창조: 설계하다, 개발하다, 생성하다, 구성하다, 계획하다
+## Bloom's Taxonomy Verbs
+- Remember: define, list, recognize, recall, name
+- Understand: explain, summarize, interpret, classify, exemplify
+- Apply: apply, demonstrate, use, execute, implement
+- Analyze: analyze, compare, distinguish, organize, attribute
+- Evaluate: evaluate, judge, critique, justify, verify
+- Create: design, develop, generate, construct, plan
 
-## Gagné's 9 Events (반드시 모두 포함!)
-1. 주의 획득 (Gain attention)
-2. 학습 목표 제시 (Inform learners of objectives)
-3. 선수 학습 상기 (Stimulate recall of prior learning)
-4. 학습 내용 제시 (Present content)
-5. 학습 안내 제공 (Provide learning guidance)
-6. 연습 유도 (Elicit performance)
-7. 피드백 제공 (Provide feedback)
-8. 수행 평가 (Assess performance)
-9. 파지 및 전이 강화 (Enhance retention and transfer)
+## Gagné's 9 Events (must include all!)
+1. Gain attention
+2. Inform learners of objectives
+3. Stimulate recall of prior learning
+4. Present content
+5. Provide learning guidance
+6. Elicit performance
+7. Provide feedback
+8. Assess performance
+9. Enhance retention and transfer
 
-## 📋 품질 자가검증 (생성 후 반드시 확인)
+## 📋 Quality Self-Verification (must check after generation)
 
-산출물 생성 후 다음을 확인하세요:
-□ 모든 learning_objectives가 측정 가능한 동사로 시작하는가?
-□ instructional_strategy.sequence가 9개 Event를 모두 포함하는가?
-□ 각 quiz_item이 특정 learning_objective와 연결(objective_id)되는가?
-□ 전체 시간 배분 합계가 duration과 일치하는가?
-□ 모든 설명이 최소 2문장 이상인가?
-□ materials의 slides, pages 값이 모두 숫자로 입력되었는가?
-□ **facilitator_guide가 200자 이상이며 단계별 지침을 포함하는가?**
-□ **learner_guide가 100자 이상이며 구체적인 학습 안내를 포함하는가?**
+After generating the output, verify the following:
+□ Do all learning_objectives start with a measurable verb?
+□ Does instructional_strategy.sequence include all 9 Events?
+□ Is each quiz_item linked (objective_id) to a specific learning_objective?
+□ Does the total time allocation match duration?
+□ Is every description at least 2 sentences?
+□ Are the slides and pages values of materials all entered as numbers?
+□ **Is facilitator_guide 200+ characters and does it include step-by-step instructions?**
+□ **Is learner_guide 100+ characters and does it include specific learning guidance?**
 
-## ⚠️ Implementation 가이드 필수 요소
+## ⚠️ Required Elements of the Implementation Guides
 
-**facilitator_guide** (최소 200자):
-- 단계별 진행 지침 (1, 2, 3... 번호 사용)
-- 각 모듈/활동별 구체적 안내
-- 시간 관리 팁
-- 학습자 참여 유도 방법
+**facilitator_guide** (minimum 200 characters):
+- Step-by-step facilitation instructions (use numbers 1, 2, 3...)
+- Specific guidance for each module/activity
+- Time management tips
+- Methods for encouraging learner participation
 
-예시:
-"1. 주의 집중 (5분): 동영상 재생 후 간단한 질문으로 관심 유도
-2. 목표 제시 (3분): 화이트보드에 학습 목표를 시각적으로 제시
-3. 내용 전달 (20분): 슬라이드를 보며 핵심 개념 설명..."
+Example:
+"1. Gain attention (5 min): Play a video and spark interest with a simple question
+2. Present objectives (3 min): Present the learning objectives visually on the whiteboard
+3. Deliver content (20 min): Explain core concepts while going through the slides..."
 
-**learner_guide** (최소 100자):
-- 학습 전/중/후 활동 안내
-- 참여 방법
-- 질문/도움 요청 방법
+**learner_guide** (minimum 100 characters):
+- Guidance on before/during/after learning activities
+- How to participate
+- How to ask questions/request help
 
-## 출력 예시 (상세도 참고용 - 내용은 시나리오에 맞게 작성)
+## Output Example (for reference on level of detail - write content to fit the scenario)
 
-아래는 **상세도 수준**의 예시입니다. 실제 내용은 주어진 시나리오에 맞게 작성하세요:
+Below is an example of the **level of detail**. Write the actual content to fit the given scenario:
 
 ```json
 {
   "analysis": {
     "learner_analysis": {
-      "target_audience": "[시나리오의 대상자]",
+      "target_audience": "[Target audience of the scenario]",
       "characteristics": [
-        "[대상자의 연령대, 배경 등 인구통계학적 특성]",
-        "[교육 수준 및 전문 분야]",
-        "[관련 경험 수준]",
-        "[학습 태도 및 성향]",
-        "[기술/도구 활용 능력]"
+        "[Demographic characteristics such as age range and background of the target audience]",
+        "[Education level and field of expertise]",
+        "[Level of relevant experience]",
+        "[Learning attitude and disposition]",
+        "[Ability to use technology/tools]"
       ],
-      "prior_knowledge": "[대상자가 이미 알고 있는 내용과 부족한 부분을 2-3문장으로 상세히 기술]",
+      "prior_knowledge": "[Describe in detail in 2-3 sentences what the target audience already knows and what they lack]",
       "learning_preferences": [
-        "[선호하는 학습 방식 1]",
-        "[선호하는 학습 방식 2]",
-        "[선호하는 콘텐츠 유형]",
-        "[학습 환경 선호도]"
+        "[Preferred learning mode 1]",
+        "[Preferred learning mode 2]",
+        "[Preferred content type]",
+        "[Learning environment preference]"
       ],
-      "motivation": "[학습 동기를 2-3문장으로 구체적으로 기술. 내적 동기와 외적 동기 모두 포함]",
+      "motivation": "[Describe learning motivation specifically in 2-3 sentences. Include both intrinsic and extrinsic motivation]",
       "challenges": [
-        "[예상되는 학습 어려움 1]",
-        "[예상되는 학습 어려움 2]",
-        "[예상되는 학습 어려움 3]"
+        "[Anticipated learning difficulty 1]",
+        "[Anticipated learning difficulty 2]",
+        "[Anticipated learning difficulty 3]"
       ]
     },
     "context_analysis": {
-      "environment": "[학습 환경]",
-      "duration": "[총 학습 시간]",
-      "constraints": ["[제약조건 1]", "[제약조건 2]", "[제약조건 3]"],
-      "resources": ["[가용 자원 1]", "[가용 자원 2]", "[가용 자원 3]", "[가용 자원 4]"],
-      "technical_requirements": ["[기술 요구사항 1]", "[기술 요구사항 2]", "[기술 요구사항 3]"]
+      "environment": "[Learning environment]",
+      "duration": "[Total learning time]",
+      "constraints": ["[Constraint 1]", "[Constraint 2]", "[Constraint 3]"],
+      "resources": ["[Available resource 1]", "[Available resource 2]", "[Available resource 3]", "[Available resource 4]"],
+      "technical_requirements": ["[Technical requirement 1]", "[Technical requirement 2]", "[Technical requirement 3]"]
     },
     "task_analysis": {
-      "main_topics": ["[주요 주제 1]", "[주요 주제 2]", "[주요 주제 3]"],
-      "subtopics": ["[세부 주제 1-1]", "[세부 주제 1-2]", "[세부 주제 2-1]", "[세부 주제 2-2]", "[세부 주제 3-1]", "[세부 주제 3-2]"],
-      "prerequisites": ["[선수 학습 1]", "[선수 학습 2]"]
+      "main_topics": ["[Main topic 1]", "[Main topic 2]", "[Main topic 3]"],
+      "subtopics": ["[Subtopic 1-1]", "[Subtopic 1-2]", "[Subtopic 2-1]", "[Subtopic 2-2]", "[Subtopic 3-1]", "[Subtopic 3-2]"],
+      "prerequisites": ["[Prerequisite learning 1]", "[Prerequisite learning 2]"]
     }
   },
   "design": {
     "learning_objectives": [
-      {"id": "OBJ-01", "level": "기억", "statement": "[측정 가능한 행동 동사로 시작하는 목표]", "bloom_verb": "[동사]", "measurable": true},
-      {"id": "OBJ-02", "level": "이해", "statement": "[측정 가능한 행동 동사로 시작하는 목표]", "bloom_verb": "[동사]", "measurable": true},
-      {"id": "OBJ-03", "level": "적용", "statement": "[측정 가능한 행동 동사로 시작하는 목표]", "bloom_verb": "[동사]", "measurable": true},
-      {"id": "OBJ-04", "level": "적용", "statement": "[측정 가능한 행동 동사로 시작하는 목표]", "bloom_verb": "[동사]", "measurable": true},
-      {"id": "OBJ-05", "level": "분석", "statement": "[측정 가능한 행동 동사로 시작하는 목표]", "bloom_verb": "[동사]", "measurable": true}
+      {"id": "OBJ-01", "level": "Remember", "statement": "[Objective starting with a measurable action verb]", "bloom_verb": "[verb]", "measurable": true},
+      {"id": "OBJ-02", "level": "Understand", "statement": "[Objective starting with a measurable action verb]", "bloom_verb": "[verb]", "measurable": true},
+      {"id": "OBJ-03", "level": "Apply", "statement": "[Objective starting with a measurable action verb]", "bloom_verb": "[verb]", "measurable": true},
+      {"id": "OBJ-04", "level": "Apply", "statement": "[Objective starting with a measurable action verb]", "bloom_verb": "[verb]", "measurable": true},
+      {"id": "OBJ-05", "level": "Analyze", "statement": "[Objective starting with a measurable action verb]", "bloom_verb": "[verb]", "measurable": true}
     ],
     "assessment_plan": {
-      "diagnostic": ["[진단 평가 방법 1]", "[진단 평가 방법 2]"],
-      "formative": ["[형성 평가 방법 1]", "[형성 평가 방법 2]", "[형성 평가 방법 3]"],
-      "summative": ["[총괄 평가 방법 1]", "[총괄 평가 방법 2]"]
+      "diagnostic": ["[Diagnostic assessment method 1]", "[Diagnostic assessment method 2]"],
+      "formative": ["[Formative assessment method 1]", "[Formative assessment method 2]", "[Formative assessment method 3]"],
+      "summative": ["[Summative assessment method 1]", "[Summative assessment method 2]"]
     },
     "instructional_strategy": {
       "model": "Gagné's 9 Events",
       "sequence": [
-        {"event": "주의 획득", "activity": "[구체적 활동 설명]", "duration": "[시간]", "resources": ["[자원]"]},
-        {"event": "학습 목표 제시", "activity": "[구체적 활동 설명]", "duration": "[시간]", "resources": ["[자원]"]},
-        {"event": "선수 학습 상기", "activity": "[구체적 활동 설명]", "duration": "[시간]", "resources": ["[자원]"]},
-        {"event": "학습 내용 제시", "activity": "[구체적 활동 설명]", "duration": "[시간]", "resources": ["[자원]"]},
-        {"event": "학습 안내 제공", "activity": "[구체적 활동 설명]", "duration": "[시간]", "resources": ["[자원]"]},
-        {"event": "연습 유도", "activity": "[구체적 활동 설명]", "duration": "[시간]", "resources": ["[자원]"]},
-        {"event": "피드백 제공", "activity": "[구체적 활동 설명]", "duration": "[시간]", "resources": ["[자원]"]},
-        {"event": "수행 평가", "activity": "[구체적 활동 설명]", "duration": "[시간]", "resources": ["[자원]"]},
-        {"event": "파지 및 전이 강화", "activity": "[구체적 활동 설명]", "duration": "[시간]", "resources": ["[자원]"]}
+        {"event": "Gain attention", "activity": "[Specific activity description]", "duration": "[time]", "resources": ["[resource]"]},
+        {"event": "Inform learners of objectives", "activity": "[Specific activity description]", "duration": "[time]", "resources": ["[resource]"]},
+        {"event": "Stimulate recall of prior learning", "activity": "[Specific activity description]", "duration": "[time]", "resources": ["[resource]"]},
+        {"event": "Present content", "activity": "[Specific activity description]", "duration": "[time]", "resources": ["[resource]"]},
+        {"event": "Provide learning guidance", "activity": "[Specific activity description]", "duration": "[time]", "resources": ["[resource]"]},
+        {"event": "Elicit performance", "activity": "[Specific activity description]", "duration": "[time]", "resources": ["[resource]"]},
+        {"event": "Provide feedback", "activity": "[Specific activity description]", "duration": "[time]", "resources": ["[resource]"]},
+        {"event": "Assess performance", "activity": "[Specific activity description]", "duration": "[time]", "resources": ["[resource]"]},
+        {"event": "Enhance retention and transfer", "activity": "[Specific activity description]", "duration": "[time]", "resources": ["[resource]"]}
       ],
-      "methods": ["[교수 방법 1]", "[교수 방법 2]", "[교수 방법 3]"]
+      "methods": ["[Instructional method 1]", "[Instructional method 2]", "[Instructional method 3]"]
     }
   },
   "implementation": {
-    "delivery_method": "[전달 방식]",
-    "facilitator_guide": "1. 사전 준비 (10분 전): 강의실 점검, 프로젝터 테스트, 학습 자료 배치\n2. 오프닝 (5분): 환영 인사, 오늘의 학습 목표 안내, 아이스브레이킹 활동\n3. 모듈 1 진행 (20분): 슬라이드 설명 후 그룹 토론, 질의응답\n4. 실습 지도 (15분): 개별 실습 지원, 어려워하는 학습자 1:1 도움\n5. 마무리 (5분): 핵심 내용 요약, 다음 단계 안내",
-    "learner_guide": "1. 학습 전: 사전 설문 작성, 개인 학습 목표 설정\n2. 학습 중: 적극적 질문, 그룹 활동 참여, 실습 시 동료와 협력\n3. 학습 후: 핸드아웃 복습, 업무 적용 계획 수립",
-    "technical_requirements": ["[기술 요구사항 1]", "[기술 요구사항 2]", "[기술 요구사항 3]"],
-    "support_plan": "[학습자 지원 계획]"
+    "delivery_method": "[Delivery method]",
+    "facilitator_guide": "1. Pre-preparation (10 min before): Inspect the classroom, test the projector, lay out learning materials\n2. Opening (5 min): Welcome, guide to today's learning objectives, icebreaking activity\n3. Module 1 delivery (20 min): Group discussion after slide explanation, Q&A\n4. Practice guidance (15 min): Support individual practice, 1:1 help for struggling learners\n5. Wrap-up (5 min): Summarize key content, guide next steps",
+    "learner_guide": "1. Before learning: Complete the pre-survey, set personal learning goals\n2. During learning: Ask questions actively, participate in group activities, collaborate with peers during practice\n3. After learning: Review the handouts, establish a plan for applying it on the job",
+    "technical_requirements": ["[Technical requirement 1]", "[Technical requirement 2]", "[Technical requirement 3]"],
+    "support_plan": "[Learner support plan]"
   }
 }
 ```
 
-## 출력 형식
-위 예시의 상세도를 참고하여 **시나리오에 맞는** 완전한 JSON 구조로 출력하세요:
+## Output Format
+Referring to the level of detail in the example above, output a complete JSON structure **that fits the scenario**:
 
 ```json
 {
@@ -345,7 +345,7 @@ class EduPlannerAgent(BaseAgent):
 
     @property
     def role(self) -> str:
-        return "3-Agent 협업을 통해 고품질 교수설계 산출물을 생성합니다."
+        return "Generates high-quality instructional design outputs through 3-Agent collaboration."
 
     @property
     def evaluator(self) -> EvaluatorAgent:
@@ -388,7 +388,7 @@ class EduPlannerAgent(BaseAgent):
         start_time = datetime.now()
         trajectory = Trajectory()
         total_tokens = 0
-        step_counter = 0  # tool_calls step 카운터
+        step_counter = 0  # tool_calls step counter
 
         # target_audience 추론: 기존 필드가 없으면 IDLD 필드에서 조합
         target_audience = scenario_input.context.target_audience
@@ -400,20 +400,20 @@ class EduPlannerAgent(BaseAgent):
                 parts_audience.append(scenario_input.context.learner_role)
             if scenario_input.context.learner_education:
                 parts_audience.append(f"({scenario_input.context.learner_education})")
-            target_audience = " ".join(parts_audience) if parts_audience else "학습자"
+            target_audience = " ".join(parts_audience) if parts_audience else "Learners"
 
         # 학습자 프로필 생성
         learner_profile = LearnerProfile.from_scenario(
             target_audience=target_audience,
             prior_knowledge=scenario_input.context.prior_knowledge,
-            learning_environment=scenario_input.context.learning_environment or "미정",
+            learning_environment=scenario_input.context.learning_environment or "TBD",
         )
 
         # 시나리오 컨텍스트 문자열
         scenario_context = self._build_scenario_context(scenario_input)
 
         # 1단계: 초기 ADDIE 산출물 생성
-        trajectory.reasoning_steps.append("Step 1: 초기 ADDIE 산출물 생성")
+        trajectory.reasoning_steps.append("Step 1: Generate initial ADDIE output")
         gen_start = datetime.now()
         addie_output = self._generate_initial_output(scenario_input, learner_profile)
         gen_end = datetime.now()
@@ -423,7 +423,7 @@ class EduPlannerAgent(BaseAgent):
             step=step_counter,
             tool="generate_initial_addie",
             args={"scenario_id": scenario_input.scenario_id},
-            result="ADDIE 산출물 초기 생성 완료",
+            result="Initial ADDIE output generation complete",
             timestamp=gen_start,
             duration_ms=int((gen_end - gen_start).total_seconds() * 1000),
         ))
@@ -431,10 +431,10 @@ class EduPlannerAgent(BaseAgent):
         # 2단계: 반복적 개선 루프
         best_output = addie_output
         best_score = 0.0
-        score_history = []  # 점수 이력 추적
+        score_history = []  # track score history
 
         for iteration in range(1, self.max_iterations + 1):
-            trajectory.reasoning_steps.append(f"Step {iteration + 1}: 평가 및 개선 반복 {iteration}")
+            trajectory.reasoning_steps.append(f"Step {iteration + 1}: Evaluation and improvement iteration {iteration}")
 
             # 2.1 & 2.2: Evaluator와 Analyst 병렬 실행 (#79 성능 최적화)
             parallel_start = datetime.now()
@@ -468,7 +468,7 @@ class EduPlannerAgent(BaseAgent):
                 step=step_counter,
                 tool="evaluate_addie",
                 args={"iteration": iteration},
-                result=f"ADDIE 평가 완료: {feedback.score:.1f}점",
+                result=f"ADDIE evaluation complete: {feedback.score:.1f} points",
                 timestamp=parallel_start,
                 duration_ms=int((parallel_end - parallel_start).total_seconds() * 1000 / 2),
                 output_data={"score": feedback.score, "addie": feedback.addie_scores},
@@ -481,7 +481,7 @@ class EduPlannerAgent(BaseAgent):
                 step=step_counter,
                 tool="analyze_addie",
                 args={"iteration": iteration},
-                result=f"분석 완료: 품질={analysis_result.quality_level}, 오류={len(analysis_result.errors)}개",
+                result=f"Analysis complete: quality={analysis_result.quality_level}, errors={len(analysis_result.errors)}",
                 timestamp=parallel_start,
                 duration_ms=int((parallel_end - parallel_start).total_seconds() * 1000 / 2),
                 output_data={
@@ -505,12 +505,12 @@ class EduPlannerAgent(BaseAgent):
             # 2. 점수 개선 없으면 종료 (반복 낭비 방지)
             if feedback.score >= 85.0:
                 trajectory.reasoning_steps.append(
-                    f"조기 종료: 목표 점수 달성 ({feedback.score:.1f}점)"
+                    f"Early termination: target score reached ({feedback.score:.1f} points)"
                 )
                 break
             if len(score_history) >= 2 and feedback.score <= score_history[-2]:
                 trajectory.reasoning_steps.append(
-                    f"조기 종료: 점수 개선 없음 ({score_history[-2]:.1f} → {feedback.score:.1f})"
+                    f"Early termination: no score improvement ({score_history[-2]:.1f} → {feedback.score:.1f})"
                 )
                 break
 
@@ -530,7 +530,7 @@ class EduPlannerAgent(BaseAgent):
                 step=step_counter,
                 tool="optimize_addie",
                 args={"iteration": iteration},
-                result="ADDIE 산출물 최적화 완료",
+                result="ADDIE output optimization complete",
                 timestamp=opt_start,
                 duration_ms=int((opt_end - opt_start).total_seconds() * 1000),
                 output_data={"optimized": True, "feedback_score": feedback.score},
@@ -540,7 +540,7 @@ class EduPlannerAgent(BaseAgent):
         # 최고 점수 버전으로 복원 (점수가 떨어진 경우 대비)
         addie_output = best_output
         trajectory.reasoning_steps.append(
-            f"최고 점수 버전 사용: {best_score:.1f}점"
+            f"Using highest-scoring version: {best_score:.1f} points"
         )
 
         # 최종 평가
@@ -557,13 +557,13 @@ class EduPlannerAgent(BaseAgent):
             step=step_counter,
             tool="final_evaluate_addie",
             args={"type": "final"},
-            result=f"최종 CIDPP 평가: {final_feedback.score:.1f}점",
+            result=f"Final CIDPP evaluation: {final_feedback.score:.1f} points",
             timestamp=final_eval_start,
             duration_ms=int((final_eval_end - final_eval_start).total_seconds() * 1000),
         ))
 
         trajectory.reasoning_steps.append(
-            f"최종 점수: {final_feedback.score:.1f}/100"
+            f"Final score: {final_feedback.score:.1f}/100"
         )
 
         # 메타데이터 생성
@@ -597,9 +597,9 @@ class EduPlannerAgent(BaseAgent):
                 if fallback_slides:
                     from eduplanner.models.schemas import Material
                     new_material = Material(
-                        type="프레젠테이션",
-                        title="교육 슬라이드",
-                        description="모듈 정보 기반 자동 생성 슬라이드",
+                        type="Presentation",
+                        title="Training Slides",
+                        description="Slides auto-generated from module information",
                         slides=len(fallback_slides),
                         slide_contents=fallback_slides,
                     )
@@ -627,32 +627,32 @@ class EduPlannerAgent(BaseAgent):
                 parts_audience.append(scenario_input.context.learner_role)
             if scenario_input.context.learner_education:
                 parts_audience.append(f"({scenario_input.context.learner_education})")
-            target_audience = " ".join(parts_audience) if parts_audience else "학습자"
+            target_audience = " ".join(parts_audience) if parts_audience else "Learners"
 
         parts = [
-            f"**제목:** {scenario_input.title}",
-            f"**대상:** {target_audience}",
-            f"**시간:** {scenario_input.context.duration or '미정'}",
-            f"**환경:** {scenario_input.context.learning_environment or '미정'}",
-            f"**목표:** {', '.join(scenario_input.learning_goals)}",
+            f"**Title:** {scenario_input.title}",
+            f"**Target Audience:** {target_audience}",
+            f"**Duration:** {scenario_input.context.duration or 'TBD'}",
+            f"**Environment:** {scenario_input.context.learning_environment or 'TBD'}",
+            f"**Goals:** {', '.join(scenario_input.learning_goals)}",
         ]
 
         if scenario_input.context.prior_knowledge:
-            parts.append(f"**사전지식:** {scenario_input.context.prior_knowledge}")
+            parts.append(f"**Prior Knowledge:** {scenario_input.context.prior_knowledge}")
 
         if scenario_input.context.class_size:
-            parts.append(f"**학습자 수:** {scenario_input.context.class_size}")
+            parts.append(f"**Class Size:** {scenario_input.context.class_size}")
 
         if scenario_input.context.institution_type:
-            parts.append(f"**기관 유형:** {scenario_input.context.institution_type}")
+            parts.append(f"**Institution Type:** {scenario_input.context.institution_type}")
 
         if scenario_input.constraints:
             if scenario_input.constraints.budget:
-                parts.append(f"**예산:** {scenario_input.constraints.budget}")
+                parts.append(f"**Budget:** {scenario_input.constraints.budget}")
             if scenario_input.constraints.resources:
-                parts.append(f"**자원:** {', '.join(scenario_input.constraints.resources)}")
+                parts.append(f"**Resources:** {', '.join(scenario_input.constraints.resources)}")
             if scenario_input.constraints.tech_requirements:
-                parts.append(f"**기술요건:** {scenario_input.constraints.tech_requirements}")
+                parts.append(f"**Technical Requirements:** {scenario_input.constraints.tech_requirements}")
 
         return "\n".join(parts)
 
@@ -671,7 +671,7 @@ class EduPlannerAgent(BaseAgent):
 
         if self.debug:
             print("\n" + "="*60)
-            print("[Sequential ADDIE Pipeline] 순차적 생성 시작")
+            print("[Sequential ADDIE Pipeline] Starting sequential generation")
             print("="*60)
 
         # 시나리오 컨텍스트 (모든 단계에서 공통 사용)
@@ -681,15 +681,15 @@ class EduPlannerAgent(BaseAgent):
         # Step 1: Analysis 단계
         # ============================================================
         if self.debug:
-            print("\n[Step 1/5] Analysis 단계 생성 중...")
+            print("\n[Step 1/5] Generating Analysis stage...")
 
-        analysis_prompt = f"""## 시나리오 정보
+        analysis_prompt = f"""## Scenario Information
 {scenario_context}
 
-## 학습자 프로필
+## Learner Profile
 {learner_profile.skill_tree.to_prompt_context()}
 
-위 시나리오에 대한 Analysis(분석) 단계를 수행하세요."""
+Perform the Analysis stage for the scenario above."""
 
         analysis_response = self.llm.invoke([
             SystemMessage(content=ANALYSIS_PROMPT),
@@ -698,23 +698,23 @@ class EduPlannerAgent(BaseAgent):
         analysis_data = self._parse_json_response(analysis_response.content)
 
         if self.debug:
-            print(f"  → Analysis 완료: characteristics={len(analysis_data.get('learner_analysis', {}).get('characteristics', []))}개")
+            print(f"  → Analysis complete: characteristics={len(analysis_data.get('learner_analysis', {}).get('characteristics', []))}")
 
         # ============================================================
         # Step 2: Design 단계 (Analysis 결과 입력)
         # ============================================================
         if self.debug:
-            print("\n[Step 2/5] Design 단계 생성 중...")
+            print("\n[Step 2/5] Generating Design stage...")
 
-        design_prompt = f"""## 시나리오 정보
+        design_prompt = f"""## Scenario Information
 {scenario_context}
 
-## 이전 단계 결과: Analysis
+## Previous Stage Result: Analysis
 ```json
 {json.dumps(analysis_data, ensure_ascii=False, indent=2)}
 ```
 
-위 Analysis 결과를 바탕으로 Design(설계) 단계를 수행하세요."""
+Based on the Analysis result above, perform the Design stage."""
 
         design_response = self.llm.invoke([
             SystemMessage(content=DESIGN_PROMPT),
@@ -723,29 +723,29 @@ class EduPlannerAgent(BaseAgent):
         design_data = self._parse_json_response(design_response.content)
 
         if self.debug:
-            print(f"  → Design 완료: objectives={len(design_data.get('learning_objectives', []))}개, events={len(design_data.get('instructional_strategy', {}).get('sequence', []))}개")
+            print(f"  → Design complete: objectives={len(design_data.get('learning_objectives', []))}, events={len(design_data.get('instructional_strategy', {}).get('sequence', []))}")
 
         # ============================================================
         # Step 3: Development 단계 (Analysis + Design 결과 입력)
         # ============================================================
         if self.debug:
-            print("\n[Step 3/5] Development 단계 생성 중...")
+            print("\n[Step 3/5] Generating Development stage...")
 
-        development_prompt = f"""## 시나리오 정보
+        development_prompt = f"""## Scenario Information
 {scenario_context}
 
-## 이전 단계 결과: Analysis
+## Previous Stage Result: Analysis
 ```json
 {json.dumps(analysis_data, ensure_ascii=False, indent=2)}
 ```
 
-## 이전 단계 결과: Design
+## Previous Stage Result: Design
 ```json
 {json.dumps(design_data, ensure_ascii=False, indent=2)}
 ```
 
-위 결과를 바탕으로 Development(개발) 단계를 수행하세요.
-Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
+Based on the results above, perform the Development stage.
+Link the learning_objectives IDs from Design to the objectives of the modules."""
 
         development_response = self.llm.invoke([
             SystemMessage(content=DEVELOPMENT_PROMPT),
@@ -754,38 +754,38 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
         development_data = self._parse_json_response(development_response.content)
 
         if self.debug:
-            print(f"  → Development 완료: modules={len(development_data.get('lesson_plan', {}).get('modules', []))}개, materials={len(development_data.get('materials', []))}개")
+            print(f"  → Development complete: modules={len(development_data.get('lesson_plan', {}).get('modules', []))}, materials={len(development_data.get('materials', []))}")
 
         # ============================================================
         # Step 4: Implementation 단계 (이전 단계 결과 입력)
         # ============================================================
         if self.debug:
-            print("\n[Step 4/5] Implementation 단계 생성 중...")
+            print("\n[Step 4/5] Generating Implementation stage...")
 
-        implementation_prompt = f"""## 시나리오 정보
+        implementation_prompt = f"""## Scenario Information
 {scenario_context}
 
-## 이전 단계 결과 요약
+## Summary of Previous Stage Results
 
 ### Analysis
-- 대상: {analysis_data.get('learner_analysis', {}).get('target_audience', '')}
-- 환경: {analysis_data.get('context_analysis', {}).get('environment', '')}
-- 시간: {analysis_data.get('context_analysis', {}).get('duration', '')}
+- Target audience: {analysis_data.get('learner_analysis', {}).get('target_audience', '')}
+- Environment: {analysis_data.get('context_analysis', {}).get('environment', '')}
+- Duration: {analysis_data.get('context_analysis', {}).get('duration', '')}
 
 ### Design
-- 학습 목표: {len(design_data.get('learning_objectives', []))}개
-- 교수 전략: {design_data.get('instructional_strategy', {}).get('model', '')}
+- Learning objectives: {len(design_data.get('learning_objectives', []))}
+- Instructional strategy: {design_data.get('instructional_strategy', {}).get('model', '')}
 
 ### Development - Lesson Plan
 ```json
 {json.dumps(development_data.get('lesson_plan', {}), ensure_ascii=False, indent=2)}
 ```
 
-위 결과를 바탕으로 Implementation(실행) 단계를 수행하세요.
+Based on the results above, perform the Implementation stage.
 
-⚠️ **중요**: facilitator_guide와 learner_guide는 반드시 상세하게 작성하세요!
-- facilitator_guide: 200자 이상, 단계별 번호와 시간 배분 포함
-- learner_guide: 150자 이상, 학습 전/중/후 구분"""
+⚠️ **Important**: facilitator_guide and learner_guide must be written in detail!
+- facilitator_guide: 200+ characters, include step numbering and time allocation
+- learner_guide: 150+ characters, separated into before/during/after learning"""
 
         implementation_response = self.llm.invoke([
             SystemMessage(content=IMPLEMENTATION_PROMPT),
@@ -796,24 +796,24 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
         if self.debug:
             fg_len = len(implementation_data.get('facilitator_guide', ''))
             lg_len = len(implementation_data.get('learner_guide', ''))
-            print(f"  → Implementation 완료: facilitator_guide={fg_len}자, learner_guide={lg_len}자")
+            print(f"  → Implementation complete: facilitator_guide={fg_len} chars, learner_guide={lg_len} chars")
 
         # ============================================================
         # Step 5: Evaluation 단계 (이전 단계 결과 입력)
         # ============================================================
         if self.debug:
-            print("\n[Step 5/5] Evaluation 단계 생성 중...")
+            print("\n[Step 5/5] Generating Evaluation stage...")
 
-        evaluation_prompt = f"""## 시나리오 정보
+        evaluation_prompt = f"""## Scenario Information
 {scenario_context}
 
-## 이전 단계 결과: Design - Learning Objectives
+## Previous Stage Result: Design - Learning Objectives
 ```json
 {json.dumps(design_data.get('learning_objectives', []), ensure_ascii=False, indent=2)}
 ```
 
-위 학습 목표에 맞춰 Evaluation(평가) 단계를 수행하세요.
-각 quiz_item의 objective_id가 위 learning_objectives의 id와 연결되어야 합니다."""
+Perform the Evaluation stage in line with the learning objectives above.
+The objective_id of each quiz_item must be linked to the id of the learning_objectives above."""
 
         evaluation_response = self.llm.invoke([
             SystemMessage(content=EVALUATION_PROMPT),
@@ -822,9 +822,9 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
         evaluation_data = self._parse_json_response(evaluation_response.content)
 
         if self.debug:
-            print(f"  → Evaluation 완료: quiz_items={len(evaluation_data.get('quiz_items', []))}개")
+            print(f"  → Evaluation complete: quiz_items={len(evaluation_data.get('quiz_items', []))}")
             print("\n" + "="*60)
-            print("[Sequential ADDIE Pipeline] 생성 완료!")
+            print("[Sequential ADDIE Pipeline] Generation complete!")
             print("="*60 + "\n")
 
         # ============================================================
@@ -879,7 +879,7 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
                 parts_audience.append(scenario_input.context.learner_age)
             if scenario_input.context.learner_role:
                 parts_audience.append(scenario_input.context.learner_role)
-            target_audience = " ".join(parts_audience) if parts_audience else "학습자"
+            target_audience = " ".join(parts_audience) if parts_audience else "Learners"
 
         # NeedsAnalysis (Item 1-4)
         needs_analysis = None
@@ -901,8 +901,8 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
                 challenges=la_data.get("challenges", []),
             ),
             context_analysis=ContextAnalysis(
-                environment=ca_data.get("environment", scenario_input.context.learning_environment or "미정"),
-                duration=ca_data.get("duration", scenario_input.context.duration or "미정"),
+                environment=ca_data.get("environment", scenario_input.context.learning_environment or "TBD"),
+                duration=ca_data.get("duration", scenario_input.context.duration or "TBD"),
                 constraints=ca_data.get("constraints", []),
                 resources=ca_data.get("resources", []),
                 technical_requirements=ca_data.get("technical_requirements", []),
@@ -930,9 +930,9 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
         for i, obj in enumerate(design_data.get("learning_objectives", [])):
             objectives.append(LearningObjective(
                 id=obj.get("id", f"OBJ-{i+1:02d}"),
-                level=obj.get("level", "이해"),
+                level=obj.get("level", "Understand"),
                 statement=obj.get("statement", ""),
-                bloom_verb=obj.get("bloom_verb", "설명하다"),
+                bloom_verb=obj.get("bloom_verb", "explain"),
                 measurable=obj.get("measurable", True),
             ))
 
@@ -1058,7 +1058,7 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
 
         development = Development(
             lesson_plan=LessonPlan(
-                total_duration=lesson_data.get("total_duration", scenario_input.context.duration or "미정"),
+                total_duration=lesson_data.get("total_duration", scenario_input.context.duration or "TBD"),
                 modules=modules,
             ),
             materials=materials,
@@ -1071,7 +1071,7 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
 
         # Implementation
         implementation = Implementation(
-            delivery_method=implementation_data.get("delivery_method", "대면 교육"),
+            delivery_method=implementation_data.get("delivery_method", "In-person training"),
             facilitator_guide=implementation_data.get("facilitator_guide"),
             learner_guide=implementation_data.get("learner_guide"),
             technical_requirements=implementation_data.get("technical_requirements", []),
@@ -1163,7 +1163,7 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
         d = addie_output.design
         if len(d.learning_objectives) < 5:
             issues.append(f"learning_objectives: {len(d.learning_objectives)}/5")
-            score -= 20  # 학습 목표는 중요
+            score -= 20  # learning objectives are important
         if len(d.instructional_strategy.sequence) < 9:
             issues.append(f"instructional_strategy.sequence: {len(d.instructional_strategy.sequence)}/9")
             score -= 15
@@ -1188,10 +1188,10 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
         fg_len = len(str(impl.facilitator_guide or ""))
         lg_len = len(str(impl.learner_guide or ""))
         if fg_len < 200:
-            issues.append(f"facilitator_guide: {fg_len}/200자")
-            score -= 15  # 중요한 항목
+            issues.append(f"facilitator_guide: {fg_len}/200 chars")
+            score -= 15  # important item
         if lg_len < 100:
-            issues.append(f"learner_guide: {lg_len}/100자")
+            issues.append(f"learner_guide: {lg_len}/100 chars")
             score -= 10
 
         return max(0, score), issues
@@ -1203,39 +1203,39 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
     ) -> str:
         """생성 프롬프트 구성"""
         parts = [
-            "다음 시나리오에 맞는 ADDIE 교수설계 산출물을 생성해주세요.\n",
-            "## 시나리오 정보",
-            f"**제목:** {scenario_input.title}",
-            f"**시나리오 ID:** {scenario_input.scenario_id}",
-            f"\n**학습 맥락:**",
-            f"- 대상: {scenario_input.context.target_audience}",
-            f"- 시간: {scenario_input.context.duration}",
-            f"- 환경: {scenario_input.context.learning_environment}",
+            "Please generate an ADDIE instructional design output that fits the following scenario.\n",
+            "## Scenario Information",
+            f"**Title:** {scenario_input.title}",
+            f"**Scenario ID:** {scenario_input.scenario_id}",
+            f"\n**Learning Context:**",
+            f"- Target audience: {scenario_input.context.target_audience}",
+            f"- Duration: {scenario_input.context.duration}",
+            f"- Environment: {scenario_input.context.learning_environment}",
         ]
 
         if scenario_input.context.prior_knowledge:
-            parts.append(f"- 사전지식: {scenario_input.context.prior_knowledge}")
+            parts.append(f"- Prior knowledge: {scenario_input.context.prior_knowledge}")
 
         if scenario_input.context.class_size:
-            parts.append(f"- 학습자 수: {scenario_input.context.class_size}명")
+            parts.append(f"- Class size: {scenario_input.context.class_size} learners")
 
-        parts.append(f"\n**학습 목표:**")
+        parts.append(f"\n**Learning Goals:**")
         for goal in scenario_input.learning_goals:
             parts.append(f"- {goal}")
 
         if scenario_input.constraints:
-            parts.append("\n**제약 조건:**")
+            parts.append("\n**Constraints:**")
             if scenario_input.constraints.budget:
-                parts.append(f"- 예산: {scenario_input.constraints.budget}")
+                parts.append(f"- Budget: {scenario_input.constraints.budget}")
             if scenario_input.constraints.resources:
-                parts.append(f"- 사용 가능 자원: {', '.join(scenario_input.constraints.resources)}")
+                parts.append(f"- Available resources: {', '.join(scenario_input.constraints.resources)}")
             if scenario_input.constraints.accessibility:
-                parts.append(f"- 접근성: {', '.join(scenario_input.constraints.accessibility)}")
+                parts.append(f"- Accessibility: {', '.join(scenario_input.constraints.accessibility)}")
 
         # 학습자 프로필
         parts.append("\n" + learner_profile.skill_tree.to_prompt_context())
 
-        parts.append("\n위 정보를 바탕으로 완전한 ADDIE 산출물을 생성해주세요.")
+        parts.append("\nBased on the information above, please generate a complete ADDIE output.")
 
         return "\n".join(parts)
 
@@ -1299,9 +1299,9 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
         for i, obj in enumerate(design_data.get("learning_objectives", [])):
             objectives.append(LearningObjective(
                 id=f"OBJ-{i+1:02d}",
-                level=obj.get("level", "이해"),
+                level=obj.get("level", "Understand"),
                 statement=obj.get("statement", ""),
-                bloom_verb=obj.get("bloom_verb", "설명하다"),
+                bloom_verb=obj.get("bloom_verb", "explain"),
                 measurable=obj.get("measurable", True),
             ))
 
@@ -1386,7 +1386,7 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
 
             # Fallback: 프레젠테이션인데 slide_contents가 없으면 자동 생성
             mat_type = mat.get("type", "").lower()
-            if not slide_contents and ("프레젠테이션" in mat_type or "슬라이드" in mat_type or "presentation" in mat_type):
+            if not slide_contents and ("presentation" in mat_type or "slide" in mat_type or "presentation" in mat_type):
                 slide_contents = self._generate_fallback_slides(modules, scenario_input, objectives)
 
             # slides/pages가 숫자 문자열인 경우 정수로 변환
@@ -1422,9 +1422,9 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
             fallback_slides = self._generate_fallback_slides(modules, scenario_input, objectives)
             if fallback_slides:
                 materials.append(Material(
-                    type="프레젠테이션",
-                    title="교육 슬라이드",
-                    description="모듈 정보 기반 자동 생성 슬라이드",
+                    type="Presentation",
+                    title="Training Slides",
+                    description="Slides auto-generated from module information",
                     slides=len(fallback_slides),
                     slide_contents=fallback_slides,
                 ))
@@ -1440,7 +1440,7 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
         # Implementation
         impl_data = data.get("implementation", {})
         implementation = Implementation(
-            delivery_method=impl_data.get("delivery_method", "대면 교육"),
+            delivery_method=impl_data.get("delivery_method", "In-person training"),
             facilitator_guide=impl_data.get("facilitator_guide"),
             learner_guide=impl_data.get("learner_guide"),
             technical_requirements=impl_data.get("technical_requirements", []),
@@ -1535,9 +1535,9 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
         # 도입 슬라이드
         slide_contents.append(SlideContent(
             slide_number=slide_num,
-            title="교육 소개",
-            bullet_points=["환영 인사", "교육 목표", "일정 안내"],
-            speaker_notes="참가자들을 환영하며 교육 목표를 명확히 전달합니다.",
+            title="Training Introduction",
+            bullet_points=["Welcome", "Training objectives", "Schedule overview"],
+            speaker_notes="Welcome the participants and clearly convey the training objectives.",
         ))
         slide_num += 1
 
@@ -1545,54 +1545,54 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
         if scenario_input.learning_goals:
             slide_contents.append(SlideContent(
                 slide_number=slide_num,
-                title="학습 목표",
+                title="Learning Objectives",
                 bullet_points=scenario_input.learning_goals[:5],
-                speaker_notes="오늘 학습을 통해 달성할 목표들을 설명합니다.",
+                speaker_notes="Explain the objectives to be achieved through today's learning.",
             ))
             slide_num += 1
 
         # 모듈별 슬라이드 생성
         for module in modules:
-            module_title = module.title if module.title else "학습 모듈"
+            module_title = module.title if module.title else "Learning Module"
 
             # 모듈 시작 슬라이드 - objective ID를 실제 statement로 변환
             raw_objectives = module.objectives[:3] if module.objectives else []
-            resolved_objectives = [resolve_objective(obj) for obj in raw_objectives] if raw_objectives else ["학습 목표", "주요 내용"]
+            resolved_objectives = [resolve_objective(obj) for obj in raw_objectives] if raw_objectives else ["Learning objectives", "Key content"]
 
-            bullet_points = resolved_objectives + [f"예상 소요 시간: {module.duration}"] if module.duration else resolved_objectives
+            bullet_points = resolved_objectives + [f"Estimated duration: {module.duration}"] if module.duration else resolved_objectives
             slide_contents.append(SlideContent(
                 slide_number=slide_num,
                 title=module_title,
                 bullet_points=bullet_points,
-                speaker_notes=f"{module_title}의 학습 목표와 개요를 설명합니다.",
+                speaker_notes=f"Explain the learning objectives and overview of {module_title}.",
             ))
             slide_num += 1
 
             # 활동별 슬라이드 (최대 3개)
             activities = module.activities if module.activities else []
             for activity in activities[:3]:
-                activity_name = activity.activity if activity.activity else "학습 활동"
+                activity_name = activity.activity if activity.activity else "Learning Activity"
                 description = activity.description if activity.description else ""
-                bullet_points = [description] if description else ["활동 설명"]
+                bullet_points = [description] if description else ["Activity description"]
 
                 # 자원 정보 추가
                 if activity.resources:
-                    bullet_points.extend([f"자원: {r}" for r in activity.resources[:2]])
+                    bullet_points.extend([f"Resource: {r}" for r in activity.resources[:2]])
 
                 slide_contents.append(SlideContent(
                     slide_number=slide_num,
                     title=activity_name,
                     bullet_points=bullet_points,
-                    speaker_notes=f"{activity_name} 진행 방법을 안내합니다.",
+                    speaker_notes=f"Explain how to carry out {activity_name}.",
                 ))
                 slide_num += 1
 
         # 마무리 슬라이드
         slide_contents.append(SlideContent(
             slide_number=slide_num,
-            title="정리 및 Q&A",
-            bullet_points=["오늘 학습 내용 요약", "핵심 포인트 정리", "질의응답"],
-            speaker_notes="핵심 내용을 요약하고 질문을 받습니다.",
+            title="Wrap-up and Q&A",
+            bullet_points=["Summary of today's learning content", "Recap of key points", "Q&A"],
+            speaker_notes="Summarize the key content and take questions.",
         ))
 
         return slide_contents
@@ -1618,9 +1618,9 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
                 learning_objectives=[
                     LearningObjective(
                         id="OBJ-01",
-                        level="이해",
+                        level="Understand",
                         statement=scenario_input.learning_goals[0] if scenario_input.learning_goals else "",
-                        bloom_verb="설명하다",
+                        bloom_verb="explain",
                     )
                 ],
                 assessment_plan=AssessmentPlan(),
@@ -1632,7 +1632,7 @@ Design의 learning_objectives ID를 modules의 objectives에 연결하세요."""
                 ),
             ),
             implementation=Implementation(
-                delivery_method="대면 교육",
+                delivery_method="In-person training",
             ),
             evaluation=Evaluation(),
         )
