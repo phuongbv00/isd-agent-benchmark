@@ -4,14 +4,23 @@ Uses only the offline pieces: the TF-IDF char-ngram encoder and the
 Korean/English Bloom verb lexicon. No network, no LLM.
 """
 
+import hashlib
+
+import pytest
+
 from isd_evaluator.metrics.alignment import (
     AlignmentEvaluator,
     LexiconBloomClassifier,
+    OpenAIAPIEncoder,
     TfidfCharNgramEncoder,
+    _EmbeddingCache,
     extract_activities,
     extract_assessment_items,
+    extract_declared_links,
+    extract_evaluation_texts,
     extract_objectives,
     normalize_declared_level,
+    reaggregate,
 )
 
 # ---------------------------------------------------------------------------
@@ -104,12 +113,13 @@ def evaluate(output, scenario=SCENARIO):
 
 def assert_unit_interval(score):
     values = [
+        score.objective_assessment_alignment,
+        score.objective_activity_alignment,
+        score.objective_evaluation_alignment,
+        score.objective_cognitive_congruence,
         score.porter_mean,
-        score.webb_range,
         score.webb_bloom_consistency,
-        score.embedding_coverage,
-        score.embedding_precision,
-        score.composite,
+        score.assessment_precision,
         *score.porter.values(),
     ]
     for value in values:
@@ -124,21 +134,15 @@ def assert_unit_interval(score):
 
 class TestAlignedVsMisaligned:
     def test_aligned_scores_higher(self):
+        # Primary endpoint: continuous assessment alignment (mean-max cosine).
         aligned = evaluate(ALIGNED_OUTPUT)
         misaligned = evaluate(MISALIGNED_OUTPUT)
-        assert aligned.composite > misaligned.composite + 0.15
+        assert (aligned.objective_assessment_alignment
+                > misaligned.objective_assessment_alignment)
 
     def test_all_values_in_unit_interval(self):
         assert_unit_interval(evaluate(ALIGNED_OUTPUT))
         assert_unit_interval(evaluate(MISALIGNED_OUTPUT))
-
-    def test_webb_range_full_when_every_objective_assessed(self):
-        aligned = evaluate(ALIGNED_OUTPUT)
-        assert aligned.webb_range == 1.0
-
-    def test_webb_range_drops_for_off_topic_items(self):
-        misaligned = evaluate(MISALIGNED_OUTPUT)
-        assert misaligned.webb_range < 1.0
 
     def test_bloom_consistency_contrast(self):
         aligned = evaluate(ALIGNED_OUTPUT)
@@ -148,11 +152,6 @@ class TestAlignedVsMisaligned:
         assert aligned.webb_bloom_consistency == 1.0
         assert misaligned.webb_bloom_consistency is not None
         assert misaligned.webb_bloom_consistency < aligned.webb_bloom_consistency
-
-    def test_coverage_contrast(self):
-        aligned = evaluate(ALIGNED_OUTPUT)
-        misaligned = evaluate(MISALIGNED_OUTPUT)
-        assert aligned.embedding_coverage > misaligned.embedding_coverage
 
     def test_porter_contrast(self):
         aligned = evaluate(ALIGNED_OUTPUT)
@@ -167,8 +166,127 @@ class TestAlignedVsMisaligned:
         assert len(per_objective) == 3
         for entry in per_objective:
             assert entry["best_item"] is not None
-            assert entry["matched"] is True
             assert entry["best_similarity"] > 0
+            assert entry["best_activity"] is not None
+            assert entry["best_activity_similarity"] > 0
+            assert entry["best_evaluation"] is not None
+            assert entry["cognitively_congruent"] is True
+            # No threshold-based booleans anymore.
+            assert "matched" not in entry
+            assert "fully_aligned" not in entry
+
+
+# ---------------------------------------------------------------------------
+# Objective-level endpoints (continuous, threshold-free)
+# ---------------------------------------------------------------------------
+
+
+class TestObjectiveEndpoints:
+    def test_no_threshold_attribute(self):
+        # The evaluator must carry no threshold at all.
+        assert not hasattr(AlignmentEvaluator(), "match_threshold")
+
+    def test_reaggregate_reproduces_endpoints(self):
+        # Re-aggregating a saved score from its stored per-objective signals
+        # must reproduce the endpoints exactly — no re-encoding needed for an
+        # objective-level metric-definition change.
+        score = evaluate(ALIGNED_OUTPUT).to_dict()
+        expected = {k: score[k] for k in (
+            "objective_assessment_alignment", "objective_activity_alignment",
+            "objective_evaluation_alignment", "objective_cognitive_congruence")}
+        # Corrupt the top-level endpoints; reaggregate must restore them.
+        for k in expected:
+            score[k] = -1.0
+        score["objective_measurability"] = 0.5  # a since-removed criterion
+        reaggregate(score)
+        for k, v in expected.items():
+            assert score[k] == v
+        assert "objective_measurability" not in score  # stale key dropped
+
+    def test_alignment_endpoints_are_continuous_means(self):
+        # Each endpoint equals the mean over objectives of the recorded
+        # best-match similarity — no thresholding.
+        score = evaluate(ALIGNED_OUTPUT)
+        objs = score.details["objectives"]
+        exp_asm = sum(o["best_similarity"] for o in objs) / len(objs)
+        exp_act = sum(o["best_activity_similarity"] for o in objs) / len(objs)
+        assert abs(score.objective_assessment_alignment - exp_asm) < 1e-9
+        assert abs(score.objective_activity_alignment - exp_act) < 1e-9
+        # Continuous: not pinned to 0/1.
+        assert 0.0 < score.objective_assessment_alignment < 1.0
+
+    def test_assessment_alignment_contrast(self):
+        aligned = evaluate(ALIGNED_OUTPUT)
+        misaligned = evaluate(MISALIGNED_OUTPUT)
+        assert (aligned.objective_assessment_alignment
+                > misaligned.objective_assessment_alignment)
+        assert (aligned.objective_activity_alignment
+                > misaligned.objective_activity_alignment)
+
+    def test_cognitive_congruence_contrast(self):
+        aligned = evaluate(ALIGNED_OUTPUT)
+        misaligned = evaluate(MISALIGNED_OUTPUT)
+        # Misaligned items sit at Remember level against higher objectives.
+        assert aligned.objective_cognitive_congruence == 1.0
+        congruence = misaligned.objective_cognitive_congruence
+        assert congruence is None or congruence < 1.0
+
+    def test_no_activities_zeroes_activity_alignment(self):
+        output = {
+            "design": {
+                "learning_objectives":
+                    ALIGNED_OUTPUT["design"]["learning_objectives"]
+            },
+            "evaluation": ALIGNED_OUTPUT["evaluation"],
+        }
+        score = evaluate(output)
+        assert score.objective_activity_alignment == 0.0
+        assert any("no activities" in note for note in score.notes)
+
+    def test_no_evaluation_zeroes_evaluation_alignment(self):
+        output = {
+            "design": ALIGNED_OUTPUT["design"],
+            "development": {
+                "assessment_tools": [
+                    {"item_id": f"A-{i}", "question": q["question"]}
+                    for i, q in enumerate(ALIGNED_OUTPUT["evaluation"]["quiz_items"])
+                ]
+            },
+        }
+        score = evaluate(output)
+        assert score.objective_assessment_alignment > 0.0
+        assert score.objective_evaluation_alignment == 0.0
+        assert any("no evaluation texts" in note for note in score.notes)
+
+
+# ---------------------------------------------------------------------------
+# Language and validation-evidence layers
+# ---------------------------------------------------------------------------
+
+
+class TestLanguageAndValidation:
+    def test_declared_link_agreement(self):
+        output = {
+            "design": ALIGNED_OUTPUT["design"],
+            "development": {
+                "assessment_tools": [
+                    {"item_id": "A-001", "aligned_objective": "LO-001",
+                     "question": "변수와 자료형의 개념과 차이를 설명하시오"},
+                    {"item_id": "A-002", "aligned_objective": "LO-002",
+                     "question": "조건문과 반복문을 활용하여 짝수 합을 구하는 프로그램을 구현하시오"},
+                ]
+            },
+            "evaluation": ALIGNED_OUTPUT["evaluation"],
+        }
+        assert len(extract_declared_links(output)) == 2
+        score = evaluate(output)
+        validation = score.details["validation"]
+        assert validation["declared_links_checked"] == 2
+        assert validation["declared_link_agreement"] == 1.0
+
+    def test_no_declared_links_is_undefined(self):
+        score = evaluate(ALIGNED_OUTPUT)
+        assert score.details["validation"]["declared_link_agreement"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -179,21 +297,22 @@ class TestAlignedVsMisaligned:
 class TestEdgeCases:
     def test_empty_output(self):
         score = evaluate({})
-        assert score.composite == 0.0
+        assert score.objective_assessment_alignment == 0.0
         assert score.counts["objectives"] == 0
         assert any("no learning objectives" in note for note in score.notes)
 
     def test_no_objectives(self):
         score = evaluate({"evaluation": ALIGNED_OUTPUT["evaluation"]})
-        assert score.composite == 0.0
+        assert score.objective_assessment_alignment == 0.0
+        assert score.objective_activity_alignment == 0.0
+        assert score.objective_evaluation_alignment == 0.0
         assert_unit_interval(score)
 
     def test_objectives_but_no_items(self):
         output = {"design": {"learning_objectives":
                              ALIGNED_OUTPUT["design"]["learning_objectives"]}}
         score = evaluate(output)
-        assert score.webb_range == 0.0
-        assert score.embedding_coverage == 0.0
+        assert score.objective_assessment_alignment == 0.0
         assert score.porter["assessment"] == 0.0
         assert_unit_interval(score)
 
@@ -206,7 +325,8 @@ class TestEdgeCases:
         wrapped = {"addie_output": ALIGNED_OUTPUT}
         direct = evaluate(ALIGNED_OUTPUT)
         via_wrapper = evaluate(wrapped)
-        assert via_wrapper.composite == direct.composite
+        assert (via_wrapper.objective_assessment_alignment
+                == direct.objective_assessment_alignment)
 
 
 # ---------------------------------------------------------------------------
@@ -333,6 +453,103 @@ class TestExtraction:
         }
         assert extract_assessment_items(output) == ["퀴즈로 x 개념 확인"]
 
+    def test_assessment_plan_object_layout_observed_in_baselines(self):
+        output = {
+            "design": {
+                "assessment_plan": {
+                    "diagnostic": [
+                        {
+                            "method": "Pre-course EMR evaluation",
+                            "description": "Assess prior navigation knowledge.",
+                        }
+                    ],
+                    "formative": [
+                        {
+                            "description": "Review the draft protocol with peers.",
+                        }
+                    ],
+                    "summative": [
+                        {
+                            "summative1": "Present the final learning portfolio.",
+                            "summative2": "Defend the selected design decisions.",
+                        }
+                    ],
+                    "assessment_criteria": [
+                        "Accuracy of the protocol and supporting rationale."
+                    ],
+                }
+            }
+        }
+        assert extract_assessment_items(output) == [
+            "Pre-course EMR evaluation Assess prior navigation knowledge.",
+            "Review the draft protocol with peers.",
+            "Present the final learning portfolio. "
+            "Defend the selected design decisions.",
+            "Accuracy of the protocol and supporting rationale.",
+        ]
+
+    def test_strategy_activities_layout_observed_in_agents(self):
+        output = {
+            "design": {
+                "instructional_strategies": {
+                    "methods": ["Case study", "Peer review"],
+                    "activities": [
+                        "Analyze a failed project.",
+                        "Review a peer's protocol.",
+                    ],
+                    "rationale": "Gagné's 9 Events",
+                }
+            }
+        }
+        assert extract_activities(output) == [
+            "Analyze a failed project.",
+            "Review a peer's protocol.",
+        ]
+
+    def test_pilot_data_collection_layout_observed_in_baselines(self):
+        output = {
+            "evaluation": {
+                "pilot_data_collection": {
+                    "collection_methods": [
+                        {
+                            "method": "Test/quiz",
+                            "timing": "Before and after training",
+                            "tool": "LMS",
+                        }
+                    ],
+                    "instruments": [
+                        {"name": "Pre-post test", "type": "Knowledge assessment"}
+                    ],
+                    "data_types": {
+                        "quantitative": [
+                            {
+                                "type": "Post-test scores",
+                                "purpose": "Learning outcome measurement",
+                                "source": "Learners",
+                            }
+                        ]
+                    },
+                    "timeline": [
+                        {
+                            "phase": "Immediately after",
+                            "activities": ["Post-test", "Satisfaction survey"],
+                        }
+                    ],
+                    "data_management": {
+                        "storage": "Secure storage",
+                        "retention_period": "3 years",
+                    },
+                }
+            }
+        }
+        assert extract_evaluation_texts(output) == [
+            "Test/quiz Before and after training LMS",
+            "Pre-post test Knowledge assessment",
+            "Post-test scores Learning outcome measurement Learners",
+            "Post-test",
+            "Satisfaction survey",
+        ]
+
     def test_sanity_report_agreement(self):
         score = evaluate(ALIGNED_OUTPUT)
         sanity = score.details["sanity"]
@@ -340,3 +557,171 @@ class TestExtraction:
         assert sanity["n_declared"] == 3
         # Statements were written so lexicon level == declared level.
         assert sanity["lexicon_vs_declared_agreement"] == 1.0
+
+
+# ---------------------------------------------------------------------------
+# Default-configuration guards (library vs scorer script)
+# ---------------------------------------------------------------------------
+
+
+class TestDefaults:
+    def test_library_defaults_are_offline(self):
+        evaluator = AlignmentEvaluator()
+        assert isinstance(evaluator.encoder, TfidfCharNgramEncoder)
+        assert isinstance(evaluator.bloom, LexiconBloomClassifier)
+        assert not hasattr(evaluator, "match_threshold")  # threshold-free
+
+    def test_scorer_defaults_match_protocol(self):
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        script = (Path(__file__).resolve().parents[2] / "scripts"
+                  / "alignmentgraph-isd-bench" / "06_score_alignment.py")
+        spec = importlib.util.spec_from_file_location("score_alignment", script)
+        module = importlib.util.module_from_spec(spec)
+        # Register before exec: @dataclass resolves annotations through
+        # sys.modules[cls.__module__], which is None for an unregistered module.
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        assert module.DEFAULT_EMBED_MODEL == "nvidia/llama-embed-nemotron-8b"
+        assert "composite" not in module.COMPONENTS
+        assert module.COMPONENTS[0] == "objective_assessment_alignment"
+        assert "objective_evaluation_alignment" in module.COMPONENTS
+        # the primary encoder owns the unsuffixed artifact pooling reads
+        assert module.ENCODER_PRESETS[module.PRIMARY_ENCODER][2] == ""
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible API encoder (fake transport — no network)
+# ---------------------------------------------------------------------------
+
+
+def _fake_api_encoder(tmp_path, calls, base_urls="http://localhost:1/v1",
+                      revision=None):
+    encoder = OpenAIAPIEncoder(
+        base_urls=base_urls,
+        model="fake-embed",
+        cache_path=tmp_path / "embed_cache.sqlite",
+        batch_size=2,
+        revision=revision,
+    )
+
+    def fake_embed(texts, client=None):
+        calls.append((client, list(texts)))
+        return [[float(len(t)), 1.0, 0.5] for t in texts]
+
+    encoder._embed_batch = fake_embed
+    return encoder
+
+
+class TestOpenAIAPIEncoder:
+    def test_batching_and_shapes(self, tmp_path):
+        calls = []
+        encoder = _fake_api_encoder(tmp_path, calls)
+        vectors = encoder.encode(["a", "bb", "ccc"])
+        assert [len(v) for v in vectors] == [3, 3, 3]
+        assert vectors[1][0] == 2.0
+        assert len(calls) == 2  # batch_size=2 -> two API batches
+
+    def test_empty_text_zero_vector_without_call(self, tmp_path):
+        calls = []
+        encoder = _fake_api_encoder(tmp_path, calls)
+        vectors = encoder.encode(["hello", "   "])
+        assert all(x == 0.0 for x in vectors[1])
+        assert [texts for _, texts in calls] == [["hello"]]
+
+    def test_cache_hit_skips_api(self, tmp_path):
+        calls = []
+        encoder = _fake_api_encoder(tmp_path, calls)
+        first = encoder.encode(["same text", "other"])
+        assert len(calls) == 1
+        second = encoder.encode(["same text", "other"])
+        assert len(calls) == 1  # everything served from cache
+        assert first == second
+
+    def test_multi_endpoint_load_balances(self, tmp_path):
+        calls = []
+        encoder = _fake_api_encoder(
+            tmp_path, calls,
+            base_urls=["http://pod-a/v1", "http://pod-b/v1"],
+        )
+        # 6 texts / batch_size 2 = 3 batches across 2 endpoints (round-robin).
+        vectors = encoder.encode(["aa", "bb", "cc", "dd", "ee", "ff"])
+        assert [len(v) for v in vectors] == [3] * 6
+        assert len(encoder._clients) == 2
+        clients_used = {id(c) for c, _ in calls}
+        assert len(clients_used) == 2  # both pods received batches
+        # every text embedded exactly once, order preserved
+        assert sorted(t for _, ts in calls for t in ts) == \
+            ["aa", "bb", "cc", "dd", "ee", "ff"]
+
+    def test_single_url_string_still_accepted(self, tmp_path):
+        encoder = _fake_api_encoder(tmp_path, [], base_urls="http://one/v1")
+        assert len(encoder._clients) == 1
+
+    def test_cache_persists_across_instances(self, tmp_path):
+        calls = []
+        encoder = _fake_api_encoder(tmp_path, calls)
+        first = encoder.encode(["persisted"])
+        fresh = OpenAIAPIEncoder(
+            base_urls="http://localhost:1/v1",
+            model="fake-embed",
+            cache_path=tmp_path / "embed_cache.sqlite",
+        )
+
+        def boom(texts, client=None):  # pragma: no cover - must not be reached
+            raise AssertionError("cache miss hit the API")
+
+        fresh._embed_batch = boom
+        assert fresh.encode(["persisted"]) == first
+
+    def test_revision_is_part_of_the_cache_key(self, tmp_path):
+        """A revision bump must re-embed, not serve the old weights' vectors.
+
+        The model id does not pin weights, so without the revision in the key
+        a re-score after an upstream update would silently reuse the previous
+        vectors while the score file claims the new revision.
+        """
+        old_calls, new_calls = [], []
+        old = _fake_api_encoder(tmp_path, old_calls, revision="rev-a")
+        old.encode(["shared text"])
+        assert len(old_calls) == 1
+
+        new = _fake_api_encoder(tmp_path, new_calls, revision="rev-b")
+        new.encode(["shared text"])
+        assert len(new_calls) == 1, "rev-b wrongly served rev-a's cached vector"
+
+        again = _fake_api_encoder(tmp_path, [], revision="rev-a")
+
+        def boom(texts, client=None):  # pragma: no cover - must not be reached
+            raise AssertionError("rev-a lost its own cache entry")
+
+        again._embed_batch = boom
+        again.encode(["shared text"])
+
+    def test_unpinned_revision_keeps_the_legacy_cache_key(self, tmp_path):
+        """Existing caches (written before revisions existed) stay valid."""
+        legacy_key = hashlib.sha1(b"fake-embed\x00shared text").hexdigest()
+        assert _EmbeddingCache.key("fake-embed", "shared text") == legacy_key
+        assert _EmbeddingCache.key("fake-embed", "shared text", None) == legacy_key
+
+    def test_cache_only_refuses_to_call_the_endpoint(self, tmp_path):
+        calls = []
+        warm = _fake_api_encoder(tmp_path, calls)
+        warm.encode(["already cached"])
+
+        offline = OpenAIAPIEncoder(
+            base_urls="http://embed-cache-only.invalid/v1",
+            model="fake-embed",
+            cache_path=tmp_path / "embed_cache.sqlite",
+            cache_only=True,
+        )
+
+        def boom(texts, client=None):  # pragma: no cover - must not be reached
+            raise AssertionError("cache_only still called the API")
+
+        offline._embed_batch = boom
+        assert offline.encode(["already cached"]) == warm.encode(["already cached"])
+        with pytest.raises(RuntimeError, match="not in the embedding cache"):
+            offline.encode(["never seen before"])

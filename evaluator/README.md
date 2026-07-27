@@ -69,19 +69,30 @@ LLM이 일관된 평가 기준을 적용할 수 있도록 지원합니다.
 텍스트만 읽습니다(에이전트가 자기 신고한 `objective_id`/`level` 필드는
 채점에 쓰지 않음). 구성 요소는 모두 [0, 1]:
 
+**매칭 임계값(threshold)은 어디에도 없습니다** — 모든 지표는 연속형이며,
+합성 스칼라(composite)도 없습니다. 각 지표를 따로 보고합니다.
+
 | 구성 요소 | 설명 |
 |-----------|------|
+| `objective_assessment_alignment` (**주 지표**) | objective별 임의 평가항목까지의 max cosine 평균 (연속형) |
+| `objective_activity_alignment` / `objective_evaluation_alignment` | 같은 공식, 활동 / 총괄평가 텍스트 대상 |
+| `objective_cognitive_congruence` | best 평가항목(argmax)의 Bloom level ≥ objective level 비율 |
 | Porter Alignment Index | topic × Bloom-level 분포 행렬 일치도 (Porter 2002) |
-| Webb Range-of-Knowledge | objective당 매칭 평가항목 존재 비율 (Webb 1997/1999) |
-| Webb Bloom-Consistency | 매칭 항목의 Bloom level ≥ objective level 비율 |
-| Embedding coverage / precision | objective↔item 상호 최대 cosine 유사도 (traceability) |
+| Webb Bloom-Consistency | 매칭 항목의 Bloom level ≥ objective level 비율 (item-centric) |
+| `assessment_precision` | 주 지표의 역방향 (평가항목 → objective; traceability) |
 
-기본 텍스트 인코더는 순수 파이썬 character n-gram TF-IDF이며,
-`SentenceTransformerEncoder`(LaBSE 등)로 교체 가능합니다. Bloom 분류는
-한/영 동사 lexicon 기반이고, `scripts/train_bloom_classifier.py`로 학습한
-transformer 체크포인트로 대체할 수 있습니다(`evaluator/scripts/README.md`).
+cosine은 **rectified** 입니다 — `max(0, cos)`, 상한 1.0으로 clip. 이는 임계값이
+아니라 *척도* 선택입니다: 음의 유사도는 정렬(alignment)로서 의미가 없어 0 바닥으로
+모으고, 모든 지표를 공통 [0, 1] 범위에 둡니다. 두 텍스트가 "매칭되는지"를 정하는
+상수는 존재하지 않습니다.
 
-벤치마크 레벨 실행: 상위 저장소의 `scripts/alignmentgraph-isd-bench/7_score_alignment.py`가 run dir
+프로토콜의 기본 텍스트 인코더는 OpenAI 호환 `/v1/embeddings` 엔드포인트를 쓰는
+`OpenAIAPIEncoder`(`nvidia/llama-embed-nemotron-8b`)이며, 순수 파이썬 character
+n-gram TF-IDF(`TfidfCharNgramEncoder`)는 네트워크가 필요 없는 어휘적 하한선
+(sensitivity 축)입니다. `SentenceTransformerEncoder`로도 교체 가능합니다.
+Bloom 분류는 한/영 동사 lexicon 기반입니다(측정 과정에 LLM 호출 없음).
+
+벤치마크 레벨 실행: 상위 저장소의 `scripts/alignmentgraph-isd-bench/06_score_alignment.py`가 run dir
 전체를 채점해 시나리오별 `alignment_scores.json`을 남깁니다. 지표 정의
 전문은 모노레포의 `docs/benchmark_guides.md` 부록 A.3 참조.
 
