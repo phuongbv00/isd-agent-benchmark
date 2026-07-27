@@ -11,7 +11,7 @@ DATASET="${DATASET:-test}"
 # Optional run tag(s) appended to the results dir name -- used by the tune
 # loop on train_30 (guide section 5) to separate tune iterations. Accepts a
 # comma- (or space-) separated list, run SEQUENTIALLY inside each slot's tmux
-# session, same var and mechanism as RUN_TAGS in 5_run_ladder.sh:
+# session, same var and mechanism as RUN_TAGS in 02_run_ladder.sh:
 #   RUN_TAGS=tune1                   -> one tagged run
 #   RUN_TAGS=tune1,tune2,tune3       -> three sequential runs per slot
 # Empty (default) -> single untagged run.
@@ -42,7 +42,7 @@ slot_upper() {
 # child tmux sessions inherit them.
 # NOTE: no associative arrays here -- macOS ships bash 3.2 as /bin/bash (no
 # `declare -A`), which silently degrades to a broken integer-indexed array
-# (see 5_run_ladder.sh, which has `set -u` and crashes outright on this).
+# (see 02_run_ladder.sh, which has `set -u` and crashes outright on this).
 _exported_keys_list=""
 register_key_envs() {
     local IFS=','
@@ -97,6 +97,20 @@ for slot in $_AGENT_MODEL_SLOTS_LIST; do
     tmux kill-session -t "bench-${slot}" 2>/dev/null
 done
 
+# A slot may be served by SEVERAL pods of the same model: set
+# <SLOT>_AGENT_MODEL_BASE_URLS to a comma-separated list and the agents
+# round-robin across them (shared/llm/config.py::resolve_base_url). Fold the
+# plural into the singular so the invocation below stays unchanged, and strip
+# whitespace — the value is interpolated unquoted into the tmux command string,
+# so a space would split it into two arguments.
+for slot in $_AGENT_MODEL_SLOTS_LIST; do
+    upper=$(slot_upper "$slot")
+    plural_var="${upper}_AGENT_MODEL_BASE_URLS"
+    single_var="${upper}_AGENT_MODEL_BASE_URL"
+    _urls="${!plural_var:-${!single_var:-}}"
+    printf -v "$single_var" '%s' "${_urls//[[:space:]]/}"
+done
+
 i=0
 for slot in $_AGENT_MODEL_SLOTS_LIST; do
     i=$((i + 1))
@@ -114,7 +128,7 @@ for slot in $_AGENT_MODEL_SLOTS_LIST; do
     echo "[${i}/${NUM_SLOTS}] ${slot}: ${!name_var} (rate=$slot_rate)..."
 
     if [[ -n "$_RUN_TAGS_LIST" ]]; then
-        # Sequential tagged runs inside the session (mirrors 5_run_ladder.sh):
+        # Sequential tagged runs inside the session (mirrors 02_run_ladder.sh):
         # \$tag expands per-iteration in the child shell, not at launch time.
         tmux new-session -d -s "$session" \
 "cd $(pwd) || exit 1; source .env 2>/dev/null || true; \

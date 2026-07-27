@@ -8,7 +8,7 @@ This script does the remaining mechanical part: list the live pods, match
 each one to a ladder slot (by start command / pod name), confirm the served
 model against the pod's own /v1/models, and REWRITE the managed block at the
 end of the repo's .env file (between the >>>/<<< markers below) with the
-current env-quads -- so `source .env` (which 5_run_ladder.sh already does)
+current env-quads -- so `source .env` (which 02_run_ladder.sh already does)
 picks everything up. Re-running replaces the block, never duplicates it;
 nothing outside the markers is touched.
 
@@ -22,19 +22,20 @@ Usage:
   python scripts/3_sync_runpod_pods_env.py            # sync pods -> .env block
   python scripts/3_sync_runpod_pods_env.py --dry-run  # print the block, write nothing
   source .env
-  ./scripts/alignmentgraph-isd-bench/5_run_ladder.sh
+  ./scripts/alignmentgraph-isd-bench/02_run_ladder.sh
 
 The managed block contains, per slot, the benchmark env-quad:
 
   QWEN2B_AGENT_MODEL_PROVIDER=runpod-vllm
-  QWEN2B_AGENT_MODEL_BASE_URL=https://<pod_id>-8000.proxy.runpod.net/v1
+  QWEN2B_AGENT_MODEL_BASE_URLS=https://<pod_id>-8000.proxy.runpod.net/v1
+    (comma-separated when several pods serve that slot -- agents round-robin)
   QWEN2B_AGENT_MODEL_NAME=Qwen/Qwen3.5-2B
   QWEN2B_AGENT_MODEL_API_KEY_ENVS=VLLM_API_KEY
 
 plus the three protective flags every ladder run must have (see
 ../docs/benchmark_guides.md, section 4.4, for the incidents that motivated them):
 
-  AGENT_MODEL_MAX_TOKENS_CAP=8096
+  AGENT_MODEL_MAX_TOKENS_CAP=8192
   AGENT_MODEL_STREAMING=1
   AGENT_MODEL_DISABLE_THINKING=1
 
@@ -75,7 +76,7 @@ SLOT_PATTERNS = [
 ]
 
 PROTECTIVE_FLAGS = [
-    "AGENT_MODEL_MAX_TOKENS_CAP=8096",
+    "AGENT_MODEL_MAX_TOKENS_CAP=8192",
     "AGENT_MODEL_STREAMING=1",
     "AGENT_MODEL_DISABLE_THINKING=1",
 ]
@@ -161,7 +162,7 @@ def main() -> None:
     data = _rest("/pods")
     pods = data if isinstance(data, list) else data.get("pods", [])
 
-    slots: dict[str, dict] = {}
+    slots: dict[str, list[dict]] = {}
     print(f"{len(pods)} pod(s) on the account:")
     for pod in pods:
         pod_id = pod.get("id", "?")
@@ -187,13 +188,9 @@ def main() -> None:
             print(f"           WARNING: could not confirm via {base_url}/models "
                   f"(pod booting? VLLM_API_KEY unset?) -- using {model_name!r} unverified",
                   file=sys.stderr)
-        if slot in slots:
-            print(f"           WARNING: multiple pods match {slot}; keeping the first "
-                  f"({slots[slot]['pod_id']}), ignoring {pod_id}", file=sys.stderr)
-            continue
         if status != "RUNNING":
             print(f"           WARNING: {slot} pod is {status}, not RUNNING", file=sys.stderr)
-        slots[slot] = {
+        entry = {
             "pod_id": pod_id,
             "pod_name": name,
             "status": status,
@@ -202,6 +199,22 @@ def main() -> None:
             "base_url": base_url,
             "gpu_type": (pod.get("machine") or {}).get("gpuTypeId") or pod.get("gpuTypeId"),
         }
+        if slot in slots:
+            # Several pods on one slot is a supported setup, not a mistake: the
+            # agents round-robin across them. They must serve the SAME model,
+            # or the runs silently mix two models under one label.
+            first = slots[slot][0]
+            if model_name and first["hf_model"] and model_name != first["hf_model"]:
+                print(f"ERROR: {slot} has pods serving DIFFERENT models "
+                      f"({first['hf_model']!r} on {first['pod_id']}, "
+                      f"{model_name!r} on {pod_id}). One model per slot.",
+                      file=sys.stderr)
+                sys.exit(1)
+            print(f"           note: {slot} now has {len(slots[slot]) + 1} pods "
+                  f"-- requests will round-robin across them")
+            slots[slot].append(entry)
+        else:
+            slots[slot] = [entry]
 
     missing = [s for s, _ in SLOT_PATTERNS if s not in slots]
     if missing:
@@ -213,13 +226,20 @@ def main() -> None:
         sys.exit(1)
 
     env_lines: list[str] = []
-    for slot, info in slots.items():
+    for slot, pods_for_slot in slots.items():
         upper = slot.upper().replace("-", "_")
+        head = pods_for_slot[0]
         env_lines += [
-            f"# {slot}: pod {info['pod_id']} ({info.get('gpu_type') or '?'}, {info['status']})",
+            f"# {slot}: " + ", ".join(
+                f"pod {p['pod_id']} ({p.get('gpu_type') or '?'}, {p['status']})"
+                for p in pods_for_slot
+            ),
             f"{upper}_AGENT_MODEL_PROVIDER=runpod-vllm",
-            f"{upper}_AGENT_MODEL_BASE_URL={info['base_url']}",
-            f"{upper}_AGENT_MODEL_NAME={info['hf_model']}",
+            # Plural even for one pod: one shape for the scripts to read, and
+            # adding a second pod later is then a pure data change.
+            f"{upper}_AGENT_MODEL_BASE_URLS="
+            + ",".join(p["base_url"] for p in pods_for_slot),
+            f"{upper}_AGENT_MODEL_NAME={head['hf_model']}",
             f"{upper}_AGENT_MODEL_API_KEY_ENVS=VLLM_API_KEY",
         ]
 
@@ -247,7 +267,7 @@ def main() -> None:
         _, _, post = rest.partition(BLOCK_END)
         outside = pre + post
     for line in outside.splitlines():
-        if re.match(r"\s*(export\s+)?QWEN\w*_AGENT_MODEL_BASE_URL=", line):
+        if re.match(r"\s*(export\s+)?QWEN\w*_AGENT_MODEL_BASE_URLS?=", line):
             print(f"WARNING: .env sets a QWEN base URL outside the managed block "
                   f"({line.split('=')[0].strip()}) -- the managed block at the end "
                   f"overrides it on source; consider removing the manual line.",
@@ -266,7 +286,7 @@ def main() -> None:
 
     print(f"\n{action} {ENV_PATH} ({len(slots)} slot(s))")
     print("\nsource .env")
-    print("./scripts/alignmentgraph-isd-bench/5_run_ladder.sh")
+    print("./scripts/alignmentgraph-isd-bench/02_run_ladder.sh")
 
 
 if __name__ == "__main__":

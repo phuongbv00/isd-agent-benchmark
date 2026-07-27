@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate paper figures (RQ1/RQ2 statistical charts) from pooled_ladder.json.
 
-Companion of scripts/alignmentgraph-isd-bench/8_gen_paper_tables.py — same stage of the pipeline, same
+Companion of scripts/alignmentgraph-isd-bench/09_gen_paper_tables.py — same stage of the pipeline, same
 input, but emits figures instead of tables. Writes every figure as both .pdf
 (vector, for LaTeX \\includegraphics) and .png (dpi 200, for quick preview)
 into results/generated/figures/ (benchmark-local; sync into the thesis paper
@@ -13,24 +13,25 @@ tree with docs/scripts/sync_generated.sh from the thesis repo root):
                           size with bootstrap 95% CI band, Holm-significance
                           markers, and the OLS delta trend slope
   fig_rq1_components      ADDIE vs Trajectory component means vs size
-  fig_rq2_ladder          alignment composite vs model size per agent
+  fig_rq2_ladder          objective-assessment alignment vs model size per agent
                           (RQ2 headline: does the gap widen as models shrink?)
   fig_rq2_components      heatmap agents x 5 alignment components per size
-  fig_rq2_vs_rq1_scatter  per-scenario alignment composite vs Total (judge),
+  fig_rq2_vs_rq1_scatter  per-scenario objective-assessment alignment vs Total (judge),
                           Spearman rho per size  [needs --runs-glob]
   fig_failure_rate        % scenarios with no scorable output per agent/size
                           (mean of runs, min-max whiskers)
-  fig_cost_quality        mean Total vs mean total tokens / execution time
+  fig_cost_quality        mean Total vs mean total tokens (execution time
+                          omitted — it reflects serving load, not the method)
 
 All figure text is English (Vietnamese captions live in the LaTeX source, as
 with the generated tables). Numbers come exclusively from pooled_ladder.json
 and the raw run dirs — nothing hand-typed.
 
 Usage:
-  python scripts/alignmentgraph-isd-bench/8_gen_paper_figures.py                       # pooled JSON only
-  python scripts/alignmentgraph-isd-bench/8_gen_paper_figures.py \
+  python scripts/alignmentgraph-isd-bench/10_gen_paper_figures.py                       # pooled JSON only
+  python scripts/alignmentgraph-isd-bench/10_gen_paper_figures.py \
       --runs-glob 'results/test_90_benchmark_*_r*'            # + scatter figure
-  python scripts/alignmentgraph-isd-bench/8_gen_paper_figures.py --demo                # synthetic layout test
+  python scripts/alignmentgraph-isd-bench/10_gen_paper_figures.py --demo                # synthetic layout test
 """
 
 from __future__ import annotations
@@ -62,7 +63,7 @@ BENCH_ROOT = Path(__file__).resolve().parents[2]   # isd-agent-benchmark/
 DEFAULT_POOLED = BENCH_ROOT / "results" / "pooled_ladder.json"
 DEFAULT_OUTDIR = BENCH_ROOT / "results" / "generated" / "figures"
 
-# Same identities as scripts/alignmentgraph-isd-bench/8_gen_paper_tables.py (kept in sync by hand).
+# Same identities as scripts/alignmentgraph-isd-bench/09_gen_paper_tables.py (kept in sync by hand).
 AGENT_DISPLAY = {
     "baseline": "Baseline",
     "eduplanner": "EduPlanner",
@@ -107,14 +108,14 @@ def point_marker(agent: str) -> str:
     hue (+ the olive dash on lines); shape only singles out the proposed."""
     return "D" if agent == PROPOSED else "o"
 
-# The 5 alignment components (order fixed; same set as 7_score_alignment.py
-# COMPONENTS minus the composite, which gets its own figure).
+# The five alignment criteria (assessment alignment gets its own
+# figure). Kept to five so the per-cell numbers stay legible; the Porter/Webb/
+# embedding descriptive indices live in stats_summary.md, not this heatmap.
 RQ2_COMPONENTS = [
-    ("porter_mean", "Porter"),
-    ("webb_range", "Webb range"),
-    ("webb_bloom_consistency", "Webb-Bloom"),
-    ("embedding_coverage", "Emb. coverage"),
-    ("embedding_precision", "Emb. precision"),
+    ("objective_assessment_alignment", "Assessment"),
+    ("objective_activity_alignment", "Activity"),
+    ("objective_evaluation_alignment", "Evaluation"),
+    ("objective_cognitive_congruence", "Cognitive"),
 ]
 
 plt.rcParams.update({
@@ -194,33 +195,14 @@ def sized_axis(ax, sizes: list[float], labels: list[str]) -> None:
 
 
 def spearman_rho(xs: list[float], ys: list[float]) -> float:
-    """Spearman rank correlation with average ranks for ties (stdlib only)."""
-    def ranks(vals: list[float]) -> list[float]:
-        order = sorted(range(len(vals)), key=lambda i: vals[i])
-        r = [0.0] * len(vals)
-        i = 0
-        while i < len(order):
-            j = i
-            while j + 1 < len(order) and vals[order[j + 1]] == vals[order[i]]:
-                j += 1
-            avg = (i + j) / 2 + 1
-            for k in range(i, j + 1):
-                r[order[k]] = avg
-            i = j + 1
-        return r
-    n = len(xs)
-    if n < 3:
-        return float("nan")
-    rx, ry = ranks(xs), ranks(ys)
-    mx, my = sum(rx) / n, sum(ry) / n
-    num = sum((a - mx) * (b - my) for a, b in zip(rx, ry))
-    den = math.sqrt(sum((a - mx) ** 2 for a in rx) * sum((b - my) ** 2 for b in ry))
-    return num / den if den else float("nan")
+    """Spearman rho — delegates to 07_pool_ladder_runs.py, the single home of
+    the statistics (which also uses it for the cross-encoder agreement)."""
+    return load_pool_module().spearman_rho(xs, ys)
 
 
 def load_pool_module():
-    """Import 7_pool_ladder_runs.py (digit-prefixed name) for its loaders."""
-    path = Path(__file__).resolve().with_name("7_pool_ladder_runs.py")
+    """Import 07_pool_ladder_runs.py (digit-prefixed name) for its loaders."""
+    path = Path(__file__).resolve().with_name("07_pool_ladder_runs.py")
     spec = importlib.util.spec_from_file_location("pool_ladder_runs", path)
     mod = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -343,6 +325,11 @@ def fig_rq2_ladder(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     align = pooled.get("alignment") or {}
     if not align.get("models"):
         return False
+    if not any(
+        "objective_assessment_alignment" in metrics
+        for agents in align["models"].values() for metrics in agents.values()
+    ):
+        return False  # legacy pooled input without the alignment endpoint
     models = [m for m in pooled["models"] if m["label"] in align["models"]]
     agents = agents_in(pooled)
     sizes = [size_of_label(m["label"]) for m in models]
@@ -352,14 +339,14 @@ def fig_rq2_ladder(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     for a in agents:
         ys, errs = [], []
         for m in models:
-            cell = align["models"][m["label"]].get(a, {}).get("composite", {})
+            cell = align["models"][m["label"]].get(a, {}).get("objective_assessment_alignment", {})
             ys.append(_nan(cell.get("mean")))
             n = cell.get("n_scenarios") or 0
             sd = _nan(cell.get("sd_across_scenarios"))
             errs.append(sd / math.sqrt(n) if n and not math.isnan(sd) else 0.0)
         ax.errorbar(sizes, ys, yerr=errs, capsize=2, elinewidth=0.8, **line_kw(a))
     sized_axis(ax, sizes, labels)
-    ax.set_ylabel("Alignment composite (0–1)")
+    ax.set_ylabel("Objective–assessment alignment (0–1)")
     ax.grid(axis="x", visible=False)
     ax.text(0.02, 0.02, "error bars: ±SEM across scenarios",
             transform=ax.transAxes, fontsize=6.5, color="#666666")
@@ -377,7 +364,8 @@ def fig_rq2_components(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     comp_keys = [k for k, _ in RQ2_COMPONENTS]
     comp_names = [n for _, n in RQ2_COMPONENTS]
 
-    fig, axes = plt.subplots(1, len(models), figsize=(7.0, 2.0 + 0.28 * len(agents)),
+    fig, axes = plt.subplots(1, len(models),
+                             figsize=(2.15 * len(models) + 1.4, 2.2 + 0.30 * len(agents)),
                              sharey=True)
     axes = [axes] if len(models) == 1 else list(axes)
     cmap = plt.get_cmap("Blues")
@@ -390,17 +378,17 @@ def fig_rq2_components(pooled: dict, outdir: Path, written: list[Path]) -> bool:
             for j, v in enumerate(row):
                 if math.isnan(v):
                     continue
-                ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=6,
-                        color="white" if v > 0.6 else "#333333")
+                ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=7.5,
+                        color="white" if v > 0.55 else "#333333")
         ax.set_title(f"Qwen3.5-{size_display(m['label'])}")
         ax.set_xticks(range(len(comp_names)))
-        ax.set_xticklabels(comp_names, rotation=40, ha="right", fontsize=6.5)
+        ax.set_xticklabels(comp_names, rotation=35, ha="right", fontsize=7.5)
         ax.grid(visible=False)
         ax.tick_params(length=0)
         for spine in ax.spines.values():
             spine.set_visible(False)
     axes[0].set_yticks(range(len(agents)))
-    axes[0].set_yticklabels([AGENT_DISPLAY.get(a, a) for a in agents], fontsize=7)
+    axes[0].set_yticklabels([AGENT_DISPLAY.get(a, a) for a in agents], fontsize=8)
     cbar = fig.colorbar(last_im, ax=axes, fraction=0.02, pad=0.02)
     cbar.ax.tick_params(labelsize=6.5)
     cbar.set_label("Component mean (0–1)", fontsize=7)
@@ -409,7 +397,7 @@ def fig_rq2_components(pooled: dict, outdir: Path, written: list[Path]) -> bool:
 
 
 def collect_scenario_pairs(pattern: str, agents: list[str]) -> dict[str, dict[str, list[tuple[float, float]]]]:
-    """label -> agent -> [(total_mean, composite_mean)] per scenario (mean of runs)."""
+    """label -> agent -> [(total_mean, align_mean)] per scenario (mean of runs)."""
     pool = load_pool_module()
     out: dict[str, dict[str, list[tuple[float, float]]]] = {}
     for label, dirs in pool.group_by_glob(pattern).items():
@@ -420,7 +408,7 @@ def collect_scenario_pairs(pattern: str, agents: list[str]) -> dict[str, dict[st
                 align = pool.extract_alignment_metrics(doc, agents) if doc else {}
                 for a in agents:
                     r = payload["rankings"].get(a) or {}
-                    t, c = r.get("total_score"), align.get(a, {}).get("composite")
+                    t, c = r.get("total_score"), align.get(a, {}).get("objective_assessment_alignment")
                     if isinstance(t, (int, float)) and isinstance(c, (int, float)):
                         slot = acc.setdefault(a, {}).setdefault(sid, {"t": [], "c": []})
                         slot["t"].append(float(t))
@@ -461,7 +449,7 @@ def fig_rq2_vs_rq1_scatter(pairs: dict, agents: list[str], outdir: Path,
                 transform=ax.transAxes, va="top", fontsize=7, color="#333333")
         ax.set_xlabel("Total (judge)")
         ax.grid(axis="x", visible=False)
-    axes[0].set_ylabel("Alignment composite")
+    axes[0].set_ylabel("Objective–assessment alignment")
     agent_legend(fig, agents, bbox_to_anchor=(0.5, -0.06))
     fig.tight_layout()
     save(fig, outdir, "fig_rq2_vs_rq1_scatter", written)
@@ -513,29 +501,27 @@ def fig_cost_quality(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     agents = agents_in(pooled)
     size_ms = [3.5, 5, 6.5, 8.5]  # marker size grows with model size
 
-    fig, axes = plt.subplots(1, 2, figsize=(7.0, 3.0))
-    specs = [("total_tokens", "Mean total tokens per scenario", True),
-             ("execution_time_seconds", "Mean execution time per scenario (s)", False)]
-    for ax, (field, xlabel, logx) in zip(axes, specs):
-        for a in agents:
-            xs, ys = [], []
-            for m in models:
-                xs.append(_nan(tok["models"][m["label"]].get(a, {})
-                               .get(field, {}).get("mean")))
-                ys.append(_nan(m["agents"].get(a, {}).get("mean_total")))
-            kw = line_kw(a)
-            ax.plot(xs, ys, alpha=0.9, color=kw["color"], marker="",
-                    linewidth=0.9 if a != PROPOSED else 1.6, zorder=kw["zorder"])
-            for x, y, ms in zip(xs, ys, size_ms):
-                ax.plot([x], [y], marker=point_marker(a), markersize=ms,
-                        color=kw["color"], markeredgecolor="white",
-                        markeredgewidth=0.6, zorder=kw["zorder"] + 1)
-        if logx:
-            ax.set_xscale("log")
-        ax.set_xlabel(xlabel)
-        ax.grid(axis="x", visible=False)
-    axes[0].set_ylabel("Total composite")
-    fig.suptitle("Quality vs cost — marker size grows with model size "
+    # Tokens only: execution time reflects serving load/API latency, not the
+    # method, so it is deliberately not plotted.
+    fig, ax = plt.subplots(figsize=(4.6, 3.2))
+    for a in agents:
+        xs, ys = [], []
+        for m in models:
+            xs.append(_nan(tok["models"][m["label"]].get(a, {})
+                           .get("total_tokens", {}).get("mean")))
+            ys.append(_nan(m["agents"].get(a, {}).get("mean_total")))
+        kw = line_kw(a)
+        ax.plot(xs, ys, alpha=0.9, color=kw["color"], marker="",
+                linewidth=0.9 if a != PROPOSED else 1.6, zorder=kw["zorder"])
+        for x, y, ms in zip(xs, ys, size_ms):
+            ax.plot([x], [y], marker=point_marker(a), markersize=ms,
+                    color=kw["color"], markeredgecolor="white",
+                    markeredgewidth=0.6, zorder=kw["zorder"] + 1)
+    ax.set_xscale("log")
+    ax.set_xlabel("Mean total tokens per scenario")
+    ax.grid(axis="x", visible=False)
+    ax.set_ylabel("Total composite")
+    fig.suptitle("Quality vs token cost — marker size grows with model size "
                  f"({', '.join(size_display(m['label']) for m in models)})", fontsize=8)
     agent_legend(fig, agents, bbox_to_anchor=(0.5, -0.04))
     fig.tight_layout(rect=(0, 0, 1, 0.96))
@@ -582,7 +568,7 @@ def demo_pooled() -> dict:
             "comparisons": {"policies": {"complete_case": comp_rows}},
         })
         align_models[label] = {
-            a: {"composite": {"n_scenarios": 90,
+            a: {"objective_assessment_alignment": {"n_scenarios": 90,
                               "mean": min(0.95, 0.35 + si * 0.08 + off / 60
                                           + (0.15 if a == PROPOSED else 0)),
                               "sd_across_scenarios": 0.12},
@@ -614,13 +600,13 @@ def demo_pooled() -> dict:
 
 
 def demo_pairs(pooled: dict) -> dict:
-    """Synthetic per-scenario (total, composite) pairs for the scatter figure."""
+    """Synthetic per-scenario (total, alignment) pairs for the scatter figure."""
     rng = random.Random(42)
     pairs: dict[str, dict[str, list[tuple[float, float]]]] = {}
     for m in pooled["models"]:
         by_agent = {}
         for a, s in m["agents"].items():
-            comp = pooled["alignment"]["models"][m["label"]][a]["composite"]["mean"]
+            comp = pooled["alignment"]["models"][m["label"]][a]["objective_assessment_alignment"]["mean"]
             pts = []
             for _ in range(90):
                 t = rng.gauss(s["mean_total"], 8.0)
@@ -640,12 +626,12 @@ def main() -> None:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--pooled", type=Path, default=DEFAULT_POOLED,
-                        help="pooled_ladder.json from scripts/alignmentgraph-isd-bench/7_pool_ladder_runs.py")
+                        help="pooled_ladder.json from scripts/alignmentgraph-isd-bench/07_pool_ladder_runs.py")
     parser.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR,
                         help="output directory for .pdf/.png figures")
     parser.add_argument("--runs-glob", default=None, metavar="PATTERN",
                         help="glob of raw run dirs (same convention as "
-                             "7_pool_ladder_runs.py --auto-glob); enables the "
+                             "07_pool_ladder_runs.py --auto-glob); enables the "
                              "per-scenario RQ2-vs-RQ1 scatter figure")
     parser.add_argument("--demo", action="store_true",
                         help="render every figure from synthetic data "

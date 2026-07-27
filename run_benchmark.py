@@ -1099,6 +1099,8 @@ def run_full_benchmark(
             "provider": llm_config.provider,
             "api_spec": llm_config.api_spec,
             "base_url": llm_config.base_url,
+            "base_urls": list(llm_config.all_base_urls),
+            "endpoint_strategy": llm_config.endpoint_strategy,
         },
         "config": {
             "variants": variants,
@@ -1451,7 +1453,9 @@ def main():
         type=str,
         choices=["conservative", "moderate", "aggressive", "turbo"],
         default="conservative",
-        help="Rate limit mode: conservative (2x2=4), moderate (3x4=12), aggressive (6x8=48), turbo (6x16=96). Default: conservative",
+        help="Rate limit mode as agents x scenarios in flight: conservative "
+             "(2x2=4), moderate (3x4=12), aggressive (7x8=56), turbo "
+             "(10x15=150). Default: conservative",
     )
     parser.add_argument(
         "--agent-model-provider",
@@ -1470,7 +1474,10 @@ def main():
         "--agent-model-base-url",
         type=str,
         default=None,
-        help="Agent model OpenAI-compatible base URL",
+        help="Agent model OpenAI-compatible base URL. Accepts a comma-separated "
+             "list of endpoints serving the SAME model; requests round-robin "
+             "across them (env: AGENT_MODEL_BASE_URLS, or <SLOT>_AGENT_MODEL_BASE_URLS "
+             "for the ladder).",
     )
     parser.add_argument(
         "--agent-model-name",
@@ -1589,7 +1596,7 @@ def main():
         "conservative": {"max_workers": 2, "scenario_max_workers": 2, "delay": 2.0},
         "moderate": {"max_workers": 3, "scenario_max_workers": 4, "delay": 0.5},
         "aggressive": {"max_workers": 7, "scenario_max_workers": 8, "delay": 0.1},
-        "turbo": {"max_workers": 7, "scenario_max_workers": 15, "delay": 0.0},
+        "turbo": {"max_workers": 10, "scenario_max_workers": 15, "delay": 0.0},
     }
     rate_config = rate_limit_configs[args.rate_limit]
 

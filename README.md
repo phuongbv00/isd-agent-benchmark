@@ -139,16 +139,16 @@ python scripts/3_sync_runpod_pods_env.py
 # Tune / general multi-model runs (one tmux session per slot)
 DATASET=train_30 AGENT_MODEL_SLOTS=qwen2b RUN_TAGS=tune1 ./scripts/4_run_benchmark.sh
 
-# RQ1 model ladder (4 sizes x 3 runs x 7 agents on test_90) + audits
-python scripts/alignmentgraph-isd-bench/5_audit_preflight.py
-./scripts/alignmentgraph-isd-bench/5_run_ladder.sh
-python scripts/alignmentgraph-isd-bench/6_audit_inflight.py             # while running
-python scripts/alignmentgraph-isd-bench/6_audit_postrun.py              # after each run
+# RQ1 model ladder + ablation arms (4 sizes x 3 runs x 10 agents on test_90) + audits
+python scripts/alignmentgraph-isd-bench/01_audit_preflight.py
+./scripts/alignmentgraph-isd-bench/02_run_ladder.sh
+python scripts/alignmentgraph-isd-bench/03_audit_inflight.py             # while running
+python scripts/alignmentgraph-isd-bench/04_audit_postrun.py              # after each run
 
 # Post-processing: RQ2 alignment scoring, pooling, paper tables
-for RUN in results/test_90_benchmark_*_r*; do python scripts/alignmentgraph-isd-bench/7_score_alignment.py "$RUN"; done
-python scripts/alignmentgraph-isd-bench/7_pool_ladder_runs.py --auto-glob 'results/test_90_benchmark_*_r*'
-python scripts/alignmentgraph-isd-bench/8_gen_paper_tables.py --pooled results/pooled_ladder.json
+for RUN in results/test_90_benchmark_*_r*; do python scripts/alignmentgraph-isd-bench/06_score_alignment.py "$RUN"; done
+python scripts/alignmentgraph-isd-bench/07_pool_ladder_runs.py --auto-glob 'results/test_90_benchmark_*_r*'
+python scripts/alignmentgraph-isd-bench/09_gen_paper_tables.py --pooled results/pooled_ladder.json
 ```
 
 ## Configuration Matrix
@@ -189,15 +189,21 @@ must be added explicitly with `--agents`.
 | `--scenario-max-workers N` | Maximum number of scenarios running concurrently. |
 | `--rate-limit conservative\|moderate\|aggressive\|turbo`, `-r ...` | Apply a preset for worker counts and benchmark delay. |
 
-| Rate limit | Agent workers | Scenario workers | Delay |
-|------------|---------------|------------------|-------|
-| `conservative` | 2 | 2 | `2.0s` |
-| `moderate` | 3 | 4 | `0.5s` |
-| `aggressive` | 6 | 8 | `0.1s` |
-| `turbo` | 6 | 16 | `0.0s` |
+| Preset         | Agent workers | Scenario workers | Delay | Requests in flight |
+|----------------|---------------|------------------|-------|--------------------|
+| `conservative` | 2 | 2 | `2.0s` | 4 |
+| `moderate`     | 3 | 4 | `0.5s` | 12 |
+| `aggressive`   | 7 | 8 | `0.1s` | 56 |
+| `turbo`        | 10 | 15 | `0.0s` | 150 |
 
-`--rate-limit` sets `BENCHMARK_DELAY` and overrides default worker counts unless
-`--max-workers` or `--scenario-max-workers` are passed explicitly.
+`turbo`'s 10 agent workers match the ladder line-up (7 agents + 3 ablation arms),
+so a scenario can run every agent at once.
+
+`--rate-limit` sets `BENCHMARK_DELAY` and overrides the worker counts. Note the
+override is decided by comparing against the *default* values, not by whether you
+passed the flag: `--max-workers 6` and `--scenario-max-workers 8` are the defaults,
+so passing exactly those values explicitly still lets the preset replace them. Any
+other value wins over the preset.
 
 ### Agent Model Matrix
 
@@ -207,7 +213,7 @@ The agent model generates instructional-design outputs.
 |----------|----------------------|---------|
 | `--agent-model-provider` | `AGENT_MODEL_PROVIDER` | Provider preset such as `openrouter`, `openai`, `upstage`, `anthropic`, `local-ollama`, `local-lmstudio`, or `local-vllm`. |
 | `--agent-model-api-spec` | `AGENT_MODEL_API_SPEC` | API contract: `openai_compatible`, `openai`, or `anthropic`. |
-| `--agent-model-base-url` | `AGENT_MODEL_BASE_URL` | OpenAI-compatible endpoint URL. |
+| `--agent-model-base-url` | `AGENT_MODEL_BASE_URL` / `AGENT_MODEL_BASE_URLS` | OpenAI-compatible endpoint URL. Accepts a comma-separated list of endpoints serving the **same** model; requests round-robin across them (same idea as `AGENT_MODEL_API_KEY_ENVS` for credentials). |
 | `--agent-model-name` | `AGENT_MODEL_NAME` | Model name sent to the backend. |
 | `--agent-model-api-key` | `AGENT_MODEL_API_KEY` | Direct API key value. Prefer env vars for reusable runs. |
 | `--agent-model-api-key-env` | `AGENT_MODEL_API_KEY_ENV` | Name of an environment variable containing one API key. |
@@ -253,7 +259,7 @@ multi-judge evaluation.
 | `RATE_LIMIT` | `turbo` | Rate-limit mode passed to `--rate-limit`. |
 | `DATASET` | `test` | Dataset passed to `--dataset`. |
 | `AGENT_MODEL_SLOTS` | `gpt,gemini,solar` | Comma-separated slot labels. Each slot becomes one tmux session (parallel). |
-| `RUN_TAGS` | *(empty)* | Comma/space-separated run tags (e.g. `tune1,tune2`), run sequentially inside each slot session; empty = one untagged run. Same var in `5_run_ladder.sh` (default `r1 r2 r3`). |
+| `RUN_TAGS` | *(empty)* | Comma/space-separated run tags (e.g. `tune1,tune2`), run sequentially inside each slot session; empty = one untagged run. Same var in `02_run_ladder.sh` (default `r1 r2 r3`). |
 
 Each slot reads these variables, where `<SLOT>` is uppercased and `-` becomes
 `_`, for example `GPT_AGENT_MODEL_NAME`:
@@ -261,7 +267,7 @@ Each slot reads these variables, where `<SLOT>` is uppercased and `-` becomes
 | Slot variable pattern | Meaning |
 |-----------------------|---------|
 | `<SLOT>_AGENT_MODEL_PROVIDER` | Provider for this tmux session. |
-| `<SLOT>_AGENT_MODEL_BASE_URL` | Base URL for this tmux session. |
+| `<SLOT>_AGENT_MODEL_BASE_URLS` | Base URL(s) for this tmux session. Comma-separated when several pods serve that slot — agents round-robin across them. `<SLOT>_AGENT_MODEL_BASE_URL` (singular) still works and also accepts a list. |
 | `<SLOT>_AGENT_MODEL_NAME` | Agent model for this tmux session. |
 | `<SLOT>_AGENT_MODEL_API_KEY_ENVS` | Comma-separated credential env vars for this tmux session. |
 | `<SLOT>_RATE_LIMIT` | Optional per-slot override of the global `RATE_LIMIT` preset. |
@@ -273,7 +279,7 @@ Each slot reads these variables, where `<SLOT>` is uppercased and `-` becomes
 | `OPENROUTER_API_KEY`, `UPSTAGE_API_KEY`, `UPSTAGE_API_KEY2`, `UPSTAGE_API_KEY3`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` | Common secret variables referenced by `*_API_KEY_ENV` or `*_API_KEY_ENVS`. |
 | `BENCHMARK_DELAY` | Delay between submissions. Normally set by `--rate-limit`. |
 | `ISD_EVAL_PROGRESS` | Internal evaluator progress marker flag set by the benchmark runner. |
-| `AGENT_MODEL_MAX_TOKENS_CAP` | Central clamp on every agent's completion budget (`shared/llm/factory.py`). Unset = agents' own budgets apply unchanged. Ladder runs use `8096` for the 16k-context self-hosted models. |
+| `AGENT_MODEL_MAX_TOKENS_CAP` | Central clamp on every agent's completion budget (`shared/llm/factory.py`). Unset = agents' own budgets apply unchanged. Ladder runs use `8192` for the 16k-context self-hosted models. |
 | `AGENT_MODEL_STREAMING` | `1` enables client streaming (`stream_usage=True`); required behind proxies with read timeouts (RunPod/Cloudflare 524). |
 | `AGENT_MODEL_DISABLE_THINKING` | `1` requests non-thinking mode (`chat_template_kwargs: {enable_thinking: false}`); required for small Qwen3.5 models whose `<think>` otherwise exhausts the completion budget. |
 
@@ -321,13 +327,13 @@ isd-agent-bench/
 │   ├── 3_sync_runpod_pods_env.py    # Sync RunPod pod env-quads into .env
 │   ├── 3_run_benchmark_test.sh      # Smoke run (1 scenario)
 │   ├── 4_run_benchmark.sh           # General tmux launcher (tuning)
-│   ├── 5_audit_preflight.py         # Pod/auth/flags/disk checks
-│   ├── 5_run_ladder.sh              # RQ1 model-ladder launcher
-│   ├── 6_audit_inflight.py          # Red-flag counters while running
-│   ├── 6_audit_postrun.py           # Completeness/integrity/metrics audit
-│   ├── 7_score_alignment.py         # RQ2 alignment scoring (LLM-free)
-│   ├── 7_pool_ladder_runs.py        # Pool runs -> stats + token usage
-│   └── 8_gen_paper_tables.py        # Paper .tex tables + macros
+│   ├── 01_audit_preflight.py         # Pod/auth/flags/disk checks
+│   ├── 02_run_ladder.sh              # RQ1 model-ladder launcher
+│   ├── 03_audit_inflight.py          # Red-flag counters while running
+│   ├── 04_audit_postrun.py           # Completeness/integrity/metrics audit
+│   ├── 06_score_alignment.py         # RQ2 alignment scoring (LLM-free)
+│   ├── 07_pool_ladder_runs.py        # Pool runs -> stats + token usage
+│   └── 09_gen_paper_tables.py        # Paper .tex tables + macros
 ├── scenarios/            # ISD scenarios (25,795)
 │   ├── idld_aligned/     # SCOPUS-based (8,842)
 │   ├── context_variant/  # Augmented (16,953)

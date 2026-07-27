@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 """Pool the ablation-study runs into per-arm stats (defense: component contribution).
 
-Companion of ../7_pool_ladder_runs.py and a thin orchestrator over its machinery
+Companion of ../07_pool_ladder_runs.py and a thin orchestrator over its machinery
 (pool_model / compare_model / pool_alignment / pool_tokens are imported and
 reused verbatim). The comparison axis differs from the ladder: instead of the
-proposed agent vs the 6 baseline agents ACROSS runs, this compares the ablation
-arms of alignmentgraph-isd WITHIN one run per model size — all arms share each
-scenario's judge session, so the deltas carry no judge drift.
+proposed agent vs the 6 baseline agents, this compares the ablation arms of
+alignmentgraph-isd — but out of THE SAME run dirs. Since 2026-07-26 the arms
+run inside the ladder (02_run_ladder.sh launches all 10 agents), so every arm
+shares each scenario's judge session (no judge drift in the deltas) AND gets
+the ladder's 3-run averaging. A0 is not a re-run of the full pipeline any more:
+it is literally the ladder's alignmentgraph-isd, which is why no table needs a
+caveat reconciling two different A0 numbers.
 
 Arms (agent ids registered in run_benchmark.py):
   A0 alignmentgraph-isd                (full pipeline)
@@ -22,17 +26,17 @@ Besides the arm comparisons this script adds two ablation-specific layers:
   * flag sanity check — each arm's *_trajectory.json metadata.run_config must
     match what its agent id claims (hard error on mismatch; the field only
     exists for runs made after the ablation flags landed);
-  * A0 consistency check — A0's in-session mean vs the pooled ladder r1–r3 mean
-    of the same size (from --ladder-pooled), reported against the ladder's
-    run-to-run SD as an empirical judge/session-drift gauge.
+  * A0 invariant check — A0 here vs A0 in the pooled ladder. These are the same
+    runs now, so the delta must be ~0; a non-zero value means the two poolings
+    disagree about identical data and should be debugged, not written up.
 
 Usage:
-  python scripts/alignmentgraph-isd-bench/ablation/7_pool_ablation_runs.py \
-      --auto-glob 'results/test_90_benchmark_*_abl1_*' \
+  python scripts/alignmentgraph-isd-bench/ablation/08_pool_ablation_runs.py \
+      --auto-glob 'results/test_90_benchmark_*_r[123]_*' \
       --ladder-pooled results/pooled_ladder.json
-  # -> results/pooled_ablation.json (input of 8_gen_ablation_tables/figures)
+  # -> results/pooled_ablation.json (input of 13_gen_ablation_tables / 14_gen_ablation_figures)
 
-Run scripts/alignmentgraph-isd-bench/7_score_alignment.py on each run dir first
+Run scripts/alignmentgraph-isd-bench/06_score_alignment.py on each run dir first
 if you want the RQ2 alignment layer pooled too (graceful skip otherwise).
 """
 from __future__ import annotations
@@ -50,8 +54,8 @@ _HERE = Path(__file__).resolve().parent
 
 
 def _load_ladder_pool_module():
-    """Import ../7_pool_ladder_runs.py (digit-leading name -> spec loader)."""
-    path = _HERE.parent / "7_pool_ladder_runs.py"
+    """Import ../07_pool_ladder_runs.py (digit-leading name -> spec loader)."""
+    path = _HERE.parent / "07_pool_ladder_runs.py"
     spec = importlib.util.spec_from_file_location("pool_ladder_runs", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -76,12 +80,14 @@ EXPECTED_FLAGS = {
 }
 
 
-def group_by_glob(pattern: str, run_tag: str) -> dict[str, list[Path]]:
-    """Group ablation run dirs by model label (the tag is fixed, not r\\d+)."""
-    run_dir_re = re.compile(
-        r"^(?P<dataset>.+)_benchmark_(?P<model>.+?)_" + re.escape(run_tag)
-        + r"_(?P<ts>\d{8}_\d{6})$"
-    )
+def group_by_glob(pattern: str) -> dict[str, list[Path]]:
+    """Group run dirs by model label, pooling every run of that size.
+
+    Uses the ladder's own naming regex rather than pinning one tag: the arms
+    ride along in r1/r2/r3, so pinning a tag would silently drop two thirds of
+    the data and quietly undo the 3-run averaging.
+    """
+    run_dir_re = LP.RUN_DIR_RE
     groups: dict[str, list[Path]] = {}
     for path_str in sorted(globmod.glob(pattern)):
         path = Path(path_str)
@@ -89,7 +95,7 @@ def group_by_glob(pattern: str, run_tag: str) -> dict[str, list[Path]]:
             continue
         m = run_dir_re.match(path.name)
         if not m:
-            print(f"  ! dir does not match ablation naming, skipped: {path.name}",
+            print(f"  ! dir does not match naming convention, skipped: {path.name}",
                   file=sys.stderr)
             continue
         groups.setdefault(m.group("model"), []).append(path)
@@ -143,7 +149,15 @@ def check_arm_flags(run_dirs_by_model: dict[str, list[Path]],
 
 
 def a0_consistency(models: list[dict], a0: str, ladder_pooled_path: Path) -> dict:
-    """A0 in-session mean vs the pooled ladder mean of the same size label."""
+    """A0 here vs A0 in the pooled ladder — now an invariant, not a drift gauge.
+
+    The arms used to run in their own session, so this compared two different
+    executions of the full pipeline and delta measured judge/session drift.
+    Since the arms moved into the ladder runs (2026-07-26) both numbers come
+    from the SAME runs, so delta must be ~0. A non-zero delta is therefore a
+    bug signal — the two poolings disagreeing about identical data — not
+    something to explain away in the write-up.
+    """
     try:
         ladder = json.loads(ladder_pooled_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
@@ -172,10 +186,11 @@ def a0_consistency(models: list[dict], a0: str, ladder_pooled_path: Path) -> dic
         })
     return {
         "definition": (
-            "A0 (full pipeline) re-ran inside the ablation session; its mean vs "
-            "the pooled ladder r-runs of the same size gauges judge/session "
-            "drift. |delta| within ~2x the ladder run-to-run SD supports "
-            "attributing arm deltas to the ablated mechanisms."
+            "A0 (full pipeline) is pooled here from the same ladder runs as the "
+            "ladder's own A0, so delta must be ~0 — this is an invariant check "
+            "that both poolings read the same data, NOT a drift measurement. "
+            "A materially non-zero delta means the two poolings disagree and "
+            "should be debugged, not reported."
         ),
         "per_model": rows,
     }
@@ -205,18 +220,18 @@ def print_report(pooled: dict, a0: str, arms: list[str]) -> None:
     cons = pooled.get("a0_consistency", {})
     for row in cons.get("per_model", []):
         if "delta" in row:
-            print(f"\n  A0 consistency [{row['label']}]: session−ladder "
-                  f"Δ={row['delta']:+.2f} (ladder run SD "
-                  f"{row.get('ladder_run_to_run_sd')})")
+            flag = "" if abs(row["delta"]) < 0.005 else "   <-- SHOULD BE ~0, INVESTIGATE"
+            print(f"\n  A0 invariant [{row['label']}]: ablation−ladder "
+                  f"Δ={row['delta']:+.2f}{flag}")
     if pooled.get("alignment") is None:
         print("\n  (RQ2 alignment layer absent — run "
-              "scripts/alignmentgraph-isd-bench/7_score_alignment.py on each "
+              "scripts/alignmentgraph-isd-bench/06_score_alignment.py on each "
               "run dir, then re-pool.)")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Pool ablation runs (arms within one run per size) into stats.",
+        description="Pool the ablation arms out of the ladder run dirs into stats.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
@@ -225,16 +240,17 @@ def main() -> None:
     )
     parser.add_argument(
         "--auto-glob", default=None, metavar="PATTERN",
-        help="Glob of ablation run dirs (naming "
-             "<dataset>_benchmark_<model>_<RUN_TAG>_<ts>); groups by <model>.",
+        help="Glob of run dirs (naming "
+             "<dataset>_benchmark_<model>_<RUN_TAG>_<ts>); groups by <model>. "
+             "The arms now live in the ladder runs, so this is normally "
+             "'results/test_90_benchmark_*_r[123]_*'.",
     )
-    parser.add_argument("--run-tag", default="abl1",
-                        help="Tag used by ablation/5_run_ablation.sh.")
+
     parser.add_argument("--a0-agent", default=A0_DEFAULT)
     parser.add_argument("--arms", default=",".join(ARMS_DEFAULT),
                         help="Comma-separated arm agent ids (Holm family size).")
     parser.add_argument("--ladder-pooled", default="results/pooled_ladder.json",
-                        help="pooled_ladder.json for the A0 consistency check "
+                        help="pooled_ladder.json for the A0 invariant check "
                              "(skipped with a note if absent).")
     parser.add_argument("--out", default="results/pooled_ablation.json")
     args = parser.parse_args()
@@ -249,7 +265,7 @@ def main() -> None:
         label, d = spec.split("=", 1)
         run_dirs_by_model[label] = [Path(d)]
     if args.auto_glob:
-        for label, dirs in group_by_glob(args.auto_glob, args.run_tag).items():
+        for label, dirs in group_by_glob(args.auto_glob).items():
             run_dirs_by_model.setdefault(label, dirs)
     if not run_dirs_by_model:
         parser.error("no input: give --model and/or --auto-glob")
@@ -284,7 +300,7 @@ def main() -> None:
             "expected_flags": {a: EXPECTED_FLAGS.get(a) for a in agents},
             "score_field": "total_score (per-scenario composite from comparison_report.json)",
             "direction": "mean_diff = A0 − arm = contribution of the removed component(s)",
-            "design": "all arms judged within one run per size (same judge session)",
+            "design": "arms run inside the ladder; pooled across its runs per size, and within each run all arms share the scenario's judge session",
             "primary_failure_policy": "complete_case",
             "holm_family": f"{len(arms)} arm comparisons within each model size",
             "n_boot": LP.N_BOOT,

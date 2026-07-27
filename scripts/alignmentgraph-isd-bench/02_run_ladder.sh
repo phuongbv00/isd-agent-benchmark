@@ -1,15 +1,20 @@
 #!/bin/bash
 # ---------------------------------------------------------------------------
-# 5_run_ladder.sh — RQ1 "model ladder" launcher
+# 02_run_ladder.sh — RQ1 ladder + ablation arms, in ONE set of runs
 #
 # Runs the full benchmark on 4 Qwen model sizes (0.8B / 2B / 4B / 9B),
-# 3 independent runs per size, all 7 agents, dataset test_90.
+# 3 independent runs per size, all 10 agents, dataset test_90.
 # One tmux session per model size (sizes run in PARALLEL, but the 3 runs of a
 # size run SEQUENTIALLY inside its session — safe w.r.t. per-key rate limits,
 # same mechanism as 4_run_benchmark.sh).
 #
+# The 10 agents = the 7 ladder agents + the 3 ablation arms. Running the arms
+# here rather than in their own session is what makes A0 literally the same
+# runs for both analyses: no table has to reconcile two different numbers for
+# the same full pipeline, and the arms get the ladder's 3-run averaging.
+#
 # THIS SCRIPT IS EXPENSIVE. It asks for confirmation before launching.
-# Total ≈ 4 sizes x 3 runs x 7 agents x 90 scenarios = 7,560 generations
+# Total ≈ 4 sizes x 3 runs x 10 agents x 90 scenarios = 10,800 generations
 # (+ judge calls). See ../docs/benchmark_guides.md (parent repo) for cost/time
 # estimates and how to resume a partial ladder.
 # ---------------------------------------------------------------------------
@@ -22,12 +27,15 @@ source .env 2>/dev/null || true
 # ---------------------------------------------------------------------------
 DATASET="${DATASET:-test_90}"
 RATE_LIMIT="${RATE_LIMIT:-turbo}"
-# All 7 agents: 6 benchmark defaults + the proposed system (NOT in defaults).
-AGENTS="${AGENTS:-eduplanner,baseline,react-isd,addie-agent,dick-carey-agent,rpisd-agent,alignmentgraph-isd}"
+# All 10 agents: 6 benchmark defaults + the proposed system (NOT in defaults)
+# + the 3 ablation arms (registry-only agent ids, same adapter with the two
+# HarnessRunConfig flags pinned per id). alignmentgraph-isd doubles as the
+# ladder's proposed system and the ablation's A0 arm — that is the point.
+AGENTS="${AGENTS:-eduplanner,baseline,react-isd,addie-agent,dick-carey-agent,rpisd-agent,alignmentgraph-isd,alignmentgraph-isd-no-verifier,alignmentgraph-isd-no-graph-ctx,alignmentgraph-isd-skeleton}"
 # Run tags: 3 independent runs per model size. Comma- or space-separated
 # full tags (same var and mechanism as RUN_TAGS in 4_run_benchmark.sh).
 # For resume, override e.g.
-#   RUN_TAGS="r2,r3" LADDER_SLOTS="qwen08b" ./scripts/alignmentgraph-isd-bench/5_run_ladder.sh
+#   RUN_TAGS="r2,r3" LADDER_SLOTS="qwen08b" ./scripts/alignmentgraph-isd-bench/02_run_ladder.sh
 RUN_TAGS="${RUN_TAGS:-r1 r2 r3}"
 _RUN_TAGS_LIST="${RUN_TAGS//,/ }"
 
@@ -78,6 +86,21 @@ slot_upper() {
     echo "$1" | tr '[:lower:]-' '[:upper:]_'
 }
 
+# A slot may be served by SEVERAL pods of the same model: set
+# <SLOT>_AGENT_MODEL_BASE_URLS to a comma-separated list and the agents
+# round-robin across them (shared/llm/config.py::resolve_base_url), the same
+# way EMBED_BASE_URLS works for the encoder. Fold the plural into the singular
+# here so everything downstream stays unchanged, and strip whitespace: the
+# value is interpolated unquoted into the tmux command string below, so a
+# space would split it into two arguments.
+for slot in $_LADDER_SLOTS_LIST; do
+    upper=$(slot_upper "$slot")
+    plural_var="${upper}_AGENT_MODEL_BASE_URLS"
+    single_var="${upper}_AGENT_MODEL_BASE_URL"
+    _urls="${!plural_var:-${!single_var:-}}"
+    printf -v "$single_var" '%s' "${_urls//[[:space:]]/}"
+done
+
 # Fail fast: an empty *_BASE_URL would otherwise vanish from the unquoted
 # run_benchmark.py invocation below (bash drops empty unquoted expansions),
 # silently shifting --agent-model-base-url's value onto the next flag.
@@ -94,7 +117,7 @@ if [[ -n "$_missing_base_url" ]]; then
     echo "Deploy the pods in the console (template link in ../docs/benchmark_guides.md, section 4)," >&2
     echo "then sync their env-quads into .env and relaunch:" >&2
     echo "  python scripts/3_sync_runpod_pods_env.py" >&2
-    echo "  ./scripts/alignmentgraph-isd-bench/5_run_ladder.sh" >&2
+    echo "  ./scripts/alignmentgraph-isd-bench/02_run_ladder.sh" >&2
     exit 1
 fi
 
@@ -290,4 +313,4 @@ echo ""
 echo "Stop everything: tmux kill-server"
 echo ""
 echo "After all runs finish, pool with:"
-echo "  python scripts/alignmentgraph-isd-bench/7_pool_ladder_runs.py --auto-glob 'results/${DATASET}_benchmark_*_r*'"
+echo "  python scripts/alignmentgraph-isd-bench/07_pool_ladder_runs.py --auto-glob 'results/${DATASET}_benchmark_*_r*'"
