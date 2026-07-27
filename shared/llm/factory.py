@@ -56,8 +56,11 @@ def create_chat_model(config: LLMConfig):
         kwargs = _chat_kwargs(config)
         if api_key:
             kwargs["api_key"] = api_key
-        if config.base_url:
-            kwargs["base_url"] = config.base_url
+        # One endpoint per model instance; with several pods behind the same
+        # model this round-robins them (see LLMConfig.resolve_base_url).
+        endpoint = config.resolve_base_url()
+        if endpoint:
+            kwargs["base_url"] = endpoint
         if _env_flag("AGENT_MODEL_STREAMING"):
             kwargs["streaming"] = True
             kwargs["stream_usage"] = True
@@ -79,6 +82,7 @@ def create_openai_client(config: LLMConfig) -> OpenAI:
         )
 
     kwargs: dict[str, Any] = {"api_key": config.resolve_api_key()}
-    if config.base_url:
-        kwargs["base_url"] = config.base_url
+    endpoint = config.resolve_base_url()
+    if endpoint:
+        kwargs["base_url"] = endpoint
     return OpenAI(**kwargs)

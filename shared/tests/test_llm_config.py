@@ -1,4 +1,4 @@
-from shared.llm import llm_config_from_env, llm_config_from_legacy
+from shared.llm import LLMConfig, llm_config_from_env, llm_config_from_legacy
 
 
 def test_local_provider_uses_dummy_key(monkeypatch):
@@ -52,3 +52,102 @@ def test_agent_model_env_aliases_are_role_first(monkeypatch):
     assert config.all_api_key_envs == ("UPSTAGE_API_KEY", "UPSTAGE_API_KEY2")
     assert config.resolve_api_key() == "key-1"
     assert config.resolve_api_key() == "key-2"
+
+
+def test_single_base_url_is_returned_unchanged():
+    config = LLMConfig(model="m", base_url="https://pod-a/v1")
+    assert config.all_base_urls == ("https://pod-a/v1",)
+    assert [config.resolve_base_url() for _ in range(3)] == ["https://pod-a/v1"] * 3
+
+
+def test_multiple_endpoints_round_robin():
+    config = LLMConfig(
+        model="m",
+        base_urls=("https://a/v1", "https://b/v1", "https://c/v1"),
+        endpoint_strategy="round_robin",
+    )
+    picked = [config.resolve_base_url() for _ in range(4)]
+    assert picked == ["https://a/v1", "https://b/v1", "https://c/v1", "https://a/v1"]
+
+
+def test_singular_base_url_accepts_a_comma_list():
+    # <SLOT>_AGENT_MODEL_BASE_URL may carry several pods; callers must not
+    # have to split it themselves.
+    config = LLMConfig(
+        model="m",
+        base_url="https://a/v1, https://b/v1",
+        endpoint_strategy="round_robin",
+    )
+    assert config.all_base_urls == ("https://a/v1", "https://b/v1")
+    assert config.resolve_base_url() == "https://a/v1"
+    assert config.resolve_base_url() == "https://b/v1"
+
+
+def test_duplicate_endpoints_collapse():
+    config = LLMConfig(model="m", base_url="https://a/v1", base_urls=("https://a/v1",))
+    assert config.all_base_urls == ("https://a/v1",)
+
+
+def test_base_urls_env_enables_round_robin(monkeypatch):
+    monkeypatch.setenv("AGENT_MODEL_NAME", "Qwen/Qwen3.5-9B")
+    monkeypatch.setenv("AGENT_MODEL_BASE_URLS", "https://p1/v1,https://p2/v1")
+    monkeypatch.delenv("AGENT_MODEL_BASE_URL", raising=False)
+    monkeypatch.delenv("AGENT_MODEL_ENDPOINT_STRATEGY", raising=False)
+
+    config = llm_config_from_env()
+
+    assert config.endpoint_strategy == "round_robin"
+    assert config.all_base_urls == ("https://p1/v1", "https://p2/v1")
+    assert config.resolve_base_url() == "https://p1/v1"
+    assert config.resolve_base_url() == "https://p2/v1"
+
+
+def test_endpoint_round_robin_is_thread_safe():
+    import collections
+    import threading
+
+    config = LLMConfig(
+        model="m",
+        base_urls=tuple(f"https://p{i}/v1" for i in range(4)),
+        endpoint_strategy="round_robin",
+    )
+    counts: collections.Counter = collections.Counter()
+    lock = threading.Lock()
+
+    def hammer():
+        for _ in range(100):
+            url = config.resolve_base_url()
+            with lock:
+                counts[url] += 1
+
+    threads = [threading.Thread(target=hammer) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    # every endpoint used equally: no index lost to a race
+    assert sum(counts.values()) == 800
+    assert set(counts.values()) == {200}
+
+
+def test_rotation_survives_copy_with(monkeypatch):
+    """Copies must share the rotation, not restart it.
+
+    run_benchmark.py copies the config once per agent run (to pin max_tokens),
+    so if `copy_with` handed out fresh counters every request would go to the
+    first endpoint and the first key — round-robin would be silently dead.
+    """
+    monkeypatch.setenv("K1", "key-1")
+    monkeypatch.setenv("K2", "key-2")
+    base = LLMConfig(
+        model="m",
+        base_urls=("https://a/v1", "https://b/v1"),
+        endpoint_strategy="round_robin",
+        api_key_envs=("K1", "K2"),
+        credential_strategy="round_robin",
+    )
+    urls = [base.copy_with(max_tokens=16384).resolve_base_url() for _ in range(4)]
+    keys = [base.copy_with(max_tokens=16384).resolve_api_key() for _ in range(4)]
+    assert urls == ["https://a/v1", "https://b/v1"] * 2
+    assert keys == ["key-1", "key-2"] * 2
