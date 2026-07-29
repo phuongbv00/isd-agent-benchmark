@@ -7,20 +7,21 @@ input, but emits figures instead of tables. Writes every figure as both .pdf
 into results/generated/figures/ (benchmark-local; sync into the thesis paper
 tree with docs/scripts/sync_generated.sh from the thesis repo root):
 
-  fig_rq1_ladder          mean Total vs model size, one line per agent,
-                          error bar = run-to-run SD (headline RQ1 figure)
+  fig_rq1_ladder          mean ADDIE vs model size, one line per agent,
+                          error bar = run-to-run SD *of ADDIE* (headline RQ1
+                          figure); thin complete-case support marked
   fig_rq1_delta           per-baseline paired delta (proposed - baseline) vs
                           size with bootstrap 95% CI band, Holm-significance
                           markers, and the OLS delta trend slope
   fig_rq1_components      ADDIE vs Trajectory component means vs size
-  fig_rq2_ladder          objective-assessment alignment vs model size per agent
+  fig_rq2_ladder          objective->assessment similarity vs model size per agent
                           (RQ2 headline: does the gap widen as models shrink?)
-  fig_rq2_components      heatmap agents x 5 alignment components per size
-  fig_rq2_vs_rq1_scatter  per-scenario objective-assessment alignment vs Total (judge),
+  fig_rq2_components      heatmap agents x the 7 alignment panel signals per size
+  fig_rq2_vs_rq1_scatter  per-scenario objective->assessment similarity vs ADDIE (judge),
                           Spearman rho per size  [needs --runs-glob]
   fig_failure_rate        % scenarios with no scorable output per agent/size
                           (mean of runs, min-max whiskers)
-  fig_cost_quality        mean Total vs mean total tokens (execution time
+  fig_cost_quality        mean ADDIE vs mean total tokens (execution time
                           omitted — it reflects serving load, not the method)
 
 All figure text is English (Vietnamese captions live in the LaTeX source, as
@@ -51,6 +52,7 @@ try:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
 except ImportError:  # pragma: no cover
     print(
         "Error: matplotlib is required for this script.\n"
@@ -70,7 +72,7 @@ AGENT_DISPLAY = {
     "addie-agent": "ADDIE-Agent",
     "rpisd-agent": "RPISD-Agent",
     "dick-carey-agent": "Dick-Carey-Agent",
-    "react-isd": "ReAct-ADDIE",
+    "react-isd": "ReAct-ISD",
     "alignmentgraph-isd": "AlignmentGraph-ISD",
 }
 AGENT_ORDER = [
@@ -78,6 +80,20 @@ AGENT_ORDER = [
     "dick-carey-agent", "react-isd", "alignmentgraph-isd",
 ]
 PROPOSED = "alignmentgraph-isd"
+
+#: RQ1 lead signal: ADDIE, not the benchmark composite (see 07's RQ1_SIGNALS).
+RQ1_LEAD = "addie_median"
+RQ1_LEAD_FIELD = "mean_addie"
+
+#: Run-to-run SD field matching each plotted mean. The SD must belong to the
+#: signal on the y axis: 07 emits one per signal, and the bare
+#: `run_to_run_sd` is the *total_score* value (kept only for backward
+#: compatibility) — never use it under an ADDIE or Trajectory mean.
+RQ1_SD_FIELD = {
+    "mean_addie": "run_to_run_sd_addie",
+    "mean_traj": "run_to_run_sd_traj",
+    "mean_total": "run_to_run_sd_total",
+}
 
 # Rainbow-ordered (spectral) 7-hue categorical palette, fixed per agent
 # (never cycled). Spectral ordering means the perceptually-closest hues are
@@ -108,15 +124,41 @@ def point_marker(agent: str) -> str:
     hue (+ the olive dash on lines); shape only singles out the proposed."""
     return "D" if agent == PROPOSED else "o"
 
-# The five alignment criteria (assessment alignment gets its own
-# figure). Kept to five so the per-cell numbers stay legible; the Porter/Webb/
-# embedding descriptive indices live in stats_summary.md, not this heatmap.
+# The whole panel, both instrument families. Every signal is plotted because
+# the panel's defence against selective reporting is that nothing is left out;
+# tab_rq2_panel.tex carries the same seven with exact numbers.
 RQ2_COMPONENTS = [
-    ("objective_assessment_alignment", "Assessment"),
-    ("objective_activity_alignment", "Activity"),
-    ("objective_evaluation_alignment", "Evaluation"),
+    ("objective_assessment_similarity", "Obj→Asm"),
+    ("objective_activity_similarity", "Obj→Act"),
+    ("objective_evaluation_similarity", "Obj→Evl"),
+    ("assessment_objective_similarity", "Asm→Obj†"),
     ("objective_cognitive_congruence", "Cognitive"),
+    ("porter_mean", "Porter"),
+    ("webb_bloom_consistency", "Webb"),
 ]
+
+#: Number of leading RQ2_COMPONENTS entries belonging to instrument family A
+#: (textual correspondence). The rest are family B (cognitive demand). A
+#: separator is drawn at this boundary so the single colourbar cannot be read
+#: as one construct across both families.
+RQ2_FAMILY_A_N = 4
+
+#: In-figure disclosure for the panel heatmaps. Figures get read detached from
+#: their LaTeX caption, so every caveat a reader needs to not over-read a cell
+#: has to live inside the image: the two instrument families, the
+#: non-directionality of Asm->Obj, the flat-panel status, and why some cells
+#: carry an n.
+RQ2_PANEL_FOOTNOTE = (
+    "Flat panel of 7 signals, no primary endpoint. Family A (textual correspondence, "
+    "rectified cosine max(0, cos) on [0,1]): Obj→Asm, Obj→Act, Obj→Evl, Asm→Obj.  "
+    "Family B (cognitive demand, Bloom-derived, no similarity): Cognitive congruence, "
+    "Porter (mean of 3 pairwise indices), Webb.\n"
+    "† Asm→Obj is non-directional: a high value can mean no orphan assessment items "
+    "OR items that merely restate the objectives.\n"
+    "Cell values omit the leading zero. A red n marks a cell where fewer than half the "
+    "scenarios produced a scorable output — a survivorship mean, not comparable with "
+    "full-coverage cells."
+)
 
 plt.rcParams.update({
     "font.size": 8,
@@ -186,6 +228,55 @@ def agent_legend(fig, agents: list[str], **kw) -> None:
     fig.legend(handles=handles, **kw)
 
 
+def bar_legend(fig, agents: list[str], labels: dict[str, str] | None = None, **kw) -> None:
+    """Legend for BAR charts: filled patches, matching the drawn encoding.
+
+    agent_legend() builds Line2D handles (dashes, markers) that appear nowhere
+    in a bar chart, so bars get their own key."""
+    handles = [
+        Patch(facecolor=AGENT_COLOR.get(a, "#666666"),
+              label=(labels or {}).get(a, AGENT_DISPLAY.get(a, a)))
+        for a in agents
+    ]
+    kw.setdefault("loc", "upper center")
+    kw.setdefault("bbox_to_anchor", (0.5, 0.0))
+    kw.setdefault("ncol", 4)
+    kw.setdefault("frameon", False)
+    fig.legend(handles=handles, **kw)
+
+
+def thin_coverage_n(summary: dict, model: dict) -> int | None:
+    """Complete-case n when it covers < half the scenario union, else None.
+
+    A mean over 5 of 90 scenarios is a survivorship mean; drawn identically to
+    a 90-scenario mean it reads as comparable, so callers mark it."""
+    n = summary.get("n_scenarios_complete")
+    union = model.get("n_scenarios_union") or 0
+    if isinstance(n, (int, float)) and not isinstance(n, bool) and union and n < 0.5 * union:
+        return int(n)
+    return None
+
+
+def edge_annot_kw(x: float, sizes: list[float], dy: int = -11) -> dict:
+    """Offset/alignment for an annotation, kept clear of the axis spines.
+
+    At the leftmost x a centred label straddles the y-axis spine and collides
+    with the tick labels, so edge points get pushed inward."""
+    if x == sizes[0]:
+        return {"xytext": (6, dy), "ha": "left"}
+    if x == sizes[-1]:
+        return {"xytext": (-6, dy), "ha": "right"}
+    return {"xytext": (0, dy), "ha": "center"}
+
+
+def median(xs: list[float]) -> float:
+    ys = sorted(v for v in xs if not math.isnan(v))
+    if not ys:
+        return float("nan")
+    mid = len(ys) // 2
+    return ys[mid] if len(ys) % 2 else 0.5 * (ys[mid - 1] + ys[mid])
+
+
 def sized_axis(ax, sizes: list[float], labels: list[str]) -> None:
     ax.set_xscale("log")
     ax.set_xticks(sizes)
@@ -226,14 +317,36 @@ def fig_rq1_ladder(pooled: dict, outdir: Path, written: list[Path]) -> None:
     sizes = [size_of_label(m["label"]) for m in models]
     labels = [m["label"] for m in models]
 
-    fig, ax = plt.subplots(figsize=(4.8, 3.2))
+    sd_field = RQ1_SD_FIELD[RQ1_LEAD_FIELD]
+    union = models[0].get("n_scenarios_union") if models else None
+
+    fig, ax = plt.subplots(figsize=(5.0, 3.4))
+    thin_seen = False
     for a in agents:
-        ys = [_nan(m["agents"].get(a, {}).get("mean_total")) for m in models]
-        errs = [_nan(m["agents"].get(a, {}).get("run_to_run_sd")) for m in models]
+        summaries = [m["agents"].get(a, {}) for m in models]
+        ys = [_nan(s.get(RQ1_LEAD_FIELD)) for s in summaries]
+        # SD must belong to the plotted signal; if 07 did not emit the
+        # per-signal field, draw no error bars rather than a foreign SD.
+        errs = [_nan(s.get(sd_field)) for s in summaries]
+        have_sd = any(not math.isnan(e) for e in errs)
         errs = [0.0 if math.isnan(e) else e for e in errs]
-        ax.errorbar(sizes, ys, yerr=errs, capsize=2, elinewidth=0.8, **line_kw(a))
+        ax.errorbar(sizes, ys, yerr=errs if have_sd else None,
+                    capsize=2, elinewidth=0.8, **line_kw(a))
+        # thin complete-case support: open marker + n, so a survivorship mean
+        # cannot be read as comparable with a full-coverage point
+        for x, y, s, m in zip(sizes, ys, summaries, models):
+            n = thin_coverage_n(s, m)
+            if n is None or math.isnan(y):
+                continue
+            thin_seen = True
+            ax.plot([x], [y], marker="o", markersize=6.0, markerfacecolor="white",
+                    markeredgecolor=AGENT_COLOR.get(a, "#666666"),
+                    markeredgewidth=1.3, linestyle="", zorder=7)
+            ax.annotate(f"n={n}", xy=(x, y), textcoords="offset points",
+                        fontsize=6, color=AGENT_COLOR.get(a, "#666666"),
+                        **edge_annot_kw(x, sizes, dy=-12))
     # direct label on the proposed agent (secondary encoding beside the legend)
-    prop_y = _nan(models[-1]["agents"].get(PROPOSED, {}).get("mean_total"))
+    prop_y = _nan(models[-1]["agents"].get(PROPOSED, {}).get(RQ1_LEAD_FIELD))
     if not math.isnan(prop_y):
         ax.annotate(AGENT_DISPLAY[PROPOSED], xy=(sizes[-1], prop_y),
                     xytext=(6, 0), textcoords="offset points",
@@ -241,8 +354,15 @@ def fig_rq1_ladder(pooled: dict, outdir: Path, written: list[Path]) -> None:
                     fontweight="bold")
         ax.set_xlim(right=sizes[-1] * 2.4)
     sized_axis(ax, sizes, labels)
-    ax.set_ylabel("Total composite (0.7·ADDIE + 0.3·Traj)")
+    ax.set_ylabel("ADDIE rubric (/100)")
     ax.grid(axis="x", visible=False)
+    n_runs = models[0].get("n_runs") if models else None
+    note = f"error bars: run-to-run SD of ADDIE ({n_runs} runs)"
+    if thin_seen:
+        note += ("\nopen marker + n: complete-case mean over\n"
+                 f"fewer than half of {union} scenarios (agent failures)")
+    ax.text(0.98, 0.02, note, transform=ax.transAxes, ha="right", va="bottom",
+            multialignment="right", fontsize=6.5, color="#666666", zorder=8)
     agent_legend(fig, agents, bbox_to_anchor=(0.5, -0.02))
     save(fig, outdir, "fig_rq1_ladder", written)
 
@@ -258,7 +378,7 @@ def fig_rq1_delta(pooled: dict, outdir: Path, written: list[Path]) -> None:
     for ax, b in zip(axes.flat, baselines):
         rows_by_size = []
         for m in models:
-            rows = m["comparisons"]["policies"]["complete_case"]
+            rows = m["comparisons"]["by_signal"][RQ1_LEAD]["policies"]["complete_case"]
             rows_by_size.append(next((r for r in rows if r.get("baseline") == b), {}))
         ys = [_nan(r.get("mean_diff")) for r in rows_by_size]
         los = [_nan((r.get("ci95") or [None, None])[0]) for r in rows_by_size]
@@ -275,28 +395,39 @@ def fig_rq1_delta(pooled: dict, outdir: Path, written: list[Path]) -> None:
             # flag points backed by few complete-case pairs (heavy agent failure)
             n = r.get("n")
             if n is not None and n < 0.5 * (m.get("n_scenarios_union") or n):
-                ax.annotate(f"n={n}", xy=(x, y), xytext=(0, -11),
-                            textcoords="offset points", ha="center",
-                            fontsize=6, color="#666666")
+                ax.annotate(f"n={n}", xy=(x, y), textcoords="offset points",
+                            fontsize=6, color="#666666",
+                            **edge_annot_kw(x, sizes))
         row = inter.get(b)
         if row:
-            ax.set_title(
-                f"vs {AGENT_DISPLAY.get(b, b)}\n"
-                f"slope/step {row['trend_ols_slope_per_size_step']:+.2f} "
-                f"[{row['trend_slope_ci95'][0]:+.2f}, {row['trend_slope_ci95'][1]:+.2f}]",
-                fontsize=7.5)
+            # The slope rests on the scenarios common to every size; with a
+            # handful of them the bootstrap CI collapses to zero width and
+            # would read as infinite precision, so print n and drop the
+            # interval when the support is too thin to bound anything.
+            n_common = row.get("trend_n_common_scenarios")
+            ci = row.get("trend_slope_ci95")
+            slope = f"slope/step {row['trend_ols_slope_per_size_step']:+.2f}"
+            if isinstance(n_common, int) and n_common < 10:
+                stat = f"{slope} (n={n_common} common scen.)"
+            elif ci:
+                stat = f"{slope} [{ci[0]:+.2f}, {ci[1]:+.2f}]"
+                stat += f", n={n_common}" if isinstance(n_common, int) else ""
+            else:
+                stat = slope
+            ax.set_title(f"vs {AGENT_DISPLAY.get(b, b)}\n{stat}", fontsize=7.0)
         else:
             ax.set_title(f"vs {AGENT_DISPLAY.get(b, b)}", fontsize=7.5)
         sized_axis(ax, sizes, labels)
         ax.grid(axis="x", visible=False)
     for ax in axes[0]:
         ax.set_xlabel("")
-    for ax in axes[:, 0]:
-        ax.set_ylabel("Δ Total (proposed − baseline)")
+    # one figure-level y label: the 30-char label is longer than a single row's
+    # axis is tall, so per-axes labels butt into each other
+    fig.supylabel("Δ ADDIE (proposed − baseline)", fontsize=8)
     fig.suptitle(
         "Paired per-scenario delta with bootstrap 95% CI "
         "(filled marker: Holm-adjusted p < 0.05)", fontsize=8.5)
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
+    fig.tight_layout(rect=(0.02, 0, 1, 0.97))
     save(fig, outdir, "fig_rq1_delta", written)
 
 
@@ -325,11 +456,6 @@ def fig_rq2_ladder(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     align = pooled.get("alignment") or {}
     if not align.get("models"):
         return False
-    if not any(
-        "objective_assessment_alignment" in metrics
-        for agents in align["models"].values() for metrics in agents.values()
-    ):
-        return False  # legacy pooled input without the alignment endpoint
     models = [m for m in pooled["models"] if m["label"] in align["models"]]
     agents = agents_in(pooled)
     sizes = [size_of_label(m["label"]) for m in models]
@@ -339,14 +465,14 @@ def fig_rq2_ladder(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     for a in agents:
         ys, errs = [], []
         for m in models:
-            cell = align["models"][m["label"]].get(a, {}).get("objective_assessment_alignment", {})
+            cell = align["models"][m["label"]].get(a, {}).get("objective_assessment_similarity", {})
             ys.append(_nan(cell.get("mean")))
             n = cell.get("n_scenarios") or 0
             sd = _nan(cell.get("sd_across_scenarios"))
             errs.append(sd / math.sqrt(n) if n and not math.isnan(sd) else 0.0)
         ax.errorbar(sizes, ys, yerr=errs, capsize=2, elinewidth=0.8, **line_kw(a))
     sized_axis(ax, sizes, labels)
-    ax.set_ylabel("Objective–assessment alignment (0–1)")
+    ax.set_ylabel("Objective$\\to$assessment similarity (0–1)")
     ax.grid(axis="x", visible=False)
     ax.text(0.02, 0.02, "error bars: ±SEM across scenarios",
             transform=ax.transAxes, fontsize=6.5, color="#666666")
@@ -364,22 +490,38 @@ def fig_rq2_components(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     comp_keys = [k for k, _ in RQ2_COMPONENTS]
     comp_names = [n for _, n in RQ2_COMPONENTS]
 
+    # wide enough that a 3-glyph value fits inside a column without touching
+    # its neighbour (the 7 signals are narrow by construction)
     fig, axes = plt.subplots(1, len(models),
-                             figsize=(2.15 * len(models) + 1.4, 2.2 + 0.30 * len(agents)),
+                             figsize=(3.05 * len(models) + 1.6, 2.4 + 0.34 * len(agents)),
                              sharey=True)
     axes = [axes] if len(models) == 1 else list(axes)
     cmap = plt.get_cmap("Blues")
     last_im = None
     for ax, m in zip(axes, models):
-        grid = [[_nan(align["models"][m["label"]].get(a, {}).get(k, {}).get("mean"))
-                 for k in comp_keys] for a in agents]
+        cells = [[align["models"][m["label"]].get(a, {}).get(k, {}) or {}
+                  for k in comp_keys] for a in agents]
+        grid = [[_nan(c.get("mean")) for c in row] for row in cells]
+        ns = [n for row in cells for c in row
+              if isinstance(n := c.get("n_scenarios"), int)]
+        n_max = max(ns) if ns else 0
         last_im = ax.imshow(grid, cmap=cmap, vmin=0.0, vmax=1.0, aspect="auto")
         for i, row in enumerate(grid):
             for j, v in enumerate(row):
                 if math.isnan(v):
                     continue
-                ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=7.5,
-                        color="white" if v > 0.55 else "#333333")
+                txt = f"{v:.2f}"
+                dark = v > 0.55
+                ax.text(j, i, txt[1:] if 0 <= v < 1 else txt,
+                        ha="center", va="center", fontsize=6.5,
+                        color="white" if dark else "#333333")
+                n = cells[i][j].get("n_scenarios")
+                if isinstance(n, int) and n_max and n < 0.5 * n_max:
+                    ax.text(j, i + 0.30, f"n={n}", ha="center", va="center",
+                            fontsize=5.5,
+                            color="#FFC4C4" if dark else "#8B0000")
+        # separator between the two instrument families (A | B)
+        ax.axvline(RQ2_FAMILY_A_N - 0.5, color="white", linewidth=2.0, zorder=4)
         ax.set_title(f"Qwen3.5-{size_display(m['label'])}")
         ax.set_xticks(range(len(comp_names)))
         ax.set_xticklabels(comp_names, rotation=35, ha="right", fontsize=7.5)
@@ -391,7 +533,9 @@ def fig_rq2_components(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     axes[0].set_yticklabels([AGENT_DISPLAY.get(a, a) for a in agents], fontsize=8)
     cbar = fig.colorbar(last_im, ax=axes, fraction=0.02, pad=0.02)
     cbar.ax.tick_params(labelsize=6.5)
-    cbar.set_label("Component mean (0–1)", fontsize=7)
+    cbar.set_label("Panel signal mean (0–1)", fontsize=7)
+    fig.text(0.5, -0.05, RQ2_PANEL_FOOTNOTE, ha="center", va="top",
+             fontsize=6.5, color="#555555", linespacing=1.5)
     save(fig, outdir, "fig_rq2_components", written)
     return True
 
@@ -408,7 +552,7 @@ def collect_scenario_pairs(pattern: str, agents: list[str]) -> dict[str, dict[st
                 align = pool.extract_alignment_metrics(doc, agents) if doc else {}
                 for a in agents:
                     r = payload["rankings"].get(a) or {}
-                    t, c = r.get("total_score"), align.get(a, {}).get("objective_assessment_alignment")
+                    t, c = r.get(RQ1_LEAD), align.get(a, {}).get("objective_assessment_similarity")
                     if isinstance(t, (int, float)) and isinstance(c, (int, float)):
                         slot = acc.setdefault(a, {}).setdefault(sid, {"t": [], "c": []})
                         slot["t"].append(float(t))
@@ -431,7 +575,7 @@ def fig_rq2_vs_rq1_scatter(pairs: dict, agents: list[str], outdir: Path,
                              sharex=True, sharey=True)
     axes = [axes] if len(labels) == 1 else list(axes)
     for ax, lb in zip(axes, labels):
-        all_t, all_c = [], []
+        all_t, all_c, within = [], [], []
         for a in agents:
             pts = pairs[lb].get(a, [])
             if not pts:
@@ -439,18 +583,34 @@ def fig_rq2_vs_rq1_scatter(pairs: dict, agents: list[str], outdir: Path,
             ts, cs = zip(*pts)
             all_t += list(ts)
             all_c += list(cs)
+            if len(pts) >= 10:
+                within.append(spearman_rho(list(ts), list(cs)))
             ax.scatter(ts, cs, s=7, alpha=0.45, linewidths=0,
                        color=AGENT_COLOR.get(a, "#666666"),
                        marker=point_marker(a),
                        zorder=5 if a == PROPOSED else 3)
+        # The pooled rho mixes within- and between-agent variation and is
+        # dominated by the latter (the agent clusters sit apart), so its scope
+        # is named and the within-agent view is printed beside it.
         rho = spearman_rho(all_t, all_c)
+        med = median(within)
+        txt = (f"pooled $\\rho_s$ = {rho:.2f}\n"
+               f"n = {len(all_t)} (agent-scen.)")
+        if not math.isnan(med):
+            txt += f"\nwithin-agent med. = {med:.2f}"
         ax.set_title(f"Qwen3.5-{size_display(lb)}", fontsize=8)
-        ax.text(0.04, 0.96, f"$\\rho_s$ = {rho:.2f}\nn = {len(all_t)}",
-                transform=ax.transAxes, va="top", fontsize=7, color="#333333")
-        ax.set_xlabel("Total (judge)")
+        ax.text(0.04, 0.97, txt, transform=ax.transAxes, va="top",
+                fontsize=6.0, color="#333333", zorder=8)
+        ax.set_xlabel("ADDIE rubric (judge, /100)")
         ax.grid(axis="x", visible=False)
-    axes[0].set_ylabel("Objective–assessment alignment")
+    axes[0].set_ylabel("Objective$\\to$assessment similarity")
     agent_legend(fig, agents, bbox_to_anchor=(0.5, -0.06))
+    fig.text(0.5, -0.30,
+             "Pooled $\\rho_s$ is a between-agent correlation: every agent forms its own "
+             "cluster, so it is not a per-scenario convergent-validity estimate.\n"
+             "\"within-agent med.\" = median of the per-agent Spearman "
+             f"$\\rho_s$ ({len(agents)} agents), the per-scenario view.",
+             ha="center", va="top", fontsize=6.5, color="#555555")
     fig.tight_layout()
     save(fig, outdir, "fig_rq2_vs_rq1_scatter", written)
     return True
@@ -463,6 +623,7 @@ def fig_failure_rate(pooled: dict, outdir: Path, written: list[Path]) -> None:
     width = 0.8 / n_agents
 
     fig, ax = plt.subplots(figsize=(7.0, 2.8))
+    zero_everywhere: dict[str, bool] = {}
     for ai, a in enumerate(agents):
         xs, ys, err_lo, err_hi = [], [], [], []
         for mi, m in enumerate(models):
@@ -474,6 +635,7 @@ def fig_failure_rate(pooled: dict, outdir: Path, written: list[Path]) -> None:
             ys.append(mean)
             err_lo.append(mean - min(rates, default=0.0))
             err_hi.append(max(rates, default=0.0) - mean)
+        zero_everywhere[a] = all(y == 0 for y in ys) and all(h == 0 for h in err_hi)
         bars = ax.bar(xs, ys, width=width * 0.92, color=AGENT_COLOR.get(a, "#666666"),
                       yerr=[err_lo, err_hi], error_kw={"elinewidth": 0.7, "capsize": 1.5},
                       zorder=3)
@@ -489,7 +651,12 @@ def fig_failure_rate(pooled: dict, outdir: Path, written: list[Path]) -> None:
     ax.grid(axis="x", visible=False)
     ax.set_title("Scenarios with no scorable output "
                  "(mean of runs; whiskers: min–max across runs)", fontsize=8)
-    agent_legend(fig, agents, bbox_to_anchor=(0.5, -0.04))
+    # bar chart ⇒ patch handles: the shared line legend would advertise dashes
+    # and markers that appear nowhere in the plot
+    bar_legend(fig, agents,
+               labels={a: f"{AGENT_DISPLAY.get(a, a)} (0% at every size)"
+                       for a, z in zero_everywhere.items() if z},
+               bbox_to_anchor=(0.5, -0.04))
     save(fig, outdir, "fig_failure_rate", written)
 
 
@@ -504,23 +671,51 @@ def fig_cost_quality(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     # Tokens only: execution time reflects serving load/API latency, not the
     # method, so it is deliberately not plotted.
     fig, ax = plt.subplots(figsize=(4.6, 3.2))
+    partial_seen = False
     for a in agents:
-        xs, ys = [], []
+        xs, ys, notes = [], [], []
         for m in models:
-            xs.append(_nan(tok["models"][m["label"]].get(a, {})
-                           .get("total_tokens", {}).get("mean")))
-            ys.append(_nan(m["agents"].get(a, {}).get("mean_total")))
+            cell = tok["models"][m["label"]].get(a, {}).get("total_tokens", {})
+            summary = m["agents"].get(a, {})
+            xs.append(_nan(cell.get("mean")))
+            ys.append(_nan(summary.get(RQ1_LEAD_FIELD)))
+            # the two coordinates are averaged over different scenario sets
+            # (tokens over runs with metadata, ADDIE over the complete-case
+            # set); flag the markers where they diverge badly
+            n_tok, n_add = cell.get("n_scenarios"), summary.get("n_scenarios_complete")
+            union = m.get("n_scenarios_union") or 0
+            thin = (union and isinstance(n_tok, int) and isinstance(n_add, int)
+                    and min(n_tok, n_add) < 0.5 * union)
+            notes.append(f"n={n_add}/{n_tok}" if thin else None)
         kw = line_kw(a)
         ax.plot(xs, ys, alpha=0.9, color=kw["color"], marker="",
                 linewidth=0.9 if a != PROPOSED else 1.6, zorder=kw["zorder"])
-        for x, y, ms in zip(xs, ys, size_ms):
+        for x, y, ms, note in zip(xs, ys, size_ms, notes):
             ax.plot([x], [y], marker=point_marker(a), markersize=ms,
-                    color=kw["color"], markeredgecolor="white",
-                    markeredgewidth=0.6, zorder=kw["zorder"] + 1)
+                    color=kw["color"] if note is None else "white",
+                    markerfacecolor=kw["color"] if note is None else "white",
+                    markeredgecolor="white" if note is None else kw["color"],
+                    markeredgewidth=0.6 if note is None else 1.2,
+                    zorder=kw["zorder"] + 1)
+            if note:
+                partial_seen = True
+                # to the side, not below: these points sit on the axis floor
+                ax.annotate(note, xy=(x, y), xytext=(7, -5),
+                            textcoords="offset points", ha="left", va="center",
+                            fontsize=5.5, color=kw["color"])
     ax.set_xscale("log")
     ax.set_xlabel("Mean total tokens per scenario")
     ax.grid(axis="x", visible=False)
-    ax.set_ylabel("Total composite")
+    ax.set_ylabel("ADDIE rubric (/100)")
+    if partial_seen:
+        # below the legend: the data area has no free corner at the small sizes,
+        # which is exactly where the flagged markers are
+        fig.text(0.5, -0.20,
+                 "Hollow marker: the two coordinates are averaged over different "
+                 "partial scenario sets\n(n = ADDIE complete-case / scenarios with "
+                 "token metadata), so the point is not a property\nof one common "
+                 "scenario set.",
+                 ha="center", va="top", fontsize=6.5, color="#555555")
     fig.suptitle("Quality vs token cost — marker size grows with model size "
                  f"({', '.join(size_display(m['label']) for m in models)})", fontsize=8)
     agent_legend(fig, agents, bbox_to_anchor=(0.5, -0.04))
@@ -544,12 +739,19 @@ def demo_pooled() -> dict:
         agents_summary, comp_rows = {}, []
         for a, off in offsets.items():
             total = base + off
+            # baselines "fail" at the smallest size so the thin-coverage
+            # marking is exercised by the layout test too
+            n_complete = 88 if (si or a == PROPOSED) else 6
             agents_summary[a] = {
-                "n_scenarios_complete": 88, "n_scenarios_any_missing": 2,
+                "n_scenarios_complete": n_complete,
+                "n_scenarios_any_missing": 90 - n_complete,
                 "mean_total": total, "sd_total_across_scenarios": 5.0,
                 "mean_addie": total - 2.0, "mean_traj": total + 4.0,
                 "run_means_total": [total - 0.4, total, total + 0.4],
                 "run_to_run_sd": 1.2 + (3 - si) * 0.5,
+                "run_to_run_sd_total": 1.2 + (3 - si) * 0.5,
+                "run_to_run_sd_addie": 1.5 + (3 - si) * 0.6,
+                "run_to_run_sd_traj": 0.8 + (3 - si) * 0.3,
             }
             if a != PROPOSED:
                 d = offsets[PROPOSED] - off + (3 - si) * 0.8
@@ -565,27 +767,31 @@ def demo_pooled() -> dict:
                              for a in offsets}}
                         for _ in range(3)],
             "agents": agents_summary,
-            "comparisons": {"policies": {"complete_case": comp_rows}},
+            "comparisons": {"by_signal": {
+                RQ1_LEAD: {"policies": {"complete_case": comp_rows}}}},
         })
         align_models[label] = {
-            a: {"objective_assessment_alignment": {"n_scenarios": 90,
+            a: {"objective_assessment_similarity": {"n_scenarios": nsc,
                               "mean": min(0.95, 0.35 + si * 0.08 + off / 60
                                           + (0.15 if a == PROPOSED else 0)),
                               "sd_across_scenarios": 0.12},
-                **{k: {"n_scenarios": 90,
+                **{k: {"n_scenarios": nsc if ki % 3 else max(15, nsc // 3),
                        "mean": min(0.95, 0.3 + si * 0.07 + off / 70 + ki * 0.05
                                    + (0.12 if a == PROPOSED else 0)),
                        "sd_across_scenarios": 0.1}
                    for ki, (k, _) in enumerate(RQ2_COMPONENTS)}}
             for a, off in offsets.items()
+            for nsc in [90 if (si or a == PROPOSED) else 40]
         }
         tok_models[label] = {
-            a: {"total_tokens": {"mean": 20000 + i * 15000 + si * 5000},
+            a: {"total_tokens": {"n_scenarios": 90 if (si or a == PROPOSED) else 70,
+                                 "mean": 20000 + i * 15000 + si * 5000},
                 "execution_time_seconds": {"mean": 60 + i * 40 + si * 20}}
             for i, a in enumerate(offsets)
         }
     inter = {"per_baseline": [
         {"baseline": b, "trend_ols_slope_per_size_step": -0.8,
+         "trend_n_common_scenarios": 88 if b != "baseline" else 3,
          "trend_slope_ci95": [-1.3, -0.3]} for b in offsets if b != PROPOSED]}
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -600,17 +806,17 @@ def demo_pooled() -> dict:
 
 
 def demo_pairs(pooled: dict) -> dict:
-    """Synthetic per-scenario (total, alignment) pairs for the scatter figure."""
+    """Synthetic per-scenario (ADDIE, similarity) pairs for the scatter figure."""
     rng = random.Random(42)
     pairs: dict[str, dict[str, list[tuple[float, float]]]] = {}
     for m in pooled["models"]:
         by_agent = {}
         for a, s in m["agents"].items():
-            comp = pooled["alignment"]["models"][m["label"]][a]["objective_assessment_alignment"]["mean"]
+            comp = pooled["alignment"]["models"][m["label"]][a]["objective_assessment_similarity"]["mean"]
             pts = []
             for _ in range(90):
-                t = rng.gauss(s["mean_total"], 8.0)
-                c = max(0.0, min(1.0, comp + (t - s["mean_total"]) / 120
+                t = rng.gauss(s[RQ1_LEAD_FIELD], 8.0)
+                c = max(0.0, min(1.0, comp + (t - s[RQ1_LEAD_FIELD]) / 120
                                  + rng.gauss(0, 0.06)))
                 pts.append((t, c))
             by_agent[a] = pts

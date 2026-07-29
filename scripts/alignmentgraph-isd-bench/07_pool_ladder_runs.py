@@ -55,6 +55,47 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "evaluator" / "src"))
+
+from isd_evaluator.metrics.alignment import (  # noqa: E402
+    NON_DIRECTIONAL_SIGNALS,
+    PANEL_SIGNALS,
+)
+
+#: The signal whose per-scenario values drive the scale (DiD) narrative and the
+#: default sensitivity-agreement computation. NOT a primary endpoint: every
+#: panel signal gets the same inferential treatment (see pool_alignment); this
+#: one only picks which single series the one-dimensional summaries plot.
+#: Overridable with --sensitivity-metric.
+LEAD_SIGNAL = "objective_assessment_similarity"
+
+#: Agreement for the Bloom axis must be read on a family-B signal. Swapping the
+#: Bloom classifier cannot move a family-A signal at all — those are computed
+#: from encoder vectors alone — so scoring that axis on LEAD_SIGNAL would report
+#: rho = 1.000 as a tautology and call it instrument independence.
+BLOOM_LEAD_SIGNAL = "objective_cognitive_congruence"
+
+#: RQ1 judge signals, reported side by side rather than blended. The
+#: benchmark's ``total_score`` is 0.7*ADDIE + 0.3*Trajectory — a composite whose
+#: weights come from the benchmark, not from this study's question, so it is not
+#: the headline here for the same reason RQ2 has no composite: ADDIE measures
+#: instructional-design content quality (the construct the research question is
+#: about) and Trajectory measures process conformance (a different construct).
+#: total_score is still reported in full, because it is ISD-Agent-Bench's own
+#: canonical number and dropping it would break comparability with that
+#: benchmark's reporting.
+RQ1_SIGNALS = ("addie_median", "total_score", "trajectory_score")
+
+#: The signal the RQ1 narrative, headline table, figures and DiD run on.
+RQ1_LEAD_SIGNAL = "addie_median"
+
+RQ1_SIGNAL_LABEL = {
+    "addie_median": "ADDIE rubric (/100)",
+    "total_score": "total_score = 0.7*ADDIE + 0.3*Trajectory (benchmark composite)",
+    "trajectory_score": "Trajectory (BFCL tool-use, /100)",
+}
+
 DEFAULT_PROPOSED = "alignmentgraph-isd"
 DEFAULT_BASELINES = [
     "baseline", "react-isd", "dick-carey-agent", "addie-agent", "rpisd-agent", "eduplanner",
@@ -394,21 +435,26 @@ def _scorer():
 
 def resolve_sensitivity_arms(args, run_dirs_by_model: dict[str, list[Path]]
                              ) -> list[tuple[str, str]]:
-    """[(encoder key, artifact suffix)] for the sweep arms to pool.
+    """[(arm key, artifact suffix)] for the sweep arms to pool.
 
-    The primary encoder is never an arm: its unsuffixed artifact IS
+    Covers BOTH sensitivity axes: encoders (family A, ENCODER_PRESETS) and
+    Bloom classifiers (family B, BLOOM_PRESETS). Family B is not optional
+    decoration — 3 of the 7 panel signals are Bloom-derived, so leaving it out
+    would mean those three are checked by no axis at all.
+
+    The primary configuration is never an arm: its unsuffixed artifact IS
     pooled["alignment"], and comparing it with itself is not a sensitivity
     check.
 
-    --auto-encoders is registry-first, disk-second. The sensitivity design is
-    fixed (ENCODER_PRESETS), so every non-primary preset is an arm whether or
-    not it has been scored yet — an arm nobody ran then shows up as `skipped`
-    instead of being absent, and absence is the one failure mode that makes a
-    partial sweep look complete. Suffixed artifacts found on disk are added on
-    top, so a one-off encoder outside the registry is still picked up.
+    --auto-encoders / --auto-bloom are registry-first, disk-second. The
+    sensitivity design is fixed, so every non-primary preset is an arm whether
+    or not it has been scored yet — an arm nobody ran then shows up as
+    `skipped` instead of being absent, and absence is the one failure mode that
+    makes a partial sweep look complete. Suffixed artifacts found on disk are
+    added on top, so a one-off arm outside the registry is still picked up.
     """
     scorer = _scorer()
-    suffix_to_key = scorer.SUFFIX_TO_KEY
+    suffix_to_key = {**scorer.SUFFIX_TO_KEY, **scorer.BLOOM_SUFFIX_TO_KEY}
     arms: list[tuple[str, str]] = []
     seen: set[str] = set()
 
@@ -421,8 +467,11 @@ def resolve_sensitivity_arms(args, run_dirs_by_model: dict[str, list[Path]]
         key = raw.strip()
         if not key:
             continue
-        preset = scorer.ENCODER_PRESETS.get(key)
+        preset = scorer.ENCODER_PRESETS.get(key) or scorer.BLOOM_PRESETS.get(key)
         add(key, preset[2] if preset else key)
+    if args.auto_bloom:
+        for preset_key, (_kind, _path, suffix) in scorer.BLOOM_PRESETS.items():
+            add(preset_key, suffix)
     if args.auto_encoders:
         # The fixed design first: never-scored arms must still be reported.
         for preset_key, (_kind, _model, suffix) in scorer.ENCODER_PRESETS.items():
@@ -482,14 +531,36 @@ def pool_model(label: str, run_dirs: list[Path], agents: list[str]) -> dict:
 
     agents_summary: dict[str, dict] = {}
     for a in agents:
+        # The complete-case set is defined by total_score availability and then
+        # reused for the ADDIE and Trajectory means. That is only sound because
+        # the three arrive together: over all 10,347 scored agent-run cells in the
+        # 12 ladder runs there is no cell with total_score but a missing
+        # addie_median or trajectory_score. If a future evaluator can emit one
+        # without the others, this has to become a per-signal complete-case set.
         complete = {sid: v for sid, v in totals[a].items() if all(x is not None for x in v)}
         scen_means = [_mean([x for x in v]) for v in complete.values()]  # type: ignore[list-item]
         scen_sds = [_sd([x for x in v]) for v in complete.values() if len(v) >= 2]  # type: ignore[arg-type]
-        # run-level mean (over scenarios present in that run) -> SD across runs
-        run_means = []
-        for ri in range(len(runs)):
-            vals = [v[ri] for v in totals[a].values() if v[ri] is not None]
-            run_means.append(_mean(vals) if vals else float("nan"))
+        # Run-level mean -> SD across runs, over the SAME complete-case set that
+        # mean_total uses. Averaging each run over whatever scenarios that run
+        # happens to have makes the run means incomparable: their spread would
+        # mix run-to-run variability with differences in scenario composition,
+        # which is exactly the wrong thing to print as "mean_total ± SD" (and it
+        # understates the SD precisely for the agents that fail most).
+        # Every RQ1 signal gets its OWN run-to-run SD over that same set. A single
+        # shared SD was a real defect: it is a total_score statistic, and printing
+        # it next to an ADDIE or Trajectory mean overstated run-to-run spread by up
+        # to 16x on Trajectory, which is far more stable across runs than Total.
+        def run_level_sd(series: dict[str, list[Optional[float]]]) -> tuple[list[float], float]:
+            per_run = []
+            for ri in range(len(runs)):
+                vals = [v[ri] for sid, v in series.items()
+                        if sid in complete and v[ri] is not None]
+                per_run.append(_mean(vals) if vals else float("nan"))
+            return per_run, _sd([m for m in per_run if not math.isnan(m)])
+
+        run_means, sd_run_total = run_level_sd(totals[a])
+        _, sd_run_addie = run_level_sd(addies[a])
+        _, sd_run_traj = run_level_sd(trajs[a])
         addie_means = [
             _mean([x for x in addies[a][sid] if x is not None])
             for sid in complete if any(x is not None for x in addies[a][sid])
@@ -507,7 +578,14 @@ def pool_model(label: str, run_dirs: list[Path], agents: list[str]) -> dict:
             "mean_addie": _mean(addie_means),
             "mean_traj": _mean(traj_means),
             "run_means_total": run_means,
-            "run_to_run_sd": _sd([m for m in run_means if not math.isnan(m)]),
+            # CONSUMERS: pick the field matching the signal you display. The bare
+            # `run_to_run_sd` is Total and is kept only because the ablation
+            # pooling (08) checks A0 drift on total_score; never pair it with an
+            # ADDIE or Trajectory mean.
+            "run_to_run_sd": sd_run_total,
+            "run_to_run_sd_total": sd_run_total,
+            "run_to_run_sd_addie": sd_run_addie,
+            "run_to_run_sd_traj": sd_run_traj,
         }
 
     return {
@@ -517,7 +595,10 @@ def pool_model(label: str, run_dirs: list[Path], agents: list[str]) -> dict:
         "n_scenarios_union": len(all_scenarios),
         "per_run": per_run_info,
         "agents": agents_summary,
-        "_totals": totals,  # stripped before JSON dump
+        # Per-scenario series for every RQ1 signal, so the inferential layer is
+        # not locked to the composite. Stripped before the JSON dump.
+        "_scores": {"addie_median": addies, "total_score": totals,
+                    "trajectory_score": trajs},
     }
 
 
@@ -543,51 +624,69 @@ def scenario_mean_map(totals: dict[str, dict[str, list[Optional[float]]]],
 
 
 def compare_model(model: dict, proposed: str, baselines: list[str]) -> dict:
-    totals = model["_totals"]
-    observed = [x for a in totals.values() for v in a.values() for x in v if x is not None]
-    floor = min(observed) if observed else 0.0
+    """Paired stats for every RQ1 signal, each with the three failure policies.
 
-    policies = {}
-    for policy in ("complete_case", "zero", "min_score"):
-        rows = []
-        for b in baselines:
-            pmap = scenario_mean_map(totals, proposed, policy, floor)
-            bmap = scenario_mean_map(totals, b, policy, floor)
-            shared = sorted(set(pmap) & set(bmap))
-            diffs = [pmap[s] - bmap[s] for s in shared]
-            if not diffs:
-                rows.append({"baseline": b, "n": 0})
-                continue
-            w, p, n_eff = wilcoxon_signed_rank(diffs)
-            lo, hi = bootstrap_ci(diffs)
-            rows.append({
-                "baseline": b,
-                "n": len(diffs),
-                "n_effective_nonzero": n_eff,
-                "mean_diff": _mean(diffs),
-                "ci95": [lo, hi],
-                "wilcoxon_w_plus": w,
-                "p_raw": p,
-                "rank_biserial_r": rank_biserial(diffs),
-            })
-        with_p = [r for r in rows if "p_raw" in r]
-        holm = holm_correct([r["p_raw"] for r in with_p])
-        for r, ph in zip(with_p, holm):
-            r["p_holm"] = ph
-        policies[policy] = rows
+    Every signal in :data:`RQ1_SIGNALS` gets identical treatment — the lead
+    signal is a narrative choice recorded in ``lead_signal``, not a different
+    statistical standard. Holm families stay per (signal, policy): the signals
+    measure different constructs, so pooling them into one family would trade
+    power for a correction nobody asked for.
+    """
+    by_signal: dict[str, dict] = {}
+    for metric in RQ1_SIGNALS:
+        series = model["_scores"][metric]
+        observed = [x for a in series.values() for v in a.values() for x in v
+                    if x is not None]
+        floor = min(observed) if observed else 0.0
+        policies = {}
+        for policy in ("complete_case", "zero", "min_score"):
+            rows = []
+            for b in baselines:
+                pmap = scenario_mean_map(series, proposed, policy, floor)
+                bmap = scenario_mean_map(series, b, policy, floor)
+                shared = sorted(set(pmap) & set(bmap))
+                diffs = [pmap[s] - bmap[s] for s in shared]
+                if not diffs:
+                    rows.append({"baseline": b, "n": 0})
+                    continue
+                w, p, n_eff = wilcoxon_signed_rank(diffs)
+                lo, hi = bootstrap_ci(diffs)
+                rows.append({
+                    "baseline": b,
+                    "n": len(diffs),
+                    "n_effective_nonzero": n_eff,
+                    "mean_diff": _mean(diffs),
+                    "ci95": [lo, hi],
+                    "wilcoxon_w_plus": w,
+                    "p_raw": p,
+                    "rank_biserial_r": rank_biserial(diffs),
+                })
+            with_p = [r for r in rows if "p_raw" in r]
+            holm = holm_correct([r["p_raw"] for r in with_p])
+            for r, ph in zip(with_p, holm):
+                r["p_holm"] = ph
+            policies[policy] = rows
+        by_signal[metric] = {
+            "label": RQ1_SIGNAL_LABEL[metric],
+            "min_score_floor": floor,
+            "policies": policies,
+        }
     return {
         "holm_family": (
             f"{len(baselines)} comparisons ({proposed} vs each baseline) "
-            f"within model size '{model['label']}'; Holm applied per policy."
+            f"within model size '{model['label']}'; Holm applied per "
+            "(signal, policy)."
         ),
+        "lead_signal": RQ1_LEAD_SIGNAL,
+        "signals": list(RQ1_SIGNALS),
         "primary_policy": "complete_case",
-        "min_score_floor": floor,
-        "policies": policies,
+        "by_signal": by_signal,
     }
 
 
 def interaction_tests(models: list[dict], proposed: str, baselines: list[str],
-                      n_boot: int = N_BOOT, seed: int = BOOT_SEED) -> dict:
+                      n_boot: int = N_BOOT, seed: int = BOOT_SEED,
+                      metric: str = RQ1_LEAD_SIGNAL) -> dict:
     """Method x model-size interaction (reviewer Q11).
 
     DiD = mean_i[ delta_i(largest) - delta_i(smallest) ] where
@@ -602,8 +701,9 @@ def interaction_tests(models: list[dict], proposed: str, baselines: list[str],
     for b in baselines:
         deltas_by_size = []
         for m in models:
-            pmap = scenario_mean_map(m["_totals"], proposed, "complete_case", 0.0)
-            bmap = scenario_mean_map(m["_totals"], b, "complete_case", 0.0)
+            series = m["_scores"][metric]
+            pmap = scenario_mean_map(series, proposed, "complete_case", 0.0)
+            bmap = scenario_mean_map(series, b, "complete_case", 0.0)
             deltas_by_size.append({s: pmap[s] - bmap[s] for s in set(pmap) & set(bmap)})
         d_small, d_large = deltas_by_size[0], deltas_by_size[-1]
         shared = sorted(set(d_small) & set(d_large))
@@ -654,12 +754,14 @@ def interaction_tests(models: list[dict], proposed: str, baselines: list[str],
             "trend_slope_ci95": [slope_lo, slope_hi],
         })
     return {
+        "metric": metric,
         "definition": (
-            "DiD = mean over scenarios of [delta(largest size) - delta(smallest size)], "
-            "delta = proposed - baseline per scenario (mean of runs, complete-case); "
-            "bootstrap CI (10k, seed 42) resamples scenarios; positive DiD means the "
-            "proposed method's advantage GROWS with model size, negative means it "
-            "shrinks (i.e. the method helps small models more)."
+            f"DiD on {metric} = mean over scenarios of [delta(largest size) - "
+            "delta(smallest size)], delta = proposed - baseline per scenario "
+            "(mean of runs, complete-case); bootstrap CI (10k, seed 42) "
+            "resamples scenarios; positive DiD means the proposed method's "
+            "advantage GROWS with model size, negative means it shrinks (i.e. "
+            "the method helps small models more)."
         ),
         "per_baseline": results,
     }
@@ -711,48 +813,59 @@ def failure_tests(models: list[dict], proposed: str, baselines: list[str]) -> di
 def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
                    agents: list[str], proposed: str, baselines: list[str],
                    scores_filename: str = "alignment_scores.json",
-                   return_scenario_maps: bool = False) -> Optional[dict]:
+                   return_scenario_maps: bool = False,
+                   lead_metric: str = LEAD_SIGNAL) -> Optional[dict]:
     """Pool alignment_scores.json metrics if any exist (RQ2). Graceful skip.
 
-    Besides the per-metric means, computes for objective_assessment_alignment
-    (the primary continuous, threshold-free endpoint — no composite):
+    **The inferential layer runs over the whole panel, not one endpoint.**
+    Every signal in :data:`PANEL` gets the full treatment under
+    ``per_model[].panel[<signal>]``; no signal is hoisted to the top level,
+    because a structural hierarchy is exactly the implicit composite the panel
+    design removes. Per signal:
+
       * 'comparisons': paired Wilcoxon (exact at small n) + Holm + bootstrap
         CI, proposed vs each baseline, paired by scenario on mean-of-runs
         (scenarios where both agents were scored) — the RQ2 inferential layer;
       * 'align_descriptive': per-agent mean + bootstrap 95% CI over
         per-scenario values (the absolute descriptive layer);
       * 'conditional_align': restricted to scenarios whose output yielded
-        >=1 objective in every scored run — isolates alignment quality from
-        parse failure, which the primary layer folds in as 0;
-      * 'align_failures' + 'comparisons_failure_zero': the failure-policy
-        layer, mirroring RQ1. The primary 'comparisons' are complete-case over
-        AVAILABLE outputs — a crashed agent writes no *_output.json, so its
-        scenario drops out of the paired set and the crash costs it nothing.
-        The zero policy re-adds those cells at 0.0 from the scorer's
-        'missing_outputs' roster. Report both; never call the primary layer
-        unconditional;
-      * 'interaction_align' (top-level under stats): method x model-size DiD on
-        the paired delta (largest - smallest size), bootstrap CI +
-        Wilcoxon p, mirroring the RQ1 interaction convention.
+        >=1 objective in every scored run — isolates signal quality from
+        parse failure, which the complete-case layer folds in as 0;
+      * 'comparisons_failure_zero': the failure-policy layer, mirroring RQ1.
+        'comparisons' are complete-case over AVAILABLE outputs — a crashed
+        agent writes no *_output.json, so its scenario drops out of the paired
+        set and the crash costs it nothing. The zero policy re-adds those cells
+        at 0.0 from the scorer's 'missing_outputs' roster. Report both; never
+        call the complete-case layer unconditional.
 
-    Pooling is refused outright if the run dirs carry more than one
-    (encoder, encoder_revision) pair — see the SystemExit below.
+    Multiplicity is handled at two levels, both reported (see the protocol
+    spec, docs/summary.md section 5): ``p_holm`` is Holm within one signal
+    (family = one comparison per baseline), and ``p_holm_panel`` is Holm over
+    the entire panel x baseline family for that model size. The second costs
+    nothing to compute and pre-empts the "you ran 168 tests" objection without
+    giving up the power of the first.
+
+    Signal-independent, at 'per_model[]' level: 'align_failures' (the missing
+    -output roster) and, top-level under stats, 'interaction_align' — the
+    method x model-size DiD on the paired delta of ``lead_metric``.
     """
-    PRIMARY = "objective_assessment_alignment"
+    PANEL = [signal for signal, _family in PANEL_SIGNALS]
     out_models = {}
     stats_models = []
     align_maps_by_label: dict[str, dict[str, dict[str, float]]] = {}
+    # metric -> label -> agent -> {scenario: value}. Kept for EVERY panel
+    # signal, not just the lead one: the sensitivity layer judges each axis on
+    # a signal that axis can actually move, so it cannot be locked to one.
+    maps_by_metric: dict[str, dict[str, dict[str, dict[str, float]]]] = {}
     found_any = False
     n_scenario_files = 0
     encoder_label: Optional[str] = None
     encoder_revision: Optional[str] = None
-    # (encoder, revision) -> one example file, to hard-fail on a mixed pool.
-    configs: dict[tuple[Optional[str], Optional[str]], str] = {}
-    # Do the artifacts carry the failure roster at all? Score files written
-    # before 'missing_outputs' existed are indistinguishable from a clean run
-    # unless we track this — and reporting "no failures" for them would be the
-    # same silent overclaim the roster was added to fix.
-    roster_available = False
+    bloom_classifier: Optional[str] = None
+    # (encoder, revision, bloom) -> one example file, to hard-fail on a mixed
+    # pool. The Bloom arm belongs in this key for the same reason the encoder
+    # does: averaging lexicon-scored and BERT-scored cells is not a measurement.
+    configs: dict[tuple[Optional[str], Optional[str], Optional[str]], str] = {}
     for model in models:
         label = model["label"]
         runs = [load_run(d, scores_filename) for d in run_dirs_by_model[label]]
@@ -761,7 +874,6 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
         # miss_counts[agent][scenario] = #runs where the agent produced no
         # scoreable output (the other half of the roster; see failure policies).
         miss_counts: dict[str, dict[str, int]] = {}
-        roster_here = False
         for run in runs:
             for sid, payload in run.items():
                 doc = payload.get("alignment")
@@ -771,14 +883,14 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
                 n_scenario_files += 1
                 if isinstance(doc, dict):
                     configs.setdefault(
-                        (doc.get("encoder"), doc.get("encoder_revision")),
+                        (doc.get("encoder"), doc.get("encoder_revision"),
+                         doc.get("bloom_classifier")),
                         f"{label}/{sid}",
                     )
                     if encoder_label is None:
                         encoder_label = doc.get("encoder")
                         encoder_revision = doc.get("encoder_revision")
-                    if "missing_outputs" in doc:
-                        roster_here = roster_available = True
+                        bloom_classifier = doc.get("bloom_classifier")
                     for agent, reason in (doc.get("missing_outputs") or {}).items():
                         if agent in agents and reason:
                             per = miss_counts.setdefault(agent, {})
@@ -836,7 +948,7 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
                 r["p_holm"] = ph
             return rows
 
-        align_map = per_scenario(PRIMARY)
+        align_map = per_scenario(lead_metric)
         align_maps_by_label[label] = align_map
         # Conditional-on-parseable-output: the documented criterion is ">=1
         # objective", so read the objective COUNT, not the incidental
@@ -844,45 +956,79 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
         # carry no Bloom-classifiable verb — a scenario that has objectives and
         # belongs in the conditional set). Require it in every scored run, so a
         # mean-of-runs is never half parse-failure.
-        cond_map = {
-            agent: {
-                sid: val
-                for sid, val in align_map[agent].items()
-                if min(metric_vals[agent].get("counts.objectives", {}).get(sid, [0]))
-                >= 1
+        def conditional(metric_map: dict[str, dict[str, float]]) -> dict:
+            return {
+                agent: {
+                    sid: val
+                    for sid, val in metric_map[agent].items()
+                    if min(metric_vals[agent].get("counts.objectives", {})
+                           .get(sid, [0])) >= 1
+                }
+                for agent in metric_map
             }
-            for agent in align_map
-        }
         # Failure policy, mirroring RQ1. align_map is complete-case over
         # AVAILABLE outputs: an agent that crashed has no *_output.json, so its
         # scenario silently leaves the paired set and the crash costs it
         # nothing. zero_map re-adds those (agent, scenario, run) cells at 0.0 —
         # the floor of every endpoint here, and the same value a parseable but
         # objective-less output already scores.
-        zero_map: dict[str, dict[str, float]] = {}
-        for agent in sorted(set(align_map) | set(miss_counts)):
-            per_scen = metric_vals.get(agent, {}).get(PRIMARY, {})
-            row: dict[str, float] = {}
-            for sid in set(per_scen) | set(miss_counts.get(agent, {})):
-                vals = list(per_scen.get(sid, []))
-                denom = len(vals) + miss_counts.get(agent, {}).get(sid, 0)
-                row[sid] = (sum(vals) / denom) if denom else 0.0
-            if row:
-                zero_map[agent] = row
+        def failure_zero(metric: str, metric_map: dict[str, dict[str, float]]) -> dict:
+            out: dict[str, dict[str, float]] = {}
+            for agent in sorted(set(metric_map) | set(miss_counts)):
+                per_scen = metric_vals.get(agent, {}).get(metric, {})
+                row: dict[str, float] = {}
+                for sid in set(per_scen) | set(miss_counts.get(agent, {})):
+                    vals = list(per_scen.get(sid, []))
+                    denom = len(vals) + miss_counts.get(agent, {}).get(sid, 0)
+                    row[sid] = (sum(vals) / denom) if denom else 0.0
+                if row:
+                    out[agent] = row
+            return out
+
+        panel: dict[str, dict] = {}
+        for signal in PANEL:
+            signal_map = align_map if signal == lead_metric else per_scenario(signal)
+            if not any(signal_map.values()):
+                continue
+            zero_map = failure_zero(signal, signal_map)
+            maps_by_metric.setdefault(signal, {})[label] = signal_map
+            panel[signal] = {
+                "family": dict(PANEL_SIGNALS)[signal],
+                "directional": signal not in NON_DIRECTIONAL_SIGNALS,
+                "align_descriptive": {
+                    agent: {
+                        "n": len(vals),
+                        "mean": _mean(list(vals.values())),
+                        "ci95": list(bootstrap_ci(list(vals.values()))),
+                    }
+                    for agent, vals in sorted(signal_map.items()) if vals
+                },
+                "conditional_align": {
+                    agent: {"n": len(vals), "mean": _mean(list(vals.values()))}
+                    for agent, vals in sorted(conditional(signal_map).items()) if vals
+                },
+                "comparisons": paired_rows(signal_map),
+                "comparisons_failure_zero": paired_rows(zero_map),
+                "failure_zero_descriptive": {
+                    agent: {"n": len(vals), "mean": _mean(list(vals.values()))}
+                    for agent, vals in sorted(zero_map.items()) if vals
+                },
+            }
+
+        # Holm across the WHOLE panel x baseline family for this model size --
+        # the conservative footnote that travels with the per-signal Holm. Same
+        # data, stricter correction; free to compute, and it pre-empts the
+        # multiplicity objection without costing the per-signal layer's power.
+        flat = [(signal, row)
+                for signal in panel
+                for row in panel[signal]["comparisons"] if "p_raw" in row]
+        for (_signal, row), ph in zip(flat, holm_correct([r["p_raw"] for _s, r in flat])):
+            row["p_holm_panel"] = ph
+
         stats_models.append({
             "label": label,
-            "align_descriptive": {
-                agent: {
-                    "n": len(vals),
-                    "mean": _mean(list(vals.values())),
-                    "ci95": list(bootstrap_ci(list(vals.values()))),
-                }
-                for agent, vals in sorted(align_map.items()) if vals
-            },
-            "conditional_align": {
-                agent: {"n": len(vals), "mean": _mean(list(vals.values()))}
-                for agent, vals in sorted(cond_map.items()) if vals
-            },
+            "panel": panel,
+            "n_panel_signals": len(panel),
             "align_failures": {
                 agent: {
                     "n_scenarios_affected": len(sids),
@@ -890,14 +1036,7 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
                     "scenarios": sorted(sids),
                 }
                 for agent, sids in sorted(miss_counts.items()) if sids
-            } if roster_here else None,
-            "comparisons": paired_rows(align_map),
-            "comparisons_failure_zero": (
-                paired_rows(zero_map) if roster_here else None),
-            "failure_zero_descriptive": {
-                agent: {"n": len(vals), "mean": _mean(list(vals.values()))}
-                for agent, vals in sorted(zero_map.items()) if vals
-            } if roster_here else None,
+            },
         })
     if not found_any:
         return None
@@ -908,18 +1047,18 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
     # metadata was kept. Fail loudly instead.
     if len(configs) > 1:
         detail = "; ".join(
-            f"{enc!r} @ revision {rev!r} (e.g. {where})"
-            for (enc, rev), where in sorted(configs.items(), key=lambda kv: kv[1])
+            f"{enc!r} @ revision {rev!r} + bloom {bloom!r} (e.g. {where})"
+            for (enc, rev, bloom), where in sorted(configs.items(), key=lambda kv: kv[1])
         )
         raise SystemExit(
             f"[{scores_filename}] the pooled run dirs were scored with "
-            f"{len(configs)} different encoder configurations: {detail}. "
+            f"{len(configs)} different protocol configurations: {detail}. "
             "Re-score every run dir with one configuration "
             "(06_score_alignment.py --overwrite) before pooling — a mean over "
-            "two encoders is not an alignment measurement."
+            "two instruments is not an alignment measurement."
         )
 
-    # Method x model-size interaction on the primary endpoint (largest -
+    # Method x model-size interaction on the lead metric (largest -
     # smallest size), mirroring interaction_tests()'s convention for RQ1 Total.
     interaction_align = None
     labels_with = [m["label"] for m in models if m["label"] in align_maps_by_label]
@@ -949,7 +1088,7 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
             })
         interaction_align = {
             "definition": (
-                "DiD on the paired assessment-alignment delta (proposed - "
+                f"DiD on the paired {lead_metric} delta (proposed - "
                 f"baseline): value at the largest size ({large}) minus the "
                 f"smallest ({small}), per scenario; negative = the gap narrows "
                 "as the model grows (i.e. widens toward small models). "
@@ -961,45 +1100,68 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
             "per_baseline": per_baseline,
         }
 
+    # Coverage: how many (run x scenario) cells SHOULD carry a score file vs how
+    # many were found. A half-scored sweep pools as if it were the whole thing —
+    # and the per-agent n= in the report cannot distinguish "the agent failed
+    # here" (real data, handled by the failure policy) from "this scenario was
+    # never scored" (operator error). 04_audit_postrun.py flags this per run dir;
+    # this is the second line of defence, at the point the numbers are made.
+    n_expected = sum(m["n_scenarios_union"] * m["n_runs"] for m in models)
+    coverage_complete = n_scenario_files >= n_expected
+
     result = {
         "source": f"{scores_filename} per scenario dir (pooled mean across runs, then across scenarios)",
         "encoder_label": encoder_label,
         "encoder_revision": encoder_revision,
         "encoder_revision_pinned": encoder_revision is not None,
-        "failure_roster_available": roster_available,
+        "bloom_classifier": bloom_classifier,
         "n_scenario_files": n_scenario_files,
+        "n_scenario_files_expected": n_expected,
+        "coverage_complete": coverage_complete,
         "models": out_models,
         "stats": {
             "definition": (
-                "Primary endpoint = objective_assessment_alignment "
-                "(continuous mean-max RECTIFIED cosine, max(0,cos) on [0,1]; "
-                "no matching threshold, no composite). "
+                "A PANEL of %d signals, no primary endpoint and no composite: "
+                "per_model[].panel[<signal>] carries the same layers for every "
+                "signal, reported win or lose. Continuous signals are mean-max "
+                "RECTIFIED cosine (max(0,cos) on [0,1]; no matching threshold). "
                 "'comparisons' = paired diffs (proposed - baseline) per "
                 "scenario (mean of runs where scored; scenarios scored for "
                 "both agents), Wilcoxon two-sided (exact null for n<=%d), "
-                "Holm over %d comparisons per size, bootstrap CI (%d, seed "
-                "%d). align_descriptive = per-agent mean + bootstrap 95%% "
+                "bootstrap CI (%d, seed %d). Multiplicity is reported twice: "
+                "p_holm = Holm within one signal (%d comparisons), p_holm_panel "
+                "= Holm over the whole panel x baseline family for that size. "
+                "align_descriptive = per-agent mean + bootstrap 95%% "
                 "CI over per-scenario values. Both are COMPLETE-CASE over "
                 "available outputs, not unconditional: an agent run that "
                 "crashed leaves no output to score. align_failures counts "
                 "those cells and comparisons_failure_zero re-runs the paired "
-                "test with them imputed at 0.0 (the endpoint's floor; a "
+                "test with them imputed at 0.0 (the signal's floor; a "
                 "min-score policy is degenerate here because the observed "
                 "minimum IS 0.0). conditional_align = over scenarios whose "
                 "output yielded >=1 objective in every scored run (isolates "
-                "alignment quality from parse failure). interaction_align = "
-                "method x model-size DiD on the paired delta (complete-case)."
-                % (EXACT_WILCOXON_N_MAX, len(baselines), N_BOOT, BOOT_SEED)
+                "signal quality from parse failure). interaction_align = "
+                "method x model-size DiD on the paired delta of %s "
+                "(complete-case)."
+                % (len(PANEL), EXACT_WILCOXON_N_MAX, N_BOOT, BOOT_SEED,
+                   len(baselines), lead_metric)
             ),
+            "panel_signals": [
+                {"signal": signal, "family": family,
+                 "directional": signal not in NON_DIRECTIONAL_SIGNALS}
+                for signal, family in PANEL_SIGNALS
+            ],
+            "lead_metric": lead_metric,
             "per_model": stats_models,
             "interaction_align": interaction_align,
         },
     }
     if return_scenario_maps:
-        # Per-scenario primary-metric values, keyed label -> agent -> scenario.
-        # Only the sensitivity layer needs them (scenario-level agreement);
-        # main() pops the key before the JSON dump.
-        result["_align_maps"] = align_maps_by_label
+        # Per-scenario values, keyed metric -> label -> agent -> scenario. Every
+        # panel signal is kept, because the sensitivity layer judges each axis
+        # on a signal that axis can move. Only that layer needs these; main()
+        # pops the key before the JSON dump.
+        result["_align_maps"] = maps_by_metric
     return result
 
 
@@ -1050,8 +1212,8 @@ def _agreement(primary: dict, arm: dict, primary_maps: dict, arm_maps: dict,
         ys = [a_means[a] for a in common]
 
         # scenario-level, proposed agent only (n ~ 90, not small-n)
-        p_scen = (primary_maps.get(label) or {}).get(proposed, {})
-        a_scen = (arm_maps.get(label) or {}).get(proposed, {})
+        p_scen = ((primary_maps.get(metric) or {}).get(label) or {}).get(proposed, {})
+        a_scen = ((arm_maps.get(metric) or {}).get(label) or {}).get(proposed, {})
         shared = sorted(set(p_scen) & set(a_scen))
         scen_rho = (spearman_rho([p_scen[s] for s in shared],
                                  [a_scen[s] for s in shared])
@@ -1061,7 +1223,8 @@ def _agreement(primary: dict, arm: dict, primary_maps: dict, arm_maps: dict,
         def rows_of(pooled: dict) -> dict[str, dict]:
             for entry in (pooled.get("stats") or {}).get("per_model") or []:
                 if entry.get("label") == label:
-                    return {r["baseline"]: r for r in entry.get("comparisons") or []}
+                    layers = (entry.get("panel") or {}).get(metric) or {}
+                    return {r["baseline"]: r for r in layers.get("comparisons") or []}
             return {}
 
         p_rows, a_rows = rows_of(primary), rows_of(arm)
@@ -1122,43 +1285,58 @@ def pool_alignment_sensitivity(models: list[dict],
                                agents: list[str], proposed: str,
                                baselines: list[str], arms: list[tuple[str, str]],
                                primary_pooled: Optional[dict], primary_key: str,
-                               metric: str) -> Optional[dict]:
+                               metric: str,
+                               bloom_metric: str = BLOOM_LEAD_SIGNAL) -> Optional[dict]:
     """Pool the sweep arms and score each one's agreement with the primary.
 
-    Encoder is swept exactly like model size: the SAME runs are re-scored by a
-    different encoder, so every arm reuses pool_alignment() unchanged and only
-    differs in which ``alignment_scores.<suffix>.json`` it reads. An arm with
-    no artifacts on disk is recorded as skipped rather than dropped, so a
-    half-finished sweep is visible in the JSON instead of looking complete.
+    An instrument is swept exactly like model size: the SAME runs are re-scored
+    with a different encoder (family A) or a different Bloom classifier (family
+    B), so every arm reuses pool_alignment() unchanged and only differs in
+    which ``alignment_scores.<suffix>.json`` it reads. An arm with no artifacts
+    on disk is recorded as skipped rather than dropped, so a half-finished
+    sweep is visible in the JSON instead of looking complete.
     """
     if not arms:
         return None
+    bloom_keys = set(_scorer().BLOOM_PRESETS)
     primary_maps = (primary_pooled or {}).get("_align_maps") or {}
     encoders = []
     for key, suffix in arms:
         scores_filename = f"alignment_scores.{suffix}.json" if suffix else "alignment_scores.json"
+        axis = "bloom" if key in bloom_keys else "encoder"
+        # Each axis is judged on a signal it can actually move (see
+        # BLOOM_LEAD_SIGNAL).
+        arm_metric = bloom_metric if axis == "bloom" else metric
         pooled = pool_alignment(models, run_dirs_by_model, agents, proposed,
                                 baselines, scores_filename=scores_filename,
-                                return_scenario_maps=True)
+                                return_scenario_maps=True, lead_metric=arm_metric)
         if pooled is None:
-            encoders.append({"key": key, "suffix": suffix,
+            encoders.append({"key": key, "axis": axis, "suffix": suffix,
                              "scores_filename": scores_filename,
+                             "agreement_metric": arm_metric,
                              "skipped": f"no {scores_filename} found under any run dir"})
             continue
         arm_maps = pooled.pop("_align_maps", {})
         entry = {
             "key": key,
+            "axis": axis,
+            "agreement_metric": arm_metric,
             "suffix": suffix,
             "scores_filename": scores_filename,
             "encoder_label": pooled.get("encoder_label"),
             "encoder_revision": pooled.get("encoder_revision"),
-            "coverage": {"n_scenario_files": pooled.get("n_scenario_files")},
+            "bloom_classifier": pooled.get("bloom_classifier"),
+            "coverage": {
+                "n_scenario_files": pooled.get("n_scenario_files"),
+                "n_scenario_files_expected": pooled.get("n_scenario_files_expected"),
+                "complete": pooled.get("coverage_complete"),
+            },
             "models": pooled.get("models"),
             "stats": pooled.get("stats"),
         }
         entry["agreement_with_primary"] = (
             _agreement(primary_pooled, pooled, primary_maps, arm_maps, models,
-                       agents, proposed, baselines, metric)
+                       agents, proposed, baselines, arm_metric)
             if primary_pooled else
             {"note": f"no primary ({primary_key}) alignment_scores.json pooled — "
                      "agreement undefined", "per_model": [], "pooled_over_sizes": {}}
@@ -1176,23 +1354,36 @@ def pool_alignment_sensitivity(models: list[dict],
                 taus.append(tau)
             cells += 1
             first += 1 if row.get("proposed_rank_here") == 1 else 0
+        # Read each arm on ITS OWN axis signal. Using the encoder-axis metric for
+        # every arm silently reported the Bloom arm's similarity p-values, which
+        # a Bloom swap cannot move: 3.6e-13 instead of that arm's true 1.7e-02.
+        arm_metric = entry.get("agreement_metric") or (
+            bloom_metric if (entry.get("axis") == "bloom") else metric)
         for entry_model in (entry.get("stats") or {}).get("per_model") or []:
-            for row in entry_model.get("comparisons") or []:
+            layers = (entry_model.get("panel") or {}).get(arm_metric) or {}
+            for row in layers.get("comparisons") or []:
                 if "p_holm" in row:
                     p_max = row["p_holm"] if p_max is None else max(p_max, row["p_holm"])
     return {
         "definition": (
-            "Encoder as a swept dimension: the SAME runs re-scored by each "
-            f"encoder. '{primary_key}' owns the unsuffixed artifact and stays in "
+            "Instrument as a swept dimension: the SAME runs re-scored by each "
+            "arm. This is a 3-axis STAR, not an encoder-only sweep — arms vary "
+            "either the ENCODER (compared on "
+            f"'{metric}') or the BLOOM CLASSIFIER (compared on "
+            f"'{bloom_metric}'), because a Bloom swap cannot move a cosine and "
+            "an encoder swap cannot move a Bloom level. Read each arm's 'axis' "
+            "and 'agreement_metric' rather than assuming one signal. "
+            f"'{primary_key}' owns the unsuffixed artifact and stays in "
             "pooled['alignment']; the arms here are read from "
             "alignment_scores.<suffix>.json. agreement_with_primary compares "
-            f"the per-size agent vector on '{metric}' — Spearman rho with an "
+            "the per-size agent vector on that arm's own signal — Spearman rho with an "
             "exact permutation p (n<=8) and Kendall tau-b, plus top-1 / "
             "proposed-rank / sign / Holm-verdict agreement, and a "
             "scenario-level Spearman for the proposed agent."
         ),
         "primary_encoder": primary_key,
         "metric": metric,
+        "metric_bloom_axis": bloom_metric,
         "encoders": encoders,
         "summary": {
             "n_encoders": len(scored),
@@ -1273,7 +1464,8 @@ def pool_tokens(run_dirs_by_model: dict[str, list[Path]],
 
 def print_report(pooled: dict, proposed: str, baselines: list[str]) -> None:
     print("\n" + "=" * 78)
-    print("POOLED MODEL LADDER — per-scenario composite total_score (paper-canonical)")
+    print("POOLED MODEL LADDER — RQ1 judge signals reported separately; "
+          f"lead = {RQ1_LEAD_SIGNAL}")
     print("=" * 78)
     for model in pooled["models"]:
         print(f"\n## {model['label']}  ({model['n_runs']} runs, "
@@ -1282,31 +1474,37 @@ def print_report(pooled: dict, proposed: str, baselines: list[str]) -> None:
             miss = {a: n for a, n in info["missing_by_agent"].items() if n}
             print(f"  run {Path(info['dir']).name}: {info['n_scenarios_scored']} scenarios scored"
                   + (f", missing {miss}" if miss else ""))
-        print(f"  {'agent':20s} {'nCC':>4s} {'miss':>4s} {'Total':>7s} {'±runSD':>7s} "
-              f"{'ADDIE':>7s} {'Traj':>7s}")
+        print(f"  {'agent':20s} {'nCC':>4s} {'miss':>4s} {'ADDIE':>7s} {'Traj':>7s} "
+              f"{'Total':>7s} {'±runSD':>7s}")
         for a, s in model["agents"].items():
             print(f"  {a:20s} {s['n_scenarios_complete']:4d} {s['n_scenarios_any_missing']:4d} "
-                  f"{s['mean_total']:7.2f} {s['run_to_run_sd']:7.2f} "
-                  f"{s['mean_addie']:7.2f} {s['mean_traj']:7.2f}")
+                  f"{s['mean_addie']:7.2f} {s['mean_traj']:7.2f} "
+                  f"{s['mean_total']:7.2f} {s['run_to_run_sd']:7.2f}")
         comp = model["comparisons"]
-        print(f"\n  Paired stats ({proposed} - baseline), Holm family = "
-              f"{len(baselines)} comparisons in this model size:")
-        for policy in ("complete_case", "zero", "min_score"):
-            label = {"complete_case": "PRIMARY complete-case",
-                     "zero": "sensitivity: failure=0",
-                     "min_score": f"sensitivity: failure=min ({comp['min_score_floor']:.2f})"}[policy]
-            print(f"  [{label}]")
-            for r in comp["policies"][policy]:
-                if r.get("n", 0) == 0 or "p_raw" not in r:
-                    print(f"    {r['baseline']:20s} (no paired scenarios)")
-                    continue
-                lo, hi = r["ci95"]
-                print(f"    {r['baseline']:20s} n={r['n']:3d} dTotal={r['mean_diff']:+7.2f} "
-                      f"CI95[{lo:+6.2f},{hi:+6.2f}] r_rb={r['rank_biserial_r']:+.2f} "
-                      f"p={r['p_raw']:.2e} p_holm={r['p_holm']:.2e}")
+        for metric in comp["signals"]:
+            block = comp["by_signal"][metric]
+            lead = "  <-- LEAD (answers the RQ)" if metric == comp["lead_signal"] else ""
+            print(f"\n  Paired stats on {metric} — {block['label']}{lead}")
+            print(f"  ({proposed} - baseline), Holm family = {len(baselines)} "
+                  "comparisons per policy in this model size:")
+            for policy in ("complete_case", "zero", "min_score"):
+                label = {"complete_case": "complete-case",
+                         "zero": "sensitivity: failure=0",
+                         "min_score":
+                             f"sensitivity: failure=min ({block['min_score_floor']:.2f})"}[policy]
+                print(f"  [{label}]")
+                for r in block["policies"][policy]:
+                    if r.get("n", 0) == 0 or "p_raw" not in r:
+                        print(f"    {r['baseline']:20s} (no paired scenarios)")
+                        continue
+                    lo, hi = r["ci95"]
+                    print(f"    {r['baseline']:20s} n={r['n']:3d} d={r['mean_diff']:+7.2f} "
+                          f"CI95[{lo:+6.2f},{hi:+6.2f}] r_rb={r['rank_biserial_r']:+.2f} "
+                          f"p={r['p_raw']:.2e} p_holm={r['p_holm']:.2e}")
 
     inter = pooled["interaction"]
-    print("\n## Method x model-size interaction (DiD, largest - smallest)")
+    print(f"\n## Method x model-size interaction (DiD, largest - smallest) "
+          f"on {inter.get('metric')}")
     print(f"  {inter.get('definition', '')}")
     for r in inter.get("per_baseline", []):
         lo, hi = r["did_ci95"]
@@ -1342,10 +1540,20 @@ def print_report(pooled: dict, proposed: str, baselines: list[str]) -> None:
         align = pooled["alignment"]
         print(f"  encoder = {align.get('encoder_label')} "
               f"@ revision {align.get('encoder_revision') or 'UNPINNED'}")
+        if not align.get("coverage_complete", True):
+            got = align.get("n_scenario_files")
+            want = align.get("n_scenario_files_expected")
+            pct = 100.0 * got / want if want else float("nan")
+            print(f"  WARNING: partial coverage — {got}/{want} (run x scenario) "
+                  f"score files found ({pct:.0f}%). The numbers below are pooled "
+                  "over what was scored, NOT over the full design; a low per-agent "
+                  "n= here is indistinguishable from agent failure. Finish scoring "
+                  "(06_score_alignment.py) and re-pool before using these for the "
+                  "paper — 04_audit_postrun.py lists which run dirs are short.")
         if not align.get("encoder_revision_pinned"):
             print("  NOTE: no encoder_revision in the score files — reproducibility "
                   "rests on the embedding cache only. Set <SLOT>_EMBED_REVISION "
-                  "(or --embed-model-revision) and re-score to pin the weights.")
+                  "(or --embed-revision-for SLOT=...) and re-score to pin the weights.")
         for label, agents_metrics in pooled["alignment"]["models"].items():
             print(f"  {label}:")
             for agent, metrics in agents_metrics.items():
@@ -1354,48 +1562,48 @@ def print_report(pooled: dict, proposed: str, baselines: list[str]) -> None:
                 print(f"    {agent:20s} {parts}")
         stats = pooled["alignment"].get("stats")
         if stats:
-            print("\n## Objective–assessment alignment — paired stats + descriptive (RQ2)")
+            print("\n## Alignment panel — paired stats + descriptive, every signal (RQ2)")
             print(f"  {stats['definition']}")
             for entry in stats["per_model"]:
                 print(f"  [{entry['label']}]")
-                for r in entry["comparisons"]:
-                    if r.get("n", 0) == 0 or "p_raw" not in r:
-                        print(f"    vs {r['baseline']:20s} (no paired scenarios)")
-                        continue
-                    lo, hi = r["ci95"]
-                    print(f"    vs {r['baseline']:20s} n={r['n']:3d} dAlign={r['mean_diff']:+7.3f} "
-                          f"CI95[{lo:+6.3f},{hi:+6.3f}] r_rb={r['rank_biserial_r']:+.2f} "
-                          f"p={r['p_raw']:.2e} p_holm={r['p_holm']:.2e}")
-                desc = ", ".join(
-                    f"{a}={v['mean']:.3f}[{v['ci95'][0]:.3f},{v['ci95'][1]:.3f}]"
-                    for a, v in entry.get("align_descriptive", {}).items())
-                if desc:
-                    print(f"    Align mean [CI95]: {desc}")
-                cond = ", ".join(f"{a}={v['mean']:.3f}(n={v['n']})"
-                                 for a, v in entry.get("conditional_align", {}).items())
-                if cond:
-                    print(f"    conditional (>=1 objective): {cond}")
                 fails = entry.get("align_failures")
-                if fails is None:
-                    print("    missing outputs: UNKNOWN — these score files predate "
-                          "the missing_outputs roster, so a crashed agent is "
-                          "invisible here and the numbers above are complete-case "
-                          "only. Re-score with 06_score_alignment.py --overwrite "
-                          "to get the failure=0 layer.")
-                elif fails:
+                for signal, layers in (entry.get("panel") or {}).items():
+                    flag = "" if layers.get("directional", True) else "  (diagnostic, no good direction)"
+                    print(f"   -- {signal} [{layers.get('family')}]{flag}")
+                    for r in layers.get("comparisons") or []:
+                        if r.get("n", 0) == 0 or "p_raw" not in r:
+                            print(f"      vs {r['baseline']:20s} (no paired scenarios)")
+                            continue
+                        lo, hi = r["ci95"]
+                        print(f"      vs {r['baseline']:20s} n={r['n']:3d} "
+                              f"d={r['mean_diff']:+7.3f} "
+                              f"CI95[{lo:+6.3f},{hi:+6.3f}] r_rb={r['rank_biserial_r']:+.2f} "
+                              f"p={r['p_raw']:.2e} p_holm={r['p_holm']:.2e} "
+                              f"p_panel={r.get('p_holm_panel', float('nan')):.2e}")
+                    desc = ", ".join(
+                        f"{a}={v['mean']:.3f}[{v['ci95'][0]:.3f},{v['ci95'][1]:.3f}]"
+                        for a, v in layers.get("align_descriptive", {}).items())
+                    if desc:
+                        print(f"      mean [CI95]: {desc}")
+                    cond = ", ".join(f"{a}={v['mean']:.3f}(n={v['n']})"
+                                     for a, v in layers.get("conditional_align", {}).items())
+                    if cond:
+                        print(f"      conditional (>=1 objective): {cond}")
+                    if fails:
+                        for r in layers.get("comparisons_failure_zero") or []:
+                            if r.get("n", 0) == 0 or "p_raw" not in r:
+                                continue
+                            lo, hi = r["ci95"]
+                            print(f"        [failure=0] vs {r['baseline']:20s} "
+                                  f"n={r['n']:3d} d={r['mean_diff']:+7.3f} "
+                                  f"CI95[{lo:+6.3f},{hi:+6.3f}] "
+                                  f"p_holm={r['p_holm']:.2e}")
+                if fails:
                     fail_desc = ", ".join(
                         f"{a}={v['n_agent_run_cells_missing']} cell(s)/"
                         f"{v['n_scenarios_affected']} scen"
                         for a, v in fails.items())
-                    print(f"    missing outputs (excluded above): {fail_desc}")
-                    for r in entry.get("comparisons_failure_zero") or []:
-                        if r.get("n", 0) == 0 or "p_raw" not in r:
-                            continue
-                        lo, hi = r["ci95"]
-                        print(f"      [failure=0] vs {r['baseline']:20s} n={r['n']:3d} "
-                              f"dAlign={r['mean_diff']:+7.3f} "
-                              f"CI95[{lo:+6.3f},{hi:+6.3f}] "
-                              f"p_holm={r['p_holm']:.2e}")
+                    print(f"    missing outputs (excluded from complete-case): {fail_desc}")
                 else:
                     print("    missing outputs: none — complete-case == "
                           "failure=0 for this size")
@@ -1416,16 +1624,20 @@ def print_report(pooled: dict, proposed: str, baselines: list[str]) -> None:
 
     sens = pooled.get("alignment_sensitivity")
     if sens:
-        print("\n## Encoder sensitivity (RQ2 robustness — encoder as a swept dimension)")
+        print("\n## Instrument sensitivity (RQ2 robustness — encoder + Bloom axes)")
         print(f"  primary = {sens['primary_encoder']} (alignment_scores.json), "
-              f"metric = {sens['metric']}")
+              f"metric = {sens['metric']} (encoder axis) / "
+              f"{sens.get('metric_bloom_axis')} (Bloom axis)")
         for entry in sens["encoders"]:
             if "skipped" in entry:
                 print(f"  [{entry['key']}] SKIPPED — {entry['skipped']}")
                 continue
-            cov = (entry.get("coverage") or {}).get("n_scenario_files")
+            covd = entry.get("coverage") or {}
+            cov, want = covd.get("n_scenario_files"), covd.get("n_scenario_files_expected")
+            short = "" if covd.get("complete", True) else "  <-- PARTIAL, finish scoring"
             print(f"  [{entry['key']} / {entry.get('encoder_label')}]  "
-                  f"coverage {cov} scenario file(s)")
+                  f"axis={entry.get('axis')} on {entry.get('agreement_metric')}  "
+                  f"coverage {cov}/{want} scenario file(s){short}")
             for row in entry["agreement_with_primary"].get("per_model") or []:
                 if "note" in row:
                     print(f"    {row['label']:14s} {row['note']}")
@@ -1435,7 +1647,9 @@ def print_report(pooled: dict, proposed: str, baselines: list[str]) -> None:
                     (r.get("p_holm", 0.0)
                      for m in (entry.get("stats") or {}).get("per_model") or []
                      if m.get("label") == row["label"]
-                     for r in m.get("comparisons") or []),
+                     for r in ((m.get("panel") or {}).get(
+                         entry.get("agreement_metric") or sens["metric"])
+                               or {}).get("comparisons") or []),
                     default=float("nan"))
                 top1 = "=" if row["top1_agent_here"] == row["top1_agent_primary"] else "DIFFERS"
                 print(f"    {row['label']:14s} rho={row['spearman_rho_agent_means']:.3f} "
@@ -1477,10 +1691,11 @@ def main() -> None:
                         help="Output JSON path.")
     parser.add_argument(
         "--encoders", default="", metavar="K1,K2,...",
-        help="Also pool these encoder arms of the RQ2 sensitivity sweep into "
-             "'alignment_sensitivity' (scored by 06_score_alignment.py "
-             "--encoder-presets). pooled['alignment'] always stays the primary "
-             "encoder. Empty (default) = output identical to before.",
+        help="Also pool these sweep arms into 'alignment_sensitivity' (scored "
+             "by 06_score_alignment.py). Accepts keys from either axis — "
+             "encoder presets or Bloom presets. pooled['alignment'] always "
+             "stays the primary configuration. Empty (default) = output "
+             "identical to before.",
     )
     parser.add_argument(
         "--auto-encoders", action="store_true",
@@ -1488,13 +1703,22 @@ def main() -> None:
              "present in the run dirs) instead of naming them.",
     )
     parser.add_argument(
+        "--auto-bloom", action="store_true",
+        help="Add every non-primary Bloom arm (family B's independence check) "
+             "from the registry, scored or not — an unscored arm must show up "
+             "as 'skipped' rather than vanish. Pair with --auto-encoders for "
+             "the whole star.",
+    )
+    parser.add_argument(
         "--primary-encoder", default=None,
         help="Encoder that owns the unsuffixed alignment_scores.json "
              "(default: 06_score_alignment.py's PRIMARY_ENCODER).",
     )
     parser.add_argument(
-        "--sensitivity-metric", default="objective_assessment_alignment",
-        help="Endpoint the cross-encoder agreement statistics run on.",
+        "--sensitivity-metric", default=LEAD_SIGNAL,
+        help="Panel signal the cross-arm agreement statistics run on. Not a "
+             "claim that this signal matters more -- agreement is a per-signal "
+             "quantity and this picks which one to summarise.",
     )
     args = parser.parse_args()
 
@@ -1543,7 +1767,14 @@ def main() -> None:
         "config": {
             "proposed": args.proposed,
             "baselines": baselines,
-            "score_field": "total_score (per-scenario composite from comparison_report.json)",
+            "score_field": (
+                "RQ1 signals reported side by side, no composite as headline: "
+                "addie_median (LEAD — instructional-design content quality, the "
+                "construct the research question is about), trajectory_score "
+                "(process conformance), total_score (= 0.7*ADDIE + 0.3*Traj, "
+                "ISD-Agent-Bench's own composite, kept for comparability). All "
+                "from comparison_report.json, per scenario."
+            ),
             "pooling": "mean across runs per (model, agent, scenario)",
             "primary_failure_policy": "complete_case",
             "rq2_failure_policies": (
@@ -1556,6 +1787,10 @@ def main() -> None:
         },
         "models": models,
         "interaction": interaction_tests(models, args.proposed, baselines),
+        "interaction_by_signal": {
+            m: interaction_tests(models, args.proposed, baselines, metric=m)
+            for m in RQ1_SIGNALS
+        },
         "failure_rates": failure_tests(models, args.proposed, baselines),
         "alignment": alignment,
         "token_usage": pool_tokens(run_dirs_by_model, agents),
@@ -1570,7 +1805,7 @@ def main() -> None:
     print_report(pooled, args.proposed, baselines)
 
     for model in pooled["models"]:
-        model.pop("_totals", None)
+        model.pop("_scores", None)
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(pooled, indent=2, ensure_ascii=False), encoding="utf-8")

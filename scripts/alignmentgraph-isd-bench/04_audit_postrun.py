@@ -55,7 +55,7 @@ STUB_MARKS = ['"미지정"', '"problem_definition": null']
 EXPECTED_SCENARIOS = 90
 
 #: Every text the alignment metric consumes — evaluation included, since
-#: objective_evaluation_alignment is a scored endpoint too.
+#: objective_evaluation_similarity is a scored panel signal too.
 SCORED_FIELDS = [
     ("objectives", extract_objectives),
     ("assessments", extract_assessment_items),

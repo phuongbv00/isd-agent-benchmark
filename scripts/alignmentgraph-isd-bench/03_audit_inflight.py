@@ -21,7 +21,6 @@ Exit code 0 = clean, 1 = at least one red flag > 0.
 from __future__ import annotations
 
 import argparse
-import re
 import sys
 import time
 from pathlib import Path

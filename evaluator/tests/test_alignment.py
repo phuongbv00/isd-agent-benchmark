@@ -1,7 +1,8 @@
 """Tests for the deterministic constructive-alignment metric.
 
-Uses only the offline pieces: the TF-IDF char-ngram encoder and the
-Korean/English Bloom verb lexicon. No network, no LLM.
+Uses only the offline pieces: the TF-IDF char-ngram encoder and the English
+Bloom verb lexicon. No network, no LLM. Fixtures are English because the
+scored corpus is (measured 100% across agents and model sizes).
 """
 
 import hashlib
@@ -29,49 +30,53 @@ from isd_evaluator.metrics.alignment import (
 
 SCENARIO = {
     "scenario_id": "TEST-001",
-    "title": "파이썬 프로그래밍 기초",
+    "title": "Python Programming Basics",
     "domain": "Programming",
     "learning_goals": [
-        "변수와 자료형의 개념을 설명할 수 있다",
-        "조건문과 반복문을 활용하여 프로그램을 구현할 수 있다",
-        "함수 설계 원칙을 적용하여 모듈화된 코드를 작성할 수 있다",
+        "Explain the concepts of variables and data types",
+        "Implement programs using conditionals and loops",
+        "Compose modular code applying function design principles",
     ],
 }
 
 # Perfectly aligned: every objective has a same-topic assessment item at the
 # same-or-higher Bloom level, plus matching activities and evaluation.
+# Statements are worded so the lexicon level equals the declared level.
 ALIGNED_OUTPUT = {
     "design": {
         "learning_objectives": [
-            {"id": "LO-001", "level": "이해",
-             "statement": "변수와 자료형의 개념과 차이를 설명한다"},
-            {"id": "LO-002", "level": "적용",
-             "statement": "조건문과 반복문을 활용하여 간단한 프로그램을 구현한다"},
-            {"id": "LO-003", "level": "창조",
-             "statement": "함수 설계 원칙을 적용하여 모듈화된 코드를 작성한다"},
+            {"id": "LO-001", "level": "Understand",
+             "statement": "Explain the concepts and differences of variables and data types"},
+            {"id": "LO-002", "level": "Apply",
+             "statement": "Implement a simple program using conditionals and loops"},
+            {"id": "LO-003", "level": "Create",
+             "statement": "Compose modular code applying function design principles"},
         ],
         "instructional_strategy": {
             "sequence": [
-                {"event": "개념 학습", "activity": "변수와 자료형 개념을 설명하는 강의"},
-                {"event": "실습", "activity": "조건문과 반복문을 활용한 프로그램 구현 실습"},
-                {"event": "프로젝트", "activity": "함수 설계 원칙으로 모듈화된 코드를 작성하는 프로젝트"},
+                {"event": "Concept lesson",
+                 "activity": "Lecture explaining the concepts of variables and data types"},
+                {"event": "Lab",
+                 "activity": "Hands-on practice implementing programs with conditionals and loops"},
+                {"event": "Project",
+                 "activity": "Project composing modular code with function design principles"},
             ]
         },
     },
     "evaluation": {
         "quiz_items": [
-            {"id": "Q-001", "type": "서술형",
-             "question": "변수와 자료형의 개념과 차이를 설명하시오"},
-            {"id": "Q-002", "type": "주관식",
-             "question": "조건문과 반복문을 활용하여 짝수 합을 구하는 프로그램을 구현하시오"},
-            {"id": "Q-003", "type": "서술형",
-             "question": "함수 설계 원칙을 적용하여 모듈화된 코드를 작성하시오"},
+            {"id": "Q-001", "type": "short_answer",
+             "question": "Explain the concepts and differences of variables and data types"},
+            {"id": "Q-002", "type": "coding",
+             "question": "Implement a program summing even numbers using conditionals and loops"},
+            {"id": "Q-003", "type": "project",
+             "question": "Compose modular code applying function design principles"},
         ],
         "rubric": {
             "criteria": [
-                "변수와 자료형 개념 설명의 정확성",
-                "조건문과 반복문 구현의 완성도",
-                "함수 설계와 모듈화 코드 작성 수준",
+                "Accuracy of explaining variable and data type concepts",
+                "Completeness of the conditional and loop implementation",
+                "Quality of function design and modular code composition",
             ]
         },
     },
@@ -81,28 +86,22 @@ ALIGNED_OUTPUT = {
 # than the objectives; one objective is never assessed.
 MISALIGNED_OUTPUT = {
     "design": {
-        "learning_objectives": [
-            {"id": "LO-001", "level": "이해",
-             "statement": "변수와 자료형의 개념과 차이를 설명한다"},
-            {"id": "LO-002", "level": "적용",
-             "statement": "조건문과 반복문을 활용하여 간단한 프로그램을 구현한다"},
-            {"id": "LO-003", "level": "창조",
-             "statement": "함수 설계 원칙을 적용하여 모듈화된 코드를 작성한다"},
-        ],
+        "learning_objectives": ALIGNED_OUTPUT["design"]["learning_objectives"],
         "instructional_strategy": {
             "sequence": [
-                {"event": "강의", "activity": "세계 커피 문화의 역사를 나열하는 강의"},
+                {"event": "Lecture",
+                 "activity": "Lecture listing the history of world coffee culture"},
             ]
         },
     },
     "evaluation": {
         "quiz_items": [
-            {"id": "Q-001", "type": "단답형",
-             "question": "커피 원두 품종의 이름을 나열하시오"},
-            {"id": "Q-002", "type": "OX",
-             "question": "에스프레소 추출 온도를 기억하여 진술하시오"},
+            {"id": "Q-001", "type": "short_answer",
+             "question": "List the names of coffee bean varieties"},
+            {"id": "Q-002", "type": "true_false",
+             "question": "Recall and state the espresso extraction temperature"},
         ],
-        "rubric": {"criteria": ["커피 지식 암기의 정확성"]},
+        "rubric": {"criteria": ["Accuracy of memorizing coffee knowledge"]},
     },
 }
 
@@ -113,13 +112,13 @@ def evaluate(output, scenario=SCENARIO):
 
 def assert_unit_interval(score):
     values = [
-        score.objective_assessment_alignment,
-        score.objective_activity_alignment,
-        score.objective_evaluation_alignment,
+        score.objective_assessment_similarity,
+        score.objective_activity_similarity,
+        score.objective_evaluation_similarity,
         score.objective_cognitive_congruence,
         score.porter_mean,
         score.webb_bloom_consistency,
-        score.assessment_precision,
+        score.assessment_objective_similarity,
         *score.porter.values(),
     ]
     for value in values:
@@ -137,8 +136,8 @@ class TestAlignedVsMisaligned:
         # Primary endpoint: continuous assessment alignment (mean-max cosine).
         aligned = evaluate(ALIGNED_OUTPUT)
         misaligned = evaluate(MISALIGNED_OUTPUT)
-        assert (aligned.objective_assessment_alignment
-                > misaligned.objective_assessment_alignment)
+        assert (aligned.objective_assessment_similarity
+                > misaligned.objective_assessment_similarity)
 
     def test_all_values_in_unit_interval(self):
         assert_unit_interval(evaluate(ALIGNED_OUTPUT))
@@ -192,16 +191,14 @@ class TestObjectiveEndpoints:
         # objective-level metric-definition change.
         score = evaluate(ALIGNED_OUTPUT).to_dict()
         expected = {k: score[k] for k in (
-            "objective_assessment_alignment", "objective_activity_alignment",
-            "objective_evaluation_alignment", "objective_cognitive_congruence")}
-        # Corrupt the top-level endpoints; reaggregate must restore them.
+            "objective_assessment_similarity", "objective_activity_similarity",
+            "objective_evaluation_similarity", "objective_cognitive_congruence")}
+        # Corrupt the top-level signals; reaggregate must restore them.
         for k in expected:
             score[k] = -1.0
-        score["objective_measurability"] = 0.5  # a since-removed criterion
         reaggregate(score)
         for k, v in expected.items():
             assert score[k] == v
-        assert "objective_measurability" not in score  # stale key dropped
 
     def test_alignment_endpoints_are_continuous_means(self):
         # Each endpoint equals the mean over objectives of the recorded
@@ -210,18 +207,18 @@ class TestObjectiveEndpoints:
         objs = score.details["objectives"]
         exp_asm = sum(o["best_similarity"] for o in objs) / len(objs)
         exp_act = sum(o["best_activity_similarity"] for o in objs) / len(objs)
-        assert abs(score.objective_assessment_alignment - exp_asm) < 1e-9
-        assert abs(score.objective_activity_alignment - exp_act) < 1e-9
+        assert abs(score.objective_assessment_similarity - exp_asm) < 1e-9
+        assert abs(score.objective_activity_similarity - exp_act) < 1e-9
         # Continuous: not pinned to 0/1.
-        assert 0.0 < score.objective_assessment_alignment < 1.0
+        assert 0.0 < score.objective_assessment_similarity < 1.0
 
     def test_assessment_alignment_contrast(self):
         aligned = evaluate(ALIGNED_OUTPUT)
         misaligned = evaluate(MISALIGNED_OUTPUT)
-        assert (aligned.objective_assessment_alignment
-                > misaligned.objective_assessment_alignment)
-        assert (aligned.objective_activity_alignment
-                > misaligned.objective_activity_alignment)
+        assert (aligned.objective_assessment_similarity
+                > misaligned.objective_assessment_similarity)
+        assert (aligned.objective_activity_similarity
+                > misaligned.objective_activity_similarity)
 
     def test_cognitive_congruence_contrast(self):
         aligned = evaluate(ALIGNED_OUTPUT)
@@ -240,7 +237,7 @@ class TestObjectiveEndpoints:
             "evaluation": ALIGNED_OUTPUT["evaluation"],
         }
         score = evaluate(output)
-        assert score.objective_activity_alignment == 0.0
+        assert score.objective_activity_similarity == 0.0
         assert any("no activities" in note for note in score.notes)
 
     def test_no_evaluation_zeroes_evaluation_alignment(self):
@@ -254,8 +251,8 @@ class TestObjectiveEndpoints:
             },
         }
         score = evaluate(output)
-        assert score.objective_assessment_alignment > 0.0
-        assert score.objective_evaluation_alignment == 0.0
+        assert score.objective_assessment_similarity > 0.0
+        assert score.objective_evaluation_similarity == 0.0
         assert any("no evaluation texts" in note for note in score.notes)
 
 
@@ -271,9 +268,9 @@ class TestLanguageAndValidation:
             "development": {
                 "assessment_tools": [
                     {"item_id": "A-001", "aligned_objective": "LO-001",
-                     "question": "변수와 자료형의 개념과 차이를 설명하시오"},
+                     "question": "Explain the concepts and differences of variables and data types"},
                     {"item_id": "A-002", "aligned_objective": "LO-002",
-                     "question": "조건문과 반복문을 활용하여 짝수 합을 구하는 프로그램을 구현하시오"},
+                     "question": "Implement a program summing even numbers using conditionals and loops"},
                 ]
             },
             "evaluation": ALIGNED_OUTPUT["evaluation"],
@@ -297,22 +294,22 @@ class TestLanguageAndValidation:
 class TestEdgeCases:
     def test_empty_output(self):
         score = evaluate({})
-        assert score.objective_assessment_alignment == 0.0
+        assert score.objective_assessment_similarity == 0.0
         assert score.counts["objectives"] == 0
         assert any("no learning objectives" in note for note in score.notes)
 
     def test_no_objectives(self):
         score = evaluate({"evaluation": ALIGNED_OUTPUT["evaluation"]})
-        assert score.objective_assessment_alignment == 0.0
-        assert score.objective_activity_alignment == 0.0
-        assert score.objective_evaluation_alignment == 0.0
+        assert score.objective_assessment_similarity == 0.0
+        assert score.objective_activity_similarity == 0.0
+        assert score.objective_evaluation_similarity == 0.0
         assert_unit_interval(score)
 
     def test_objectives_but_no_items(self):
         output = {"design": {"learning_objectives":
                              ALIGNED_OUTPUT["design"]["learning_objectives"]}}
         score = evaluate(output)
-        assert score.objective_assessment_alignment == 0.0
+        assert score.objective_assessment_similarity == 0.0
         assert score.porter["assessment"] == 0.0
         assert_unit_interval(score)
 
@@ -325,8 +322,8 @@ class TestEdgeCases:
         wrapped = {"addie_output": ALIGNED_OUTPUT}
         direct = evaluate(ALIGNED_OUTPUT)
         via_wrapper = evaluate(wrapped)
-        assert (via_wrapper.objective_assessment_alignment
-                == direct.objective_assessment_alignment)
+        assert (via_wrapper.objective_assessment_similarity
+                == direct.objective_assessment_similarity)
 
 
 # ---------------------------------------------------------------------------
@@ -338,40 +335,76 @@ class TestLexiconBloomClassifier:
     def setup_method(self):
         self.clf = LexiconBloomClassifier()
 
-    def test_korean_levels(self):
-        assert self.clf.classify("주요 개념을 나열할 수 있다") == 1
-        assert self.clf.classify("개념의 차이를 설명한다") == 2
-        assert self.clf.classify("배운 내용을 실무에 적용한다") == 3
-        assert self.clf.classify("두 사례를 비교하고 분석한다") == 4
-        assert self.clf.classify("결과의 타당성을 평가한다") == 5
-        assert self.clf.classify("새로운 수업 자료를 설계한다") == 6
+    def test_non_english_returns_none(self):
+        # English-only by design: other scripts are unclassifiable, not guessed.
+        assert self.clf.classify("개념의 차이를 설명한다") is None
+        assert self.clf.classify("Giải thích sự khác biệt giữa các khái niệm") is None
 
     def test_english_levels(self):
         assert self.clf.classify("List the main components of a computer") == 1
         assert self.clf.classify("Explain how photosynthesis works") == 2
         assert self.clf.classify("Apply the formula to solve the problem") == 3
-        assert self.clf.classify("Compare and contrast the two approaches") == 4
+        assert self.clf.classify("Differentiate relevant from irrelevant data") == 4
         assert self.clf.classify("Evaluate the validity of the results") == 5
         assert self.clf.classify("Design a new lesson module") == 6
 
-    def test_highest_level_wins(self):
-        # Contains both 설명 (2) and 설계 (6): highest cognitive demand wins.
-        assert self.clf.classify("설계 원칙을 설명하고 새 모듈을 설계한다") == 6
+    def test_level_follows_anderson_krathwohl_not_folk_verb_lists(self):
+        # Comparing/contrasting/matching and categorizing are Understand
+        # processes in A&K Table 5.1, though folk verb handouts put them at
+        # Analyze; integrating/outlining/structuring are Analyze (alternative
+        # names of organizing), not Create.
+        assert self.clf.classify("Compare and contrast the two approaches") == 2
+        assert self.clf.classify("Categorize the samples by type") == 2
+        assert self.clf.classify("Match each term to its definition") == 2
+        assert self.clf.classify("Integrate the findings into an outline") == 4
+        assert self.clf.classify("Check the solution for errors") == 5
+
+    def test_every_verb_has_exactly_one_level(self):
+        # "Highest level wins" must be decided by the text, never by a verb
+        # accidentally listed at two levels.
+        from isd_evaluator.metrics.alignment import _EN_VERB_LEXICON
+
+        seen: dict[str, int] = {}
+        for level, verbs in _EN_VERB_LEXICON.items():
+            for verb in verbs:
+                assert verb not in seen, f"{verb} at {seen.get(verb)} and {level}"
+                seen[verb] = level
 
     def test_noun_usage_does_not_fire(self):
-        # 교수설계 / 사용자 are noun usages; no verbal conjugation follows.
-        assert self.clf.classify("교수설계 문서") is None
-        assert self.clf.classify("사용자 목록") is None
+        # Determiner/possessive immediately before => noun or participial
+        # adjective, not the performed action.
+        assert self.clf.classify("The proposed solution must be reviewed") is None
+        assert self.clf.classify("Learners submit a plan") is None
+        assert self.clf.classify("Review of the design") is None
+        # ... but a genuine verb after a determiner+subject still fires.
+        assert self.clf.classify("The learners design a rubric") == 6
+
+    def test_leading_verb_decides_not_the_most_demanding_one(self):
+        # Webb: the level follows the CENTRAL performance. A trailing verb names
+        # the purpose or the medium, not the demand being assessed.
+        assert self.clf.classify(
+            "Explain the design principles and design a new module") == 2
+        assert self.clf.classify(
+            "Apply metaverse tools to create a 3D model") == 3
+        assert self.clf.classify(
+            "Evaluate the effectiveness of the lesson plan") == 5
+        # ... and a genuine Create objective still reads as Create.
+        assert self.clf.classify("Design a rubric for peer assessment") == 6
+
+    def test_word_boundary_is_respected(self):
+        # Substrings of longer words must not fire the verb pattern.
+        assert self.clf.classify("The username field is required") is None
+        assert self.clf.classify("Listless prose about nothing") is None
 
     def test_unclassifiable_returns_none(self):
         assert self.clf.classify("") is None
-        assert self.clf.classify("커피와 원두") is None
+        assert self.clf.classify("Coffee and roasted beans") is None
 
     def test_recall_question_fallback(self):
-        assert self.clf.classify("다음 중 올바른 것은 무엇인가?") == 1
+        assert self.clf.classify("Which of the following is correct: what is a variable?") == 1
+        assert self.clf.classify("True or false: the sky is green") == 1
 
     def test_declared_level_normalization(self):
-        assert normalize_declared_level("이해") == 2
         assert normalize_declared_level("Understand") == 2
         assert normalize_declared_level("Remember") == 1
         assert normalize_declared_level("nonsense") is None
@@ -556,7 +589,7 @@ class TestExtraction:
         assert sanity["n_objectives"] == 3
         assert sanity["n_declared"] == 3
         # Statements were written so lexicon level == declared level.
-        assert sanity["lexicon_vs_declared_agreement"] == 1.0
+        assert sanity["bloom_vs_declared_agreement"] == 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -584,10 +617,12 @@ class TestDefaults:
         # sys.modules[cls.__module__], which is None for an unregistered module.
         sys.modules[spec.name] = module
         spec.loader.exec_module(module)
-        assert module.DEFAULT_EMBED_MODEL == "nvidia/llama-embed-nemotron-8b"
+        # Encoders are preset-only; the primary preset pins the model name.
+        assert (module.ENCODER_PRESETS[module.PRIMARY_ENCODER][1]
+                == "nvidia/llama-embed-nemotron-8b")
         assert "composite" not in module.COMPONENTS
-        assert module.COMPONENTS[0] == "objective_assessment_alignment"
-        assert "objective_evaluation_alignment" in module.COMPONENTS
+        assert module.COMPONENTS[0] == "objective_assessment_similarity"
+        assert "objective_evaluation_similarity" in module.COMPONENTS
         # the primary encoder owns the unsuffixed artifact pooling reads
         assert module.ENCODER_PRESETS[module.PRIMARY_ENCODER][2] == ""
 

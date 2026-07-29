@@ -42,10 +42,10 @@ The managed block, with a Nemotron pod (two endpoints) and a bge-m3 pod up:
   BGEM3_EMBED_BASE_URLS=https://<pod_c>-8000.proxy.runpod.net/v1
   BGEM3_EMBED_MODEL=BAAI/bge-m3
   BGEM3_EMBED_API_KEY_ENV=VLLM_API_KEY
-  EMBED_BASE_URLS=...   # legacy aliases -> the primary slot, kept for
-  EMBED_MODEL=...       # single-encoder commands and older recipes
 
-EMBED_API_KEY_ENV holds the NAME of the env var carrying the Bearer token
+Endpoints are per slot only — there is no shared EMBED_BASE_URLS alias, because
+one URL cannot be the right endpoint for several encoder arms.
+<SLOT>_EMBED_API_KEY_ENV holds the NAME of the env var carrying the Bearer token
 (indirection, same pattern as the ladder's AGENT_MODEL_API_KEY_ENVS).
 VLLM_API_KEY itself must already be set in .env -- it is the token the
 template's vLLM server was started with (same RunPod secret as the ladder),
@@ -102,7 +102,6 @@ def _load_scorer():
 
 _SCORER = _load_scorer()
 ENCODER_PRESETS = _SCORER.ENCODER_PRESETS
-PRIMARY_ENCODER = _SCORER.PRIMARY_ENCODER
 encoder_slot = _SCORER.encoder_slot
 
 #: served model id -> preset key ('nvidia/llama-embed-nemotron-8b' -> 'nemotron')
@@ -310,11 +309,6 @@ def main() -> None:
                    prev_env, re.MULTILINE)
     )
 
-    primary_slot = encoder_slot(PRIMARY_ENCODER)
-    alias_slot = primary_slot if primary_slot in slots else ordered[0]
-    alias_urls = ",".join(e["base_url"] for e in slots[alias_slot])
-    alias_model = next((e["model"] for e in slots[alias_slot] if e["model"]), "")
-
     lines: list[str] = []
     for slot in ordered:
         pods_here = slots[slot]
@@ -349,10 +343,6 @@ def main() -> None:
         "re-run the script to refresh; do not edit by hand",
         f"EMBED_SLOTS={','.join(slot_keys)}",
         *lines,
-        f"# legacy aliases -> {alias_slot.lower()}; single-encoder commands keep working",
-        f"EMBED_BASE_URLS={alias_urls}",
-        f"EMBED_MODEL={alias_model}",
-        "EMBED_API_KEY_ENV=VLLM_API_KEY",
         BLOCK_END,
     ]) + "\n"
 

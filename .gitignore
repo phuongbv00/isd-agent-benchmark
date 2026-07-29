@@ -27,3 +27,7 @@ Thumbs.db
 # Logs
 *.log
 *.egg-info/
+
+# Local Bloom-classifier checkpoints (~440MB each, regenerate with
+# evaluator/scripts/train_bloom_6way_classifier.py)
+models/

@@ -13,28 +13,48 @@ non-identity applied to a similarity is a *rectification*: cosine enters as
 [0, 1] scale. That is a range choice, not a matching cutoff — no comparison
 against any constant decides whether two texts count as related.
 
-Primary endpoint — **objective_assessment_alignment**: the mean over learning
-objectives of the maximum rectified cosine to any assessment item. This is
-the objective<->assessment relation at the heart of constructive alignment
-(Biggs), continuous in [0, 1]. Reported alongside it (see
-:meth:`AlignmentEvaluator.evaluate`):
+**A panel of signals, with NO primary endpoint.** Alignment is a
+multi-faceted construct; collapsing it into one number is the mistake that
+dropping the composite already fixed, and labelling one facet "primary" is
+just an implicit composite. Every signal below is reported for every
+comparison — win or lose — so there is no selective reporting. The panel
+spans **two mechanically independent instrument families**, each with its own
+sensitivity axis, so that no single family carries the construct on its own:
 
-- *objective_activity_alignment* / *objective_evaluation_alignment* — the same
-  continuous mean-max cosine against the activities / evaluation-phase texts
-  (the ``supports`` / ``evaluates`` legs of the paper's aligned(o) predicate);
-- *objective_cognitive_congruence* — share of objectives whose argmax-closest
-  assessment item has Bloom level >= the objective's level (argmax, no
-  threshold), over objectives with both levels classifiable.
+Family A — *textual correspondence* (measured by the encoder):
 
-Descriptive indices (also threshold-free, reported separately — NO composite):
+- **objective_assessment_similarity** — mean over learning objectives of the
+  maximum rectified cosine to any assessment item; the ``measures`` leg of the
+  paper's aligned(o) predicate, the relation at the heart of constructive
+  alignment (Biggs).
+- **objective_activity_similarity** / **objective_evaluation_similarity** —
+  the same mean-max form against activities / evaluation-phase texts (the
+  ``supports`` / ``evaluates`` legs).
+- **assessment_objective_similarity** — the reverse direction (mean over
+  assessment items of the max cosine to any objective): are there orphan
+  items? Direction is deliberately NOT one-way-good — a very high value can
+  mean "no wasted items" or "items merely restate the objectives" — so it is
+  read as a diagnostic, not counted as a leg won.
 
+Family B — *cognitive demand* (measured by the Bloom classifier, no
+similarity involved):
+
+- **objective_cognitive_congruence** — share of objectives whose
+  argmax-closest assessment item has Bloom level >= the objective's level
+  (argmax, no threshold), over objectives with both levels classifiable.
 - **Porter Alignment Index** (Porter 2002; Fulmer 2011)
   ``P = 1 - 0.5 * sum(|X_ij - Y_ij|)`` between two normalized
   content-topic x Bloom-level distribution matrices, for the pairs
   objectives<->assessment, <->activities, <->evaluation.
-- **Webb Bloom-Consistency** (Webb 1997/1999), item-centric.
-- **assessment_precision** — reverse of the primary (mean over assessment
-  items of the max cosine to any objective; SE traceability framing).
+- **webb_bloom_consistency** (Webb 1997/1999), item-centric.
+
+Naming rule: a signal is named after what it computes. A metric name is never
+read inside the paragraph that defines it — it is read on a figure axis, a
+table header, a slide bullet — so a name that asserts more than the operation
+does the work only the validity evidence is entitled to do. "Alignment" is
+therefore the name of the protocol and of the aligned(o) predicate legs, never
+of a metric; and nothing here is called "precision", which would imply a
+retrieval frame that needs a threshold this protocol does not have.
 
 Design principles enforced here:
 
@@ -43,16 +63,30 @@ Design principles enforced here:
     descriptions). Structural links (``objective_id`` / ``aligned_objective``)
     and self-declared ``level`` fields are NEVER used in scoring; they feed
     only the validation-evidence report (declared-link agreement,
-    lexicon-vs-declared agreement).
+    Bloom-vs-declared agreement).
 (c) Correspondence between items and objectives is established via text
     similarity matching, never via ids.
 
 Pluggable pieces:
 
-- :class:`BloomClassifier` protocol; default :class:`LexiconBloomClassifier`
-  (Korean + English Bloom verb lexicon, rule-based, offline).
-  :class:`TransformerBloomClassifier` loads a local fine-tuned checkpoint if
-  one exists (it never downloads).
+- :class:`BloomClassifier` protocol. The protocol's **primary** arm is
+  :class:`TransformerBloomClassifier` — a 6-way BERT fine-tuned on the
+  EDM2022CLO corpus of Li et al. (2022), loaded from a local checkpoint (it
+  never downloads), agreeing with the released expert labels at kappa 0.926 on
+  a held-out split. :class:`LexiconBloomClassifier` (English Bloom verb
+  lexicon, rule-based, offline, every level assignment traceable to Anderson &
+  Krathwohl, kappa 0.650) is the **sensitivity arm**. Family B feeds 3 of the 7
+  panel signals, so it needs an independence check exactly as family A does,
+  and a rule instrument derived from the taxonomy is the strongest possible
+  check on a model trained from labelled data: the two agree at only kappa
+  0.665, so neither is a mirror of the other. They also differ by construction
+  in coverage — the lexicon abstains (83%), the transformer always argmaxes —
+  which is declared, not hidden.
+
+  NOTE: the zero-argument default of :class:`AlignmentEvaluator` is still the
+  lexicon, because the transformer needs a checkpoint that cannot be a safe
+  default. "Code default" and "protocol primary" are therefore different
+  things here; the scorer always passes the arm explicitly.
 - :class:`TextEncoder` protocol; default :class:`TfidfCharNgramEncoder`
   (character n-gram TF-IDF, pure Python, deterministic, suits unspaced
   Korean). :class:`OpenAIAPIEncoder` (OpenAI-compatible ``/v1/embeddings``
@@ -78,86 +112,140 @@ from typing import Any, Optional, Protocol
 # ---------------------------------------------------------------------------
 
 #: Canonical Bloom levels (revised taxonomy), index 1..6.
-BLOOM_LEVELS = ["기억", "이해", "적용", "분석", "평가", "창조"]
+BLOOM_LEVELS = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"]
 
 _LEVEL_ALIASES = {
-    # Korean canonical
-    "기억": 1, "이해": 2, "적용": 3, "분석": 4, "평가": 5, "창조": 6, "창안": 6,
-    # English (revised taxonomy)
+    # Revised taxonomy
     "remember": 1, "understand": 2, "apply": 3, "analyze": 4, "analyse": 4,
     "evaluate": 5, "create": 6,
-    # English (original taxonomy, occasionally emitted by agents)
+    # Original taxonomy (occasionally emitted by agents)
     "knowledge": 1, "comprehension": 2, "application": 3, "analysis": 4,
     "synthesis": 6, "evaluation": 5,
 }
 
 
 def normalize_declared_level(value: Any) -> Optional[int]:
-    """Map a self-declared level field (Korean or English) to 1..6, else None."""
+    """Map a self-declared level field to 1..6, else None.
+
+    Self-declared levels are validation evidence only — they never enter
+    scoring — so an unmappable value is reported as unclassifiable rather
+    than guessed at.
+    """
     if not isinstance(value, str):
         return None
     return _LEVEL_ALIASES.get(value.strip().lower())
 
 
 class BloomClassifier(Protocol):
-    """Text -> Bloom level (1..6), or None when undecidable."""
+    """Text -> Bloom level (1..6), or None when undecidable.
+
+    Implementations expose ``classify_many`` as well; the evaluator calls that
+    so a batching arm is not throttled to one forward pass per text.
+
+    ``name`` identifies which arm this is and is recorded in the score
+    artifact, so a scores file always states which instrument produced its
+    family-B signals instead of leaving the reader to assume the default.
+    """
+
+    name: str
 
     def classify(self, text: str) -> Optional[int]:  # pragma: no cover - protocol
         ...
 
 
-# Korean instructional verb stems per level. Matching requires a verbal
-# conjugation right after the stem (하/할/한/함/해/했/합/히 or explicit native
-# endings) so that bare noun usages ("교수설계", "사용자") do not fire.
-_KO_VERB_LEXICON: dict[int, list[str]] = {
-    1: ["기억", "암기", "나열", "열거", "정의", "명명", "회상", "식별", "확인",
-        "인지", "진술", "명시", "지칭", "상기"],
-    2: ["설명", "요약", "해석", "분류", "예시", "번역", "이해", "기술", "논의",
-        "표현", "부연", "추론", "예측", "환언"],
-    3: ["적용", "활용", "사용", "실행", "실습", "구현", "수행", "시연", "연습",
-        "계산", "조작", "해결", "응용", "시행"],
-    4: ["분석", "비교", "대조", "구별", "구분", "분해", "조사", "진단", "규명",
-        "검사", "탐색", "범주화", "차별화", "도식화"],
-    5: ["평가", "판단", "비평", "비판", "심사", "검증", "검토", "논증", "정당화",
-        "타당화", "추천", "옹호", "반박", "판정"],
-    6: ["창조", "창작", "설계", "개발", "제작", "작성", "고안", "생성", "구축",
-        "발명", "계획", "종합", "통합", "제안", "구성"],
+# --- Bloom verb lexicon -----------------------------------------------------
+#
+# TIER 1 — the citable core. The 19 cognitive processes of the Cognitive
+# Process Dimension (Anderson & Krathwohl 2001, Table 5.1) plus the
+# "alternative names" that table lists for each process. Level membership here
+# is NOT ours to choose: it is whatever A&K assign. Two consequences that
+# differ from the folk verb lists circulated as teaching handouts:
+#   * comparing/contrasting/matching are UNDERSTAND (2), not Analyze;
+#     categorizing is Understand too (alternative name of classifying).
+#   * integrating/outlining/structuring are ANALYZE (4) (alternative names of
+#     organizing), not Create.
+#
+# A&K alternative names deliberately NOT included, because they are polysemous
+# in ordinary prose and would fire on non-instructional usage: focusing,
+# selecting, mapping, representing, finding coherence, parsing, carrying out,
+# constructing models, subsuming, instantiating, abstracting, interpolating,
+# coordinating. Excluding them costs recall, never provenance.
+_AK_PROCESSES: dict[int, list[str]] = {
+    1: ["recognize", "identify", "recall", "retrieve"],
+    2: ["interpret", "clarify", "paraphrase", "translate",
+        "exemplify", "illustrate",
+        "classify", "categorize", "categorise",
+        "summarize", "summarise", "generalize", "generalise",
+        "infer", "conclude", "extrapolate", "predict",
+        "compare", "contrast", "match",
+        "explain"],
+    3: ["execute", "implement", "use"],
+    4: ["differentiate", "discriminate", "distinguish",
+        "organize", "organise", "integrate", "outline", "structure",
+        "attribute", "deconstruct"],
+    5: ["check", "detect", "monitor", "test",
+        "critique", "judge"],
+    6: ["generate", "hypothesize", "hypothesise",
+        "plan", "design",
+        "produce", "construct"],
 }
 
-# Native (non-하다) Korean verb stems: matched as bare stems.
-_KO_NATIVE_STEMS: dict[int, list[str]] = {
-    1: ["찾"],
-    6: ["만들", "세우"],
+# TIER 2 — conventional instructional verbs that are NOT A&K processes or
+# alternative names. They are widely used in objective-writing practice and in
+# the rule-based Bloom-classification literature (Omar et al. 2012 and the work
+# that follows it), and are kept for recall. Provenance is explicitly weaker
+# than tier 1: when a tier-2 verb conflicts with a tier-1 placement, tier 1
+# wins by construction (a verb appears in exactly one level below).
+_CONVENTIONAL_VERBS: dict[int, list[str]] = {
+    1: ["list", "define", "name", "label", "state", "memorize", "memorise",
+        "recite", "locate", "repeat"],
+    2: ["describe", "discuss", "restate"],
+    3: ["apply", "demonstrate", "solve", "operate", "practice", "calculate",
+        "employ", "perform", "utilize", "utilise", "conduct"],
+    4: ["analyze", "analyse", "examine", "diagnose", "investigate", "dissect"],
+    5: ["evaluate", "justify", "assess", "validate", "verify", "defend",
+        "appraise", "argue", "recommend", "prioritize", "prioritise",
+        "criticize", "criticise"],
+    6: ["create", "develop", "compose", "formulate", "devise", "build",
+        "invent", "propose", "synthesize", "synthesise", "prototype"],
 }
 
-# English instructional verbs per level (inflections generated automatically).
+#: Merged lexicon actually compiled into patterns.
 _EN_VERB_LEXICON: dict[int, list[str]] = {
-    1: ["recall", "list", "define", "name", "identify", "label", "state",
-        "recognize", "memorize", "recite", "locate", "repeat", "retrieve",
-        "match"],
-    2: ["explain", "summarize", "summarise", "describe", "interpret",
-        "classify", "paraphrase", "discuss", "illustrate", "translate",
-        "infer", "predict", "exemplify", "restate"],
-    3: ["apply", "use", "implement", "execute", "demonstrate", "solve",
-        "operate", "practice", "calculate", "employ", "perform", "utilize",
-        "conduct"],
-    4: ["analyze", "analyse", "compare", "contrast", "differentiate",
-        "distinguish", "examine", "categorize", "diagnose", "deconstruct",
-        "attribute", "investigate", "dissect"],
-    5: ["evaluate", "judge", "critique", "justify", "assess", "validate",
-        "verify", "defend", "appraise", "argue", "recommend", "prioritize",
-        "criticize"],
-    6: ["create", "design", "develop", "construct", "produce", "compose",
-        "formulate", "devise", "generate", "build", "invent", "plan",
-        "propose", "synthesize", "prototype", "integrate"],
+    level: _AK_PROCESSES[level] + _CONVENTIONAL_VERBS[level]
+    for level in sorted(_AK_PROCESSES)
 }
+
+# A verb must not appear at two levels: the "highest level wins" rule would
+# then be decided by lexicon duplication rather than by the text.
+_seen_verbs: dict[str, int] = {}
+for _level, _verbs in _EN_VERB_LEXICON.items():
+    for _verb in _verbs:
+        if _verb in _seen_verbs:  # pragma: no cover - construction-time guard
+            raise ValueError(
+                f"verb {_verb!r} is at level {_seen_verbs[_verb]} and {_level}"
+            )
+        _seen_verbs[_verb] = _level
+del _seen_verbs, _level, _verbs, _verb
+
+# A determiner, possessive or "of" immediately before a match means the word is
+# being used as a noun or a participial adjective ("the design", "their plan",
+# "a test", "the proposed solution"), not as the performed action. Measured on
+# the ladder corpus, this accounted for >=4.3% of all objective-level
+# assignments before the guard existed. Only the IMMEDIATE left context is
+# checked: allowing a gap would also suppress genuine verbs ("the learners
+# create ...").
+_NOUN_CONTEXT = re.compile(
+    r"\b(?:the|a|an|this|that|these|those|their|its|his|her|our|your|my|"
+    r"each|every|any|some|no|of)\s+$",
+    re.IGNORECASE,
+)
 
 # Question-form fallbacks (used only when no verb matched): plain
 # recall-style interrogatives are treated as Remember-level items.
 _QUESTION_FALLBACKS: list[tuple[re.Pattern[str], int]] = [
-    (re.compile(r"무엇인가|무엇입니까|무엇일까"), 1),
     (re.compile(r"\bwhat\s+(is|are)\b", re.IGNORECASE), 1),
-    (re.compile(r"\btrue\s+or\s+false\b|\(?OX\)?\s*퀴즈|OX\s*문제"), 1),
+    (re.compile(r"\btrue\s+or\s+false\b", re.IGNORECASE), 1),
 ]
 
 
@@ -174,57 +262,130 @@ def _en_inflections(verb: str) -> str:
 
 
 class LexiconBloomClassifier:
-    """Rule-based Bloom classifier over a Korean + English verb lexicon.
+    """Rule-based Bloom classifier over an English instructional-verb lexicon.
 
-    When verbs of several levels match, the **highest** level wins — the
-    conventional "highest cognitive demand" coding rule used in DOK /
-    alignment studies (a task that requires any higher-order process is coded
-    at that level).
+    English-only by design: the scored corpus is English (measured 100% across
+    all agents and model sizes), so a second-language lexicon would be dead
+    weight that the protocol description still has to account for. Text in
+    another language simply returns ``None`` — unclassifiable, and therefore
+    excluded from the Bloom-dependent quantities rather than guessed at.
+
+    Level membership comes from :data:`_AK_PROCESSES` (Anderson & Krathwohl
+    2001, Table 5.1) wherever the taxonomy defines it, extended by
+    :data:`_CONVENTIONAL_VERBS` for recall.
+
+    When verbs of several levels match, the level comes from the **leading**
+    verb — the first one in the text, which in an objective ("Learners will
+    <verb> ...") or an exam prompt ("Compare X and Y") is the central
+    performance. This follows Webb's alignment methodology, which assigns a
+    level from the central performance rather than from the most demanding verb
+    appearing anywhere; a trailing verb usually names the purpose or the medium
+    ("apply X to design Y"), not the demand being assessed.
+
+    The rule was chosen on evidence, not taste. Against the highest-wins rule
+    this lexicon previously used, on two independent labelled corpora:
+
+    ======================================  ==============  ==============
+    corpus                                  highest wins    leading verb
+    ======================================  ==============  ==============
+    EDM2022 learning objectives (n=18773)   kappa 0.591     kappa 0.657
+    Public exam-question set (n=8767)       kappa 0.386     kappa 0.434
+    ======================================  ==============  ==============
+
+    On the EDM2022 objectives — the corpus matching what this protocol scores —
+    kappa 0.657 is "substantial" agreement and exceeds the kappa 0.63 reported
+    between two trained human coders on that same dataset.
+
+    Matches in noun position are rejected (see :data:`_NOUN_CONTEXT`).
+
+    This is the **sensitivity** arm of the Bloom axis; the primary arm is
+    :class:`TransformerBloomClassifier` (the roles were swapped on 2026-07-29,
+    when the transformer measured kappa 0.926 against this one's 0.650 on a
+    held-out split). What this arm buys, and why it is kept: its level
+    assignment stays traceable to Anderson & Krathwohl and is bit-wise
+    deterministic, neither of which holds for a softmax argmax. Note the
+    coverage asymmetry between them: this one abstains (``None``) on text with
+    no lexicon verb, ~84% coverage on EDM2022CLO, while the transformer always
+    emits a level.
     """
+
+    name = "lexicon"
+
+    def classify_many(self, texts: Sequence[str]) -> list[Optional[int]]:
+        """Same entry point as the transformer arm; no batching to gain here."""
+        return [self.classify(t) for t in texts]
 
     def __init__(self) -> None:
         self._patterns: list[tuple[re.Pattern[str], int]] = []
-        for level, stems in _KO_VERB_LEXICON.items():
-            alternation = "|".join(re.escape(s) for s in stems)
-            pattern = re.compile(f"(?:{alternation})[하할한함해했합히]")
-            self._patterns.append((pattern, level))
-        for level, stems in _KO_NATIVE_STEMS.items():
-            alternation = "|".join(re.escape(s) for s in stems)
-            self._patterns.append((re.compile(f"(?:{alternation})"), level))
         for level, verbs in _EN_VERB_LEXICON.items():
             alternation = "|".join(_en_inflections(v) for v in verbs)
             pattern = re.compile(rf"\b(?:{alternation})\b", re.IGNORECASE)
             self._patterns.append((pattern, level))
 
+    def _verbal_matches(self, text: str) -> list[tuple[int, int]]:
+        """(offset, level) of every match in non-noun position, in text order."""
+        found = [
+            (m.start(), level)
+            for pattern, level in self._patterns
+            for m in pattern.finditer(text)
+            if not _NOUN_CONTEXT.search(text[: m.start()])
+        ]
+        return sorted(found)
+
     def classify(self, text: str) -> Optional[int]:
         if not text:
             return None
-        best: Optional[int] = None
-        for pattern, level in self._patterns:
-            if (best is None or level > best) and pattern.search(text):
-                best = level
-        if best is None:
-            for pattern, level in _QUESTION_FALLBACKS:
-                if pattern.search(text):
-                    return level
-        return best
+        matches = self._verbal_matches(text)
+        if matches:
+            return matches[0][1]
+        for pattern, level in _QUESTION_FALLBACKS:
+            if pattern.search(text):
+                return level
+        return None
 
 
 class TransformerBloomClassifier:
     """Bloom classifier backed by a locally fine-tuned sequence classifier.
 
-    Loads a checkpoint from ``model_path`` only if it already exists on disk;
-    it never downloads. Train one with
-    ``evaluator/scripts/train_bloom_classifier.py``.
+    The **primary arm** of the Bloom axis since 2026-07-29 (kappa 0.926 vs the
+    lexicon's 0.650 on a held-out split), but it does not replace the lexicon:
+    the sweep's question is not "which classifier is more accurate" but "does
+    the agent ranking depend on the choice of classifier at all". Two
+    instruments derived from completely separate sources — the lexicon from
+    Anderson & Krathwohl's Table 5.1, this one from 21,380 human labels —
+    agreeing on the ranking is stronger evidence than either instrument alone at
+    any kappa. The cost of leading with this one, which must be declared: a
+    per-case level is no longer traceable to Anderson & Krathwohl, and family B
+    stops being bit-wise deterministic (a discrete argmax, so floating-point
+    noise can flip a label rather than nudge a number).
+
+    Train one with ``evaluator/scripts/train_bloom_6way_classifier.py`` (default
+    recipe: ``bert-base-uncased`` on the single-label subset of EDM2022CLO,
+    after Li et al. 2022). Loads a checkpoint from ``model_path`` only if it
+    already exists on disk; it never downloads.
+
+    Unlike the lexicon this classifier **never abstains** — argmax always
+    returns a level, so family-B denominators differ between the two arms by
+    construction. That is declared rather than patched: a ranking that
+    survives two instruments with 84% and 100% coverage is a stronger result
+    than one tuned to make the arms comparable.
     """
 
-    def __init__(self, model_path: str, max_length: int = 128) -> None:
+    name = "transformer"
+
+    def __init__(
+        self,
+        model_path: str,
+        max_length: int = 128,
+        device: Optional[str] = None,
+        batch_size: int = 64,
+    ) -> None:
         import os
 
         if not os.path.isdir(model_path):
             raise FileNotFoundError(
                 f"Bloom classifier checkpoint not found at '{model_path}'. "
-                "Fine-tune one with evaluator/scripts/train_bloom_classifier.py "
+                "Fine-tune one with evaluator/scripts/train_bloom_6way_classifier.py "
                 "or fall back to LexiconBloomClassifier."
             )
         from transformers import (  # noqa: PLC0415 - optional heavy dep
@@ -232,22 +393,62 @@ class TransformerBloomClassifier:
             AutoTokenizer,
         )
 
+        import torch  # noqa: PLC0415 - optional heavy dep
+
         self._tokenizer = AutoTokenizer.from_pretrained(model_path)
         self._model = AutoModelForSequenceClassification.from_pretrained(model_path)
         self._model.eval()
         self._max_length = max_length
+        self._batch_size = batch_size
+        if device is None:
+            if torch.backends.mps.is_available():
+                device = "mps"
+            elif torch.cuda.is_available():
+                device = "cuda"
+            else:
+                device = "cpu"
+        self.device = device
+        self._model.to(device)
+        # Scoring calls this once per text per scenario, and the same objective
+        # text recurs across scenarios and arms, so a plain memo removes ~30% of
+        # the forward passes within one invocation. Levels are a pure function
+        # of the text for a fixed checkpoint, so memoising cannot skew a score.
+        self._memo: dict[str, Optional[int]] = {}
 
     def classify(self, text: str) -> Optional[int]:
-        if not text:
-            return None
+        return self.classify_many([text])[0]
+
+    def classify_many(self, texts: Sequence[str]) -> list[Optional[int]]:
+        """Batched classification — the form the evaluator should call.
+
+        One text at a time on CPU costs hours over a full ladder (measured: 58
+        texts/s vs 464k calls per arm). Batching on the local GPU is what makes
+        the transformer arm affordable to run on every sweep arm.
+        """
         import torch  # noqa: PLC0415 - optional heavy dep
 
-        inputs = self._tokenizer(
-            text, return_tensors="pt", truncation=True, max_length=self._max_length
-        )
-        with torch.no_grad():
-            logits = self._model(**inputs).logits
-        return int(logits.argmax(dim=-1).item()) + 1
+        out: list[Optional[int]] = [None] * len(texts)
+        pending = [
+            i for i, t in enumerate(texts)
+            if t and t not in self._memo
+        ]
+        for i, t in enumerate(texts):
+            if t and t in self._memo:
+                out[i] = self._memo[t]
+        for start in range(0, len(pending), self._batch_size):
+            idx = pending[start:start + self._batch_size]
+            batch = [texts[i] for i in idx]
+            inputs = self._tokenizer(
+                batch, return_tensors="pt", truncation=True, padding=True,
+                max_length=self._max_length,
+            ).to(self.device)
+            with torch.no_grad():
+                logits = self._model(**inputs).logits
+            levels = (logits.argmax(dim=-1) + 1).tolist()
+            for i, level in zip(idx, levels):
+                out[i] = int(level)
+                self._memo[texts[i]] = int(level)
+        return out
 
 
 # ---------------------------------------------------------------------------
@@ -309,27 +510,63 @@ class TfidfCharNgramEncoder:
 
 
 class SentenceTransformerEncoder:
-    """Multilingual sentence-embedding encoder (lazy-loaded, optional dep).
+    """Sentence-embedding encoder running locally, with the same vector cache.
 
     Requires the ``alignment`` extra (``pip install isd-evaluator[alignment]``).
-    Default model is LaBSE; ``BAAI/bge-m3`` is a good alternative.
+    Same cache contract as :class:`OpenAIAPIEncoder` — cache key is
+    ``sha1(model[@revision] + text)`` — so a locally-embedded arm is resumable
+    and re-analysable exactly like a served one.
+
+    **One backend per model.** The cache key does NOT record whether a vector
+    came from a pod or from here, so embedding one model both ways would mix
+    two numerically different sources under one key, invisibly. Each preset in
+    the scorer therefore pins its backend: the primary encoder is served, the
+    smaller sweep arms run here.
     """
 
-    def __init__(self, model_name: str = "sentence-transformers/LaBSE") -> None:
-        self.model_name = model_name
+    def __init__(
+        self,
+        model_name: str,
+        batch_size: int = 64,
+        cache_path: Optional[Path] = None,
+        cache_only: bool = False,
+        revision: Optional[str] = None,
+        device: Optional[str] = None,
+    ) -> None:
+        self.model = model_name
+        self.model_name = model_name        # kept: older callers use this name
+        self.revision = revision or None
+        self.batch_size = batch_size
+        self.cache_only = cache_only
+        self.device = device
+        self._cache = _EmbeddingCache(cache_path) if cache_path else None
         self._model = None
 
     def _load(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer  # noqa: PLC0415
 
-            self._model = SentenceTransformer(self.model_name)
+            kwargs = {}
+            if self.revision:
+                kwargs["revision"] = self.revision
+            if self.device:
+                kwargs["device"] = self.device
+            self._model = SentenceTransformer(self.model_name, **kwargs)
         return self._model
 
     def encode(self, texts: Sequence[str]) -> list[list[float]]:
-        model = self._load()
-        embeddings = model.encode(list(texts), normalize_embeddings=True)
-        return [list(map(float, row)) for row in embeddings]
+        def compute(pending: list[int]):
+            model = self._load()
+            for start in range(0, len(pending), self.batch_size):
+                idx = pending[start:start + self.batch_size]
+                vecs = model.encode([texts[i] for i in idx],
+                                    normalize_embeddings=True)
+                yield idx, [list(map(float, row)) for row in vecs]
+
+        return _encode_with_cache(
+            texts, cache=self._cache, model=self.model, revision=self.revision,
+            cache_only=self.cache_only, compute_chunks=compute,
+        )
 
 
 class _EmbeddingCache:
@@ -381,6 +618,65 @@ class _EmbeddingCache:
             [(k, array("f", v).tobytes()) for k, v in items.items()],
         )
         self._conn.commit()
+
+
+def _encode_with_cache(
+    texts: Sequence[str],
+    *,
+    cache: Optional[_EmbeddingCache],
+    model: str,
+    revision: Optional[str],
+    cache_only: bool,
+    compute_chunks,
+) -> list[list[float]]:
+    """Cache lookup -> compute the misses -> write back, shared by both encoders.
+
+    ``compute_chunks(pending_indices)`` yields ``(indices, vectors)`` chunks.
+    Chunking is the caller's business (HTTP batches dispatched round-robin for
+    the served encoder, forward-pass batches for the local one); everything
+    about the cache is here, so the two backends cannot drift apart in how a
+    key is formed or when a vector is persisted.
+
+    Vectors are written per chunk, not at the end: a long run that dies part
+    way keeps what it already embedded.
+
+    Empty/whitespace texts never reach the model — they become zero vectors of
+    whatever dimension the run establishes.
+    """
+    vectors: list[Optional[list[float]]] = [None] * len(texts)
+    pending: list[int] = []
+    dim: Optional[int] = None
+    keys = [cache.key(model, t, revision) if cache else "" for t in texts]
+    cached = cache.get_many(
+        [keys[i] for i, t in enumerate(texts) if t.strip()]
+    ) if cache else {}
+    for i, text in enumerate(texts):
+        if not text.strip():
+            continue
+        hit = cached.get(keys[i])
+        if hit is not None:
+            vectors[i] = hit
+            dim = dim or len(hit)
+        else:
+            pending.append(i)
+
+    if pending and cache_only:
+        raise RuntimeError(
+            f"cache_only=True but {len(pending)} of {len(texts)} texts are "
+            f"not in the embedding cache for model {model!r}. Re-run the "
+            "primary scoring pass with the encoder available first, or drop "
+            "cache_only."
+        )
+
+    for idx, embedded in compute_chunks(pending):
+        for i, vec in zip(idx, embedded):
+            vectors[i] = vec
+            dim = dim or len(vec)
+        if cache:
+            cache.put_many({keys[i]: vec for i, vec in zip(idx, embedded)})
+
+    width = dim or 1
+    return [vec if vec is not None else [0.0] * width for vec in vectors]
 
 
 class OpenAIAPIEncoder:
@@ -439,64 +735,33 @@ class OpenAIAPIEncoder:
 
     def encode(self, texts: Sequence[str]) -> list[list[float]]:
         texts = [str(t) for t in texts]
-        vectors: list[Optional[list[float]]] = [None] * len(texts)
-        pending: list[int] = []
-        keys = [
-            self._cache.key(self.model, t, self.revision) if self._cache else ""
-            for t in texts
-        ]
-        cached = self._cache.get_many(
-            [keys[i] for i, t in enumerate(texts) if t.strip()]
-        ) if self._cache else {}
-        for i, text in enumerate(texts):
-            if not text.strip():
-                continue  # zero vector, filled once the dimension is known
-            hit = cached.get(keys[i])
-            if hit is not None:
-                vectors[i] = hit
-                self._dim = self._dim or len(hit)
-            else:
-                pending.append(i)
 
-        if pending and self.cache_only:
-            raise RuntimeError(
-                f"cache_only=True but {len(pending)} of {len(texts)} texts are "
-                f"not in the embedding cache for model {self.model!r}. Re-run "
-                "the primary scoring pass against a live endpoint first, or "
-                "drop cache_only."
-            )
-        batches = [
-            pending[start:start + self.batch_size]
-            for start in range(0, len(pending), self.batch_size)
-        ]
-        n_clients = len(self._clients)
-        if n_clients > 1 and len(batches) > 1:
-            from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
-
-            def run(job):
-                bi, batch_idx = job
-                client = self._clients[bi % n_clients]
-                return batch_idx, self._embed_batch(
-                    [texts[i] for i in batch_idx], client=client)
-
-            with ThreadPoolExecutor(max_workers=n_clients) as pool:
-                results = list(pool.map(run, enumerate(batches)))
-        else:
-            results = [
-                (batch_idx, self._embed_batch([texts[i] for i in batch_idx]))
-                for batch_idx in batches
+        def compute(pending: list[int]):
+            batches = [
+                pending[start:start + self.batch_size]
+                for start in range(0, len(pending), self.batch_size)
             ]
+            n_clients = len(self._clients)
+            if n_clients > 1 and len(batches) > 1:
+                from concurrent.futures import ThreadPoolExecutor  # noqa: PLC0415
 
-        for batch_idx, embedded in results:
-            for i, vec in zip(batch_idx, embedded):
-                vectors[i] = vec
-                self._dim = self._dim or len(vec)
-            if self._cache:
-                self._cache.put_many(
-                    {keys[i]: vec for i, vec in zip(batch_idx, embedded)}
-                )
-        dim = self._dim or 1
-        return [vec if vec is not None else [0.0] * dim for vec in vectors]
+                def run(job):
+                    bi, batch_idx = job
+                    client = self._clients[bi % n_clients]
+                    return batch_idx, self._embed_batch(
+                        [texts[i] for i in batch_idx], client=client)
+
+                with ThreadPoolExecutor(max_workers=n_clients) as pool:
+                    yield from pool.map(run, enumerate(batches))
+            else:
+                for batch_idx in batches:
+                    yield batch_idx, self._embed_batch(
+                        [texts[i] for i in batch_idx])
+
+        return _encode_with_cache(
+            texts, cache=self._cache, model=self.model, revision=self.revision,
+            cache_only=self.cache_only, compute_chunks=compute,
+        )
 
 
 def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
@@ -794,43 +1059,45 @@ def extract_declared_links(addie_output: dict) -> list[tuple[str, str]]:
 
 @dataclass
 class AlignmentScore:
-    """Alignment endpoints and indices; every numeric value lies in [0, 1].
+    """The panel of alignment signals; every numeric value lies in [0, 1].
 
-    ``objective_assessment_alignment`` (continuous, threshold-free) is the
-    primary endpoint. The protocol uses **no similarity threshold anywhere** —
-    coverage of each objective by assessments/activities/evaluation is the
-    mean-max cosine, not a thresholded rate. There is no composite scalar; the
-    criteria are reported separately.
+    **No primary endpoint** — the seven signals are a flat panel, each
+    answering a different question, all reported for every comparison. The
+    protocol uses **no similarity threshold anywhere**: the correspondence
+    between an objective and the assessments/activities/evaluation is a
+    mean-max cosine, not a thresholded rate. There is no composite scalar.
     """
 
-    # Primary endpoint: mean over objectives of the max cosine to any
-    # assessment item (continuous, threshold-free) -- the objective<->
-    # assessment relation at the heart of constructive alignment (Biggs).
-    objective_assessment_alignment: Optional[float] = None
-    # The other two legs of aligned(o), same continuous form.
-    objective_activity_alignment: Optional[float] = None
-    objective_evaluation_alignment: Optional[float] = None
-    # Categorical criterion (no similarity threshold anywhere).
+    # --- Family A: textual correspondence (encoder) ---
+    # Mean over objectives of the max rectified cosine to any assessment item:
+    # the ``measures`` leg of aligned(o), the relation at the heart of
+    # constructive alignment (Biggs).
+    objective_assessment_similarity: Optional[float] = None
+    # The other two legs of aligned(o), same mean-max form.
+    objective_activity_similarity: Optional[float] = None
+    objective_evaluation_similarity: Optional[float] = None
+    # Reverse direction (orphan-item diagnostic). Direction is deliberately
+    # not one-way-good -- see the module docstring.
+    assessment_objective_similarity: Optional[float] = None
+    # --- Family B: cognitive demand (Bloom classifier, no similarity) ---
     objective_cognitive_congruence: Optional[float] = None
-    # Descriptive indices.
     porter: dict[str, Optional[float]] = field(default_factory=dict)
     porter_mean: Optional[float] = None
     webb_bloom_consistency: Optional[float] = None
-    assessment_precision: Optional[float] = None
     counts: dict[str, int] = field(default_factory=dict)
     details: dict[str, Any] = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "objective_assessment_alignment": self.objective_assessment_alignment,
-            "objective_activity_alignment": self.objective_activity_alignment,
-            "objective_evaluation_alignment": self.objective_evaluation_alignment,
+            "objective_assessment_similarity": self.objective_assessment_similarity,
+            "objective_activity_similarity": self.objective_activity_similarity,
+            "objective_evaluation_similarity": self.objective_evaluation_similarity,
+            "assessment_objective_similarity": self.assessment_objective_similarity,
             "objective_cognitive_congruence": self.objective_cognitive_congruence,
             "porter": self.porter,
             "porter_mean": self.porter_mean,
             "webb_bloom_consistency": self.webb_bloom_consistency,
-            "assessment_precision": self.assessment_precision,
             "counts": self.counts,
             "details": self.details,
             "notes": self.notes,
@@ -841,14 +1108,33 @@ class AlignmentScore:
 # Objective-level endpoint aggregation (shared by scoring and re-aggregation)
 # ---------------------------------------------------------------------------
 
-#: The four objective-level endpoints, derivable purely from the per-objective
+#: The four objective-level signals, derivable purely from the per-objective
 #: signals stored in ``details["objectives"]`` + the ``counts`` dict.
 OBJECTIVE_ENDPOINTS = (
-    "objective_assessment_alignment",
-    "objective_activity_alignment",
-    "objective_evaluation_alignment",
+    "objective_assessment_similarity",
+    "objective_activity_similarity",
+    "objective_evaluation_similarity",
     "objective_cognitive_congruence",
 )
+
+#: The reported panel, in reporting order, as (signal, instrument family).
+#: The single source of truth for "what gets reported" -- scoring, pooling,
+#: tables and figures all read this so a signal can never be reported by one
+#: stage and silently dropped by another. Flat by construction: there is no
+#: primary entry and nothing here is a "secondary" index.
+PANEL_SIGNALS: tuple[tuple[str, str], ...] = (
+    ("objective_assessment_similarity", "correspondence"),
+    ("objective_activity_similarity", "correspondence"),
+    ("objective_evaluation_similarity", "correspondence"),
+    ("assessment_objective_similarity", "correspondence"),
+    ("objective_cognitive_congruence", "cognitive"),
+    ("porter_mean", "cognitive"),
+    ("webb_bloom_consistency", "cognitive"),
+)
+
+#: Panel signals whose direction is not one-way-good, so they are read as
+#: diagnostics and never counted as "legs won".
+NON_DIRECTIONAL_SIGNALS = frozenset({"assessment_objective_similarity"})
 
 
 def objective_endpoints(
@@ -869,16 +1155,16 @@ def objective_endpoints(
     n = len(obj_details)
     out: dict[str, Optional[float]] = dict.fromkeys(OBJECTIVE_ENDPOINTS, None)
     if n == 0:
-        out["objective_assessment_alignment"] = 0.0
-        out["objective_activity_alignment"] = 0.0
-        out["objective_evaluation_alignment"] = 0.0
+        out["objective_assessment_similarity"] = 0.0
+        out["objective_activity_similarity"] = 0.0
+        out["objective_evaluation_similarity"] = 0.0
         return out, notes
     for endpoint, signal, count_key, label in (
-        ("objective_assessment_alignment", "best_similarity",
+        ("objective_assessment_similarity", "best_similarity",
          "assessment", "assessment items"),
-        ("objective_activity_alignment", "best_activity_similarity",
+        ("objective_activity_similarity", "best_activity_similarity",
          "activities", "activities"),
-        ("objective_evaluation_alignment", "best_evaluation_similarity",
+        ("objective_evaluation_similarity", "best_evaluation_similarity",
          "evaluation", "evaluation texts"),
     ):
         if counts.get(count_key, 0):
@@ -907,19 +1193,15 @@ def reaggregate(score_dict: dict[str, Any]) -> dict[str, Any]:
     ``score_dict`` is one agent's :meth:`AlignmentScore.to_dict` payload from
     an ``alignment_scores.json`` file. Reads its ``details.objectives`` +
     ``counts`` and overwrites the four :data:`OBJECTIVE_ENDPOINTS` — no
-    encoder, no Bloom call, no network. The descriptive indices
-    (``porter_mean``, ``webb_bloom_consistency``, ``assessment_precision``)
-    are left untouched: they depend on full matrices not stored per objective,
-    and are unaffected by objective-level metric-definition changes.
+    encoder, no Bloom call, no network. The remaining panel signals
+    (``porter_mean``, ``webb_bloom_consistency``,
+    ``assessment_objective_similarity``) are left untouched: they depend on
+    full matrices not stored per objective, and are unaffected by
+    objective-level metric-definition changes.
     """
     obj_details = (score_dict.get("details") or {}).get("objectives") or []
     counts = score_dict.get("counts") or {}
     endpoints, _ = objective_endpoints(obj_details, counts)
-    # Drop any endpoint keys that no longer exist (e.g. removed criteria).
-    for stale in ("objective_measurability", "full_alignment_rate",
-                  "objective_assessment_coverage", "objective_activity_coverage",
-                  "objective_evaluation_coverage"):
-        score_dict.pop(stale, None)
     score_dict.update(endpoints)
     return score_dict
 
@@ -933,35 +1215,39 @@ class AlignmentEvaluator:
     """Deterministic constructive-alignment evaluator for one ADDIE output.
 
     **No similarity threshold anywhere** — the objective<->item relations are
-    scored as continuous mean-max cosine, not thresholded rates.
+    scored as continuous mean-max cosine, not thresholded rates. Emits the
+    flat panel of :data:`PANEL_SIGNALS`; there is no primary endpoint.
 
-    Objective-level endpoints:
+    Family A — textual correspondence (the encoder):
 
-    - ``objective_assessment_alignment`` (**primary**): mean over objectives
-      of the max cosine similarity to any assessment item — the
-      objective<->assessment relation at the heart of constructive alignment
+    - ``objective_assessment_similarity``: mean over objectives of the max
+      cosine similarity to any assessment item — the ``measures`` leg of
+      aligned(o), the relation at the heart of constructive alignment
       (Biggs). Continuous, threshold-free.
-    - ``objective_activity_alignment`` / ``objective_evaluation_alignment``:
-      the same continuous mean-max cosine against activities / evaluation-
-      phase texts (the ``supports`` / ``evaluates`` legs of aligned(o)).
+    - ``objective_activity_similarity`` / ``objective_evaluation_similarity``:
+      the same mean-max form against activities / evaluation-phase texts (the
+      ``supports`` / ``evaluates`` legs).
+    - ``assessment_objective_similarity``: the reverse direction (mean over
+      assessment items of the max cosine to any objective) — an orphan-item
+      diagnostic, not a one-way-good score.
+
+    Family B — cognitive demand (the Bloom classifier, no similarity):
+
     - ``objective_cognitive_congruence``: share of objectives whose
       argmax-closest assessment item has Bloom level >= the objective's
       level, over objectives with both levels classifiable (objective-centric,
       argmax picks the closest item with no threshold); undefined when no
       objective qualifies.
-
-    Descriptive indices (also threshold-free): Porter alignment index,
-    item-centric ``webb_bloom_consistency``, ``assessment_precision``
-    (reverse direction: mean over assessment items of max cosine to any
-    objective).
+    - Porter alignment index (per pair + mean) and the item-centric
+      ``webb_bloom_consistency``.
 
     Conventions for degenerate inputs (all values stay in [0,1]):
 
-    - No objectives: the alignment endpoints are 0.0; congruence and the
-      descriptive indices are undefined.
-    - Objectives present but a counterpart set empty: that alignment endpoint
-      and the Porter index for the pair are 0.0; ``assessment_precision`` is
-      undefined.
+    - No objectives: the family-A objective signals are 0.0; congruence and
+      the family-B indices are undefined.
+    - Objectives present but a counterpart set empty: that signal and the
+      Porter index for the pair are 0.0; ``assessment_objective_similarity``
+      is undefined.
     - Bloom-dependent values use only texts the classifier can label; when
       nothing qualifies they are undefined with a note.
 
@@ -1003,11 +1289,11 @@ class AlignmentEvaluator:
 
         if not objectives:
             score.notes.append(
-                "no learning objectives found; objective-level endpoints = 0.0"
+                "no learning objectives found; objective-level signals = 0.0"
             )
-            score.objective_assessment_alignment = 0.0
-            score.objective_activity_alignment = 0.0
-            score.objective_evaluation_alignment = 0.0
+            score.objective_assessment_similarity = 0.0
+            score.objective_activity_similarity = 0.0
+            score.objective_evaluation_similarity = 0.0
             return score
 
         objective_texts = [o["text"] for o in objectives]
@@ -1034,7 +1320,7 @@ class AlignmentEvaluator:
         }
 
         levels = {
-            name: [self.bloom.classify(t) for t in texts]
+            name: self.bloom.classify_many(texts)
             for name, texts in sets.items()
         }
         topic_ids = {
@@ -1082,22 +1368,25 @@ class AlignmentEvaluator:
             sim, levels["objectives"], levels["assessment"], score.notes
         )
 
-        # Assessment precision (reverse direction: does each assessment item
-        # bind to some objective?). Threshold-free.
+        # Reverse direction (does each assessment item bind to some
+        # objective?). Threshold-free, and read as a diagnostic: a high value
+        # can mean "no orphan items" or "items restate the objectives".
         if assessments:
             per_item_max = [
                 max(sim[i][j] for i in range(len(sim))) for j in range(len(assessments))
             ]
-            score.assessment_precision = sum(per_item_max) / len(per_item_max)
+            score.assessment_objective_similarity = sum(per_item_max) / len(per_item_max)
 
         obj_details = self._objective_details(
             objectives, assessments, activities, evaluations, sim, sim_act,
             sim_eval, levels, topic_ids["objectives"], topics,
         )
         score.details["objectives"] = obj_details
-        score.details["sanity"] = self._sanity_report(objectives, levels["objectives"])
+        score.details["sanity"] = self._sanity_report(
+            objectives, levels["objectives"], self.bloom.name
+        )
 
-        # Continuous alignment endpoints, aggregated from the per-objective
+        # Continuous objective-level signals, aggregated from the per-objective
         # signals already recorded in ``details["objectives"]`` (single source
         # of truth). Split out so a metric-definition change can re-aggregate
         # from a saved score without re-encoding (see :func:`reaggregate`).
@@ -1217,7 +1506,7 @@ class AlignmentEvaluator:
                 {
                     "text": objective["text"],
                     "topic": topics[objective_topics[i]],
-                    "lexicon_level": obj_level,
+                    "bloom_level": obj_level,
                     "declared_level": objective["declared_level"],
                     "best_item": assessments[best_j] if best_j is not None else None,
                     "best_similarity": round(row[best_j], 4) if best_j is not None else None,
@@ -1271,28 +1560,37 @@ class AlignmentEvaluator:
 
     @staticmethod
     def _sanity_report(
-        objectives: list[dict[str, Any]], lexicon_levels: list[Optional[int]]
+        objectives: list[dict[str, Any]],
+        bloom_levels: list[Optional[int]],
+        classifier: str,
     ) -> dict[str, Any]:
-        """Validation evidence: agreement between the lexicon classifier and
-        the agent's self-declared ``level`` fields. Never enters scoring."""
+        """Validation evidence: agreement between the Bloom classifier of the
+        arm being scored and the agent's self-declared ``level`` fields. Never
+        enters scoring.
+
+        Keys say "bloom", not "lexicon": with two arms on the Bloom axis the
+        old ``lexicon_*`` names would state a falsehood in the transformer arm.
+        ``classifier`` records which arm produced these numbers.
+        """
         both = [
-            (obj["declared_level"], lex)
-            for obj, lex in zip(objectives, lexicon_levels)
-            if obj["declared_level"] is not None and lex is not None
+            (obj["declared_level"], level)
+            for obj, level in zip(objectives, bloom_levels)
+            if obj["declared_level"] is not None and level is not None
         ]
         agreement = (
-            sum(1 for declared, lex in both if declared == lex) / len(both)
+            sum(1 for declared, level in both if declared == level) / len(both)
             if both
             else None
         )
         return {
+            "classifier": classifier,
             "n_objectives": len(objectives),
             "n_declared": sum(
                 1 for o in objectives if o["declared_level"] is not None
             ),
-            "n_lexicon_classified": sum(
-                1 for level in lexicon_levels if level is not None
+            "n_bloom_classified": sum(
+                1 for level in bloom_levels if level is not None
             ),
             "n_comparable": len(both),
-            "lexicon_vs_declared_agreement": agreement,
+            "bloom_vs_declared_agreement": agreement,
         }

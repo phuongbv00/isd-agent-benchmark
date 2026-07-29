@@ -74,12 +74,20 @@ LLM이 일관된 평가 기준을 적용할 수 있도록 지원합니다.
 
 | 구성 요소 | 설명 |
 |-----------|------|
-| `objective_assessment_alignment` (**주 지표**) | objective별 임의 평가항목까지의 max cosine 평균 (연속형) |
-| `objective_activity_alignment` / `objective_evaluation_alignment` | 같은 공식, 활동 / 총괄평가 텍스트 대상 |
+| `objective_assessment_similarity` | objective별 임의 평가항목까지의 max cosine 평균 (연속형) — `aligned(o)`의 *measures* 축 |
+| `objective_activity_similarity` / `objective_evaluation_similarity` | 같은 공식, 활동 / 총괄평가 텍스트 대상 |
+| `assessment_objective_similarity` | 역방향 (평가항목 → objective). **방향성 없음**: 높다는 것이 항상 좋다는 뜻은 아니므로 진단 지표로만 읽음 |
 | `objective_cognitive_congruence` | best 평가항목(argmax)의 Bloom level ≥ objective level 비율 |
 | Porter Alignment Index | topic × Bloom-level 분포 행렬 일치도 (Porter 2002) |
 | Webb Bloom-Consistency | 매칭 항목의 Bloom level ≥ objective level 비율 (item-centric) |
-| `assessment_precision` | 주 지표의 역방향 (평가항목 → objective; traceability) |
+
+**주 지표는 없습니다** (2026-07-28 변경). 위 7개는 평평한 **패널**이며 하나를 "주
+지표"로 부르는 것은 이미 제거한 composite를 암묵적으로 되살리는 일입니다. 앞의 4개는
+encoder가 재는 *textual correspondence*, 뒤의 3개는 Bloom classifier가 재는
+*cognitive demand* — 서로 독립된 두 계열이고 각각 자체 sensitivity 축을 가집니다.
+이름이 `*_alignment`에서 `*_similarity`로 바뀐 이유도 같습니다: 지표 이름은 그림 축과
+슬라이드에서 읽히는데, 거기서 `..._alignment = 0.86`은 "86% 정렬됨"으로 들리고,
+그것은 validity evidence만이 할 수 있는 주장을 이름이 대신 하는 것입니다.
 
 cosine은 **rectified** 입니다 — `max(0, cos)`, 상한 1.0으로 clip. 이는 임계값이
 아니라 *척도* 선택입니다: 음의 유사도는 정렬(alignment)로서 의미가 없어 0 바닥으로

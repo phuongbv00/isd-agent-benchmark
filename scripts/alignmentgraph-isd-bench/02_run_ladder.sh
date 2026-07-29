@@ -89,7 +89,7 @@ slot_upper() {
 # A slot may be served by SEVERAL pods of the same model: set
 # <SLOT>_AGENT_MODEL_BASE_URLS to a comma-separated list and the agents
 # round-robin across them (shared/llm/config.py::resolve_base_url), the same
-# way EMBED_BASE_URLS works for the encoder. Fold the plural into the singular
+# way <SLOT>_EMBED_BASE_URLS works for the encoder. Fold the plural into the singular
 # here so everything downstream stays unchanged, and strip whitespace: the
 # value is interpolated unquoted into the tmux command string below, so a
 # space would split it into two arguments.

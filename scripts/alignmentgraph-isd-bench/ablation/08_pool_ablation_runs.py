@@ -24,8 +24,7 @@ component(s) (positive = removing it hurts).
 
 Besides the arm comparisons this script adds two ablation-specific layers:
   * flag sanity check — each arm's *_trajectory.json metadata.run_config must
-    match what its agent id claims (hard error on mismatch; the field only
-    exists for runs made after the ablation flags landed);
+    match what its agent id claims (hard error on mismatch);
   * A0 invariant check — A0 here vs A0 in the pooled ladder. These are the same
     runs now, so the delta must be ~0; a non-zero value means the two poolings
     disagree about identical data and should be debugged, not written up.
@@ -45,7 +44,6 @@ import argparse
 import glob as globmod
 import importlib.util
 import json
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -129,8 +127,8 @@ def check_arm_flags(run_dirs_by_model: dict[str, list[Path]],
                     break  # one scenario suffices: flags are fixed per process
                 if run_config is None:
                     report[label][agent] = (
-                        "WARN: no metadata.run_config found (run predates the "
-                        "ablation flags, or no trajectory written)"
+                        "WARN: no metadata.run_config found (no trajectory "
+                        "written for this arm — did it crash?)"
                     )
                     continue
                 got = {k: run_config.get(k) for k in expected}
@@ -196,6 +194,171 @@ def a0_consistency(models: list[dict], a0: str, ladder_pooled_path: Path) -> dic
     }
 
 
+# ── 2x2 factorial layer ──────────────────────────────────────────────────────
+
+#: The four arms ARE a complete 2x2 (verifier x graph context), so the design
+#: supports simple effects and an interaction — not just each arm against A0.
+#: Reading only "arm vs A0" is a main-effects-only view and it hides the case
+#: where one mechanism does nothing *because the other one already did the job*.
+FACTORIAL_CELLS = {
+    ("on", "on"): "alignmentgraph-isd",
+    ("off", "on"): "alignmentgraph-isd-no-verifier",
+    ("on", "off"): "alignmentgraph-isd-no-graph-ctx",
+    ("off", "off"): "alignmentgraph-isd-skeleton",
+}
+
+#: Judge signals (read from comparison_report.json rankings).
+FACTORIAL_JUDGE_SIGNALS = ("addie_median", "trajectory_score", "total_score")
+
+#: Every signal the factorial layer is computed on: the three judge signals plus
+#: the whole RQ2 panel. Deliberately exhaustive — the panel's defence against
+#: selective reporting is that every signal is reported for every comparison,
+#: and a factorial computed on a hand-picked subset would break exactly that.
+#: The paper's main text leads on one signal; the appendix carries all of them.
+FACTORIAL_SIGNALS = FACTORIAL_JUDGE_SIGNALS + tuple(
+    sig for sig, _family in LP.PANEL_SIGNALS)
+
+
+def _paired(diffs: list[float]) -> dict:
+    if not diffs:
+        return {"n": 0}
+    w, p, n_eff = LP.wilcoxon_signed_rank(diffs)
+    lo, hi = LP.bootstrap_ci(diffs)
+    return {"n": len(diffs), "n_effective_nonzero": n_eff,
+            "mean_diff": LP._mean(diffs), "ci95": [lo, hi],
+            "wilcoxon_w_plus": w, "p_raw": p,
+            "rank_biserial_r": LP.rank_biserial(diffs)}
+
+
+def per_scenario_maps(run_dirs: list[Path], agents: list[str]) -> dict:
+    """signal -> agent -> {scenario: mean over runs}.
+
+    One pass over the run dirs picks up both the judge fields (from
+    comparison_report.json) and the alignment panel (from alignment_scores.json),
+    so the factorial layer never re-derives a number a different way than the
+    rest of the pool does.
+    """
+    acc: dict[str, dict[str, dict[str, list[float]]]] = {
+        sig: {a: {} for a in agents} for sig in FACTORIAL_SIGNALS
+    }
+    panel_signals = [sig for sig, _f in LP.PANEL_SIGNALS]
+    for run_dir in run_dirs:
+        for sid, payload in LP.load_run(run_dir).items():
+            for a in agents:
+                r = (payload.get("rankings") or {}).get(a) or {}
+                for sig in FACTORIAL_JUDGE_SIGNALS:
+                    v = r.get(sig)
+                    if isinstance(v, (int, float)):
+                        acc[sig][a].setdefault(sid, []).append(float(v))
+            doc = payload.get("alignment") or {}
+            for a, sc in (doc.get("agents") or {}).items():
+                if a not in agents:
+                    continue
+                for sig in panel_signals:
+                    v = sc.get(sig)
+                    if isinstance(v, (int, float)):
+                        acc[sig][a].setdefault(sid, []).append(float(v))
+    return {sig: {a: {sid: LP._mean(vals) for sid, vals in by_sid.items()}
+                  for a, by_sid in by_agent.items()}
+            for sig, by_agent in acc.items()}
+
+
+def factorial_effects(maps: dict[str, dict[str, float]]) -> dict:
+    """Simple effects + interaction for one signal at one model size."""
+    cells = {k: maps.get(v, {}) for k, v in FACTORIAL_CELLS.items()}
+    shared = sorted(set.intersection(*(set(c) for c in cells.values()))) if all(
+        cells.values()) else []
+    if not shared:
+        return {"n": 0, "note": "no scenario scored for all four cells"}
+    g = lambda key: [cells[key][s] for s in shared]  # noqa: E731
+    on_on, off_on = g(("on", "on")), g(("off", "on"))
+    on_off, off_off = g(("on", "off")), g(("off", "off"))
+    verif_ctx_on = [a - b for a, b in zip(on_on, off_on)]
+    verif_ctx_off = [a - b for a, b in zip(on_off, off_off)]
+    ctx_verif_on = [a - b for a, b in zip(on_on, on_off)]
+    ctx_verif_off = [a - b for a, b in zip(off_on, off_off)]
+    interaction = [a - b for a, b in zip(verif_ctx_on, verif_ctx_off)]
+    return {
+        "n_scenarios": len(shared),
+        "cell_means": {f"verifier_{k[0]}__graphctx_{k[1]}": LP._mean(list(cells[k][s] for s in shared))
+                       for k in FACTORIAL_CELLS},
+        "verifier_effect_given_graphctx_on": _paired(verif_ctx_on),
+        "verifier_effect_given_graphctx_off": _paired(verif_ctx_off),
+        "graphctx_effect_given_verifier_on": _paired(ctx_verif_on),
+        "graphctx_effect_given_verifier_off": _paired(ctx_verif_off),
+        "interaction": _paired(interaction),
+    }
+
+
+def verifier_activity(run_dirs_by_model: dict[str, list[Path]],
+                      agents: list[str]) -> list[dict]:
+    """How often the verifier fired and repaired, per arm and size.
+
+    Mechanism evidence for the factorial result: it separates "the component
+    never runs" from "it runs but has nothing left to fix".
+    """
+    out = []
+    for label, dirs in run_dirs_by_model.items():
+        per_arm: dict[str, dict[str, list[float]]] = {
+            a: {"verifier_events": [], "repair_events": []} for a in agents}
+        for run_dir in dirs:
+            for _sid, scen_dir in LP.iter_scenario_dirs(run_dir):
+                for a in agents:
+                    path = scen_dir / f"{a}_trajectory.json"
+                    if not path.exists():
+                        continue
+                    try:
+                        tr = (json.loads(path.read_text(encoding="utf-8"))
+                              .get("trajectory") or {})
+                    except (json.JSONDecodeError, OSError):
+                        continue
+                    per_arm[a]["verifier_events"].append(len(tr.get("verifier_events") or []))
+                    per_arm[a]["repair_events"].append(len(tr.get("repair_events") or []))
+        out.append({
+            "label": label,
+            "arms": {
+                a: {
+                    "n_scenario_runs": len(v["verifier_events"]),
+                    "verifier_events_mean": LP._mean(v["verifier_events"]),
+                    "repair_events_mean": LP._mean(v["repair_events"]),
+                    "pct_scenario_runs_with_repair": (
+                        100.0 * sum(1 for x in v["repair_events"] if x > 0)
+                        / len(v["repair_events"]) if v["repair_events"] else float("nan")),
+                }
+                for a, v in per_arm.items() if v["verifier_events"]
+            },
+        })
+    return out
+
+
+def factorial_layer(run_dirs_by_model: dict[str, list[Path]],
+                    agents: list[str]) -> dict:
+    missing = [a for a in FACTORIAL_CELLS.values() if a not in agents]
+    if missing:
+        return {"skipped": f"arms missing from this pool: {missing}"}
+    signals: dict[str, dict] = {sig: {"per_model": []} for sig in FACTORIAL_SIGNALS}
+    for label, dirs in run_dirs_by_model.items():
+        maps = per_scenario_maps(dirs, agents)
+        for sig in FACTORIAL_SIGNALS:
+            signals[sig]["per_model"].append(
+                {"label": label, **factorial_effects(maps[sig])})
+    return {
+        "definition": (
+            "The four arms form a complete 2x2 (verifier x graph context). "
+            "'verifier_effect_given_graphctx_off' is the verifier's effect when "
+            "graph context is absent, 'interaction' is the difference between "
+            "the two simple effects — a negative interaction means the two "
+            "mechanisms are SUBSTITUTES (each does less when the other is on). "
+            "Paired per scenario (mean of runs), Wilcoxon two-sided + bootstrap "
+            f"CI ({LP.N_BOOT}, seed {LP.BOOT_SEED}). Reported uncorrected: these "
+            "are pre-specified structural contrasts of the design, not a family "
+            "of arm-vs-A0 comparisons."),
+        "cells": {f"verifier_{k[0]}__graphctx_{k[1]}": v
+                  for k, v in FACTORIAL_CELLS.items()},
+        "signals": signals,
+    }
+
+
 def print_report(pooled: dict, a0: str, arms: list[str]) -> None:
     print("\n" + "=" * 78)
     print("ABLATION POOLING — contribution = A0 − arm (positive: component helps)")
@@ -208,7 +371,8 @@ def print_report(pooled: dict, a0: str, arms: list[str]) -> None:
             print(f"  {agent:<38} mean_total={s.get('mean_total', float('nan')):7.2f}  "
                   f"nCC={s.get('n_scenarios_complete', 0):3d}  "
                   f"missing={s.get('n_scenarios_any_missing', 0)}")
-        rows = model["comparisons"]["policies"]["complete_case"]
+        rows = (model["comparisons"]["by_signal"]["addie_median"]
+                ["policies"]["complete_case"])
         for r in rows:
             if r.get("n"):
                 lo, hi = r["ci95"]
@@ -298,7 +462,15 @@ def main() -> None:
             "a0": args.a0_agent,
             "arms": arms,
             "expected_flags": {a: EXPECTED_FLAGS.get(a) for a in agents},
-            "score_field": "total_score (per-scenario composite from comparison_report.json)",
+            # The comparisons layer downstream consumers read is addie_median (the
+            # RQ1 lead); total_score is carried alongside, not the lead. The old
+            # single-field string advertised only total_score and was stale.
+            "score_fields": {
+                "lead": "addie_median (ADDIE rubric /100, per-scenario, "
+                        "from comparison_report.json)",
+                "also_reported": list(FACTORIAL_JUDGE_SIGNALS),
+                "a0_consistency_check": "total_score",
+            },
             "direction": "mean_diff = A0 − arm = contribution of the removed component(s)",
             "design": "arms run inside the ladder; pooled across its runs per size, and within each run all arms share the scenario's judge session",
             "primary_failure_policy": "complete_case",
@@ -313,6 +485,8 @@ def main() -> None:
         "alignment": LP.pool_alignment(models, run_dirs_by_model, agents,
                                        args.a0_agent, arms),
         "token_usage": LP.pool_tokens(run_dirs_by_model, agents),
+        "factorial": factorial_layer(run_dirs_by_model, agents),
+        "verifier_activity": verifier_activity(run_dirs_by_model, agents),
     }
 
     print_report(pooled, args.a0_agent, arms)
