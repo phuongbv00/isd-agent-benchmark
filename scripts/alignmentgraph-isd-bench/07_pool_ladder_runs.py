@@ -839,7 +839,7 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
         call the complete-case layer unconditional.
 
     Multiplicity is handled at two levels, both reported (see the protocol
-    spec, docs/summary.md section 5): ``p_holm`` is Holm within one signal
+    spec, docs/rq2_protocol.md section 5): ``p_holm`` is Holm within one signal
     (family = one comparison per baseline), and ``p_holm_panel`` is Holm over
     the entire panel x baseline family for that model size. The second costs
     nothing to compute and pre-empts the "you ran 168 tests" objection without

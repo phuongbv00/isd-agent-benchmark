@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Final gate: is every paper artifact present, real, fresh and wired in?
 
-Runs last, after the whole pipeline (07 -> 09/10, ablation 08 -> 11/12, 14,
+Runs last, after the whole pipeline (07 -> 09/10/13, ablation 08 -> 11/12, 14,
 00_validate_bloom, then docs/scripts/sync_generated.sh). Checking that files
 exist is the weakest possible read, so this audits the four ways an artifact
 can be "there" and still be wrong:
@@ -75,6 +75,7 @@ MANUSCRIPT_DIRS = [THESIS_ROOT / "docs" / "paper", THESIS_ROOT / "docs" / "thesi
 
 GEN_TABLES = "alignmentgraph-isd-bench/09_gen_paper_tables.py"
 GEN_FIGURES = "alignmentgraph-isd-bench/10_gen_paper_figures.py"
+GEN_COST = "alignmentgraph-isd-bench/13_gen_cost_table.py"
 GEN_SENS = "alignmentgraph-isd-bench/14_gen_sensitivity_table.py"
 GEN_ABL_TABLES = "alignmentgraph-isd-bench/ablation/11_gen_ablation_tables.py"
 GEN_ABL_FIGURES = "alignmentgraph-isd-bench/ablation/12_gen_ablation_figures.py"
@@ -122,6 +123,16 @@ INVENTORY: list[Spec] = [
     Spec("fig_rq2_vs_rq1_scatter", GEN_FIGURES, "figure", "always"),
     Spec("fig_failure_rate", GEN_FIGURES, "figure", "always"),
     Spec("fig_cost_quality", GEN_FIGURES, "figure", "always"),
+    # 13 — cost / deployability profile. "always": these read the ladder run
+    # dirs directly rather than a pooled layer, so if there is a ladder at all
+    # there is a cost table, and a missing one means the deployability claim in
+    # the paper has no number under it. Freshness still keys on the pooled
+    # ladder (source_stamp): both derive from the same run dirs, so a pooled
+    # JSON newer than the cost artifacts means the run set moved on without
+    # them. That is a conservative watermark, not an input dependency.
+    Spec("tab_cost.tex", GEN_COST, "tex", "always"),
+    Spec("cost_macros.tex", GEN_COST, "tex", "always"),
+    Spec("stats_cost.md", GEN_COST, "note", "always"),
     # 11/12 — ablation, expected once pooled_ablation.json exists.
     Spec("tab_ablation.tex", GEN_ABL_TABLES, "tex", "ablation"),
     Spec("tab_ablation_factorial.tex", GEN_ABL_TABLES, "tex", "ablation"),
