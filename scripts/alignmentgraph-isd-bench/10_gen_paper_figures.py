@@ -437,9 +437,10 @@ def fig_rq1_components(pooled: dict, outdir: Path, written: list[Path]) -> None:
     sizes = [size_of_label(m["label"]) for m in models]
     labels = [m["label"] for m in models]
 
-    fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.9), sharex=True)
+    fig, axes = plt.subplots(1, 3, figsize=(10.0, 2.9), sharex=True)
     for ax, (field, title) in zip(axes, [("mean_addie", "ADDIE (rubric, /100)"),
-                                         ("mean_traj", "Trajectory (/100)")]):
+                                         ("mean_traj", "Trajectory (/100)"),
+                                         ("mean_total", "Total (0.7 ADDIE + 0.3 Traj, /100)")]):
         for a in agents:
             ys = [_nan(m["agents"].get(a, {}).get(field)) for m in models]
             ax.plot(sizes, ys, **line_kw(a))
@@ -537,6 +538,66 @@ def fig_rq2_components(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     fig.text(0.5, -0.05, RQ2_PANEL_FOOTNOTE, ha="center", va="top",
              fontsize=6.5, color="#555555", linespacing=1.5)
     save(fig, outdir, "fig_rq2_components", written)
+    return True
+
+
+#: Baseline the RQ2 forest plot is drawn against: the strongest overall rival,
+#: matching the comparison the results narrative leads with.
+RQ2_FOREST_BASELINE = "react-isd"
+
+
+def fig_rq2_forest(pooled: dict, outdir: Path, written: list[Path]) -> bool:
+    """Forest plot of paired panel-signal deltas (proposed - RQ2_FOREST_BASELINE).
+
+    Primary failure=0 layer, one facet per size, 7 signals per facet in panel
+    order with the family A|B separator; filled marker = within-signal
+    Holm-adjusted p < 0.05. This is the significance view the heatmap
+    deliberately does not carry.
+    """
+    align = pooled.get("alignment") or {}
+    stats = (align.get("stats") or {}).get("per_model") or []
+    if not stats:
+        return False
+    comp_keys = [k for k, _ in RQ2_COMPONENTS]
+    comp_names = [n for _, n in RQ2_COMPONENTS]
+    ys = list(range(len(comp_keys)))[::-1]  # top-down in panel order
+
+    fig, axes = plt.subplots(1, len(stats), figsize=(1.85 * len(stats) + 1.2, 2.9),
+                             sharey=True, sharex=True)
+    axes = [axes] if len(stats) == 1 else list(axes)
+    color = AGENT_COLOR[PROPOSED]
+    for ax, m in zip(axes, stats):
+        panel = m.get("panel") or {}
+        for y, key in zip(ys, comp_keys):
+            rows = (panel.get(key) or {}).get("comparisons_failure_zero") or []
+            r = next((r for r in rows if r.get("baseline") == RQ2_FOREST_BASELINE), {})
+            d = _nan(r.get("mean_diff"))
+            lo, hi = (r.get("ci95") or [float("nan"), float("nan")])
+            if math.isnan(d):
+                continue
+            sig = _nan(r.get("p_holm")) < 0.05
+            ax.plot([lo, hi], [y, y], color=color, linewidth=1.1, zorder=2)
+            ax.plot([d], [y], marker="D", markersize=4.0,
+                    markerfacecolor=color if sig else "white",
+                    markeredgecolor=color, markeredgewidth=1.0, zorder=3)
+        ax.axvline(0, color="#999999", linewidth=0.8, zorder=1)
+        # family A | B separator, same convention as the heatmap
+        ax.axhline(len(comp_keys) - RQ2_FAMILY_A_N - 0.5, color="#CCCCCC",
+                   linewidth=0.8, linestyle=":", zorder=1)
+        ax.set_title(f"Qwen3.5-{size_display(m['label'])}", fontsize=8)
+        ax.grid(axis="y", visible=False)
+    axes[0].set_yticks(ys)
+    axes[0].set_yticklabels(comp_names, fontsize=7.5)
+    fig.supxlabel(
+        f"Δ signal (proposed − {AGENT_DISPLAY.get(RQ2_FOREST_BASELINE, RQ2_FOREST_BASELINE)}), "
+        "failure=0 layer", fontsize=8)
+    fig.text(0.5, -0.06,
+             "Paired per-scenario delta with bootstrap 95% CI; filled marker: "
+             "within-signal Holm-adjusted p < 0.05. † Asm→Obj is non-directional "
+             "and excluded from the directional count.",
+             ha="center", va="top", fontsize=6.5, color="#555555")
+    fig.tight_layout()
+    save(fig, outdir, "fig_rq2_forest", written)
     return True
 
 
@@ -865,6 +926,8 @@ def main() -> None:
         print("! no alignment data in pooled JSON — skipped fig_rq2_ladder")
     if not fig_rq2_components(pooled, args.outdir, written):
         print("! no alignment data in pooled JSON — skipped fig_rq2_components")
+    if not fig_rq2_forest(pooled, args.outdir, written):
+        print("! no alignment stats in pooled JSON — skipped fig_rq2_forest")
     if args.demo:
         fig_rq2_vs_rq1_scatter(demo_pairs(pooled), agents, args.outdir, written)
     elif args.runs_glob:
