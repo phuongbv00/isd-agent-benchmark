@@ -120,6 +120,7 @@ INVENTORY: list[Spec] = [
     Spec("fig_rq1_components", GEN_FIGURES, "figure", "always"),
     Spec("fig_rq2_ladder", GEN_FIGURES, "figure", "always"),
     Spec("fig_rq2_components", GEN_FIGURES, "figure", "always"),
+    Spec("fig_rq2_forest", GEN_FIGURES, "figure", "always"),
     Spec("fig_rq2_vs_rq1_scatter", GEN_FIGURES, "figure", "always"),
     Spec("fig_failure_rate", GEN_FIGURES, "figure", "always"),
     Spec("fig_cost_quality", GEN_FIGURES, "figure", "always"),
@@ -182,6 +183,10 @@ _HDR_SOURCE = re.compile(r"(pooled_\w+\.json)\s*\(?generated_at:?\s*"
 _INPUT_REF = re.compile(r"\\input\{[^}]*generated/([A-Za-z0-9_]+)\}")
 _GRAPHIC_REF = re.compile(
     r"\\includegraphics(?:\[[^\]]*\])?\{[^}]*generated/figures/([A-Za-z0-9_]+)")
+#: Bare-name includes resolved through \graphicspath (the paper's convention);
+#: the fig_ prefix keeps non-generated figures like architecture.pdf out.
+_GRAPHIC_BARE = re.compile(
+    r"\\includegraphics(?:\[[^\]]*\])?\{(fig_[A-Za-z0-9_]+?)(?:\.(?:pdf|png))?\}")
 _NEWCOMMAND = re.compile(r"\\newcommand\{\\([a-zA-Z]+)\}")
 _MACRO_USE = re.compile(r"\\([a-z][a-zA-Z]{3,})")
 
@@ -451,6 +456,8 @@ def check_references(rep: Report, present: list[Spec]) -> None:
         for name in _INPUT_REF.findall(body):
             inputs.setdefault(name, []).append(path)
         for name in _GRAPHIC_REF.findall(body):
+            graphics.setdefault(name, []).append(path)
+        for name in _GRAPHIC_BARE.findall(body):
             graphics.setdefault(name, []).append(path)
 
     for name, users in sorted(inputs.items()):
