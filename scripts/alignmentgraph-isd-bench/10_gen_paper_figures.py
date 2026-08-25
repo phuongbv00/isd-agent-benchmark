@@ -127,11 +127,15 @@ def point_marker(agent: str) -> str:
 # The whole panel, both instrument families. Every signal is plotted because
 # the panel's defence against selective reporting is that nothing is left out;
 # tab_rq2_panel.tex carries the same seven with exact numbers.
+#: The panel, and only the panel: the scorer also emits
+#: objective_evaluation_similarity and assessment_objective_similarity, but
+#: those are diagnostics (see alignment.NON_PANEL_DIAGNOSTICS) and putting them
+#: on a panel heatmap would show six endpoints and two non-endpoints under one
+#: colourbar with nothing distinguishing them.
 RQ2_COMPONENTS = [
     ("objective_assessment_similarity", "Obj→Asm"),
     ("objective_activity_similarity", "Obj→Act"),
-    ("objective_evaluation_similarity", "Obj→Evl"),
-    ("assessment_objective_similarity", "Asm→Obj†"),
+    ("activity_assessment_similarity", "Act→Asm"),
     ("objective_cognitive_congruence", "Cognitive"),
     ("porter_mean", "Porter"),
     ("webb_bloom_consistency", "Webb"),
@@ -141,20 +145,19 @@ RQ2_COMPONENTS = [
 #: (textual correspondence). The rest are family B (cognitive demand). A
 #: separator is drawn at this boundary so the single colourbar cannot be read
 #: as one construct across both families.
-RQ2_FAMILY_A_N = 4
+RQ2_FAMILY_A_N = 3
 
 #: In-figure disclosure for the panel heatmaps. Figures get read detached from
 #: their LaTeX caption, so every caveat a reader needs to not over-read a cell
-#: has to live inside the image: the two instrument families, the
-#: non-directionality of Asm->Obj, the flat-panel status, and why some cells
-#: carry an n.
+#: has to live inside the image: the two instrument families, the flat-panel
+#: status, and why some cells carry an n. No non-directionality note any more —
+#: the one non-directional signal left the panel.
 RQ2_PANEL_FOOTNOTE = (
-    "Flat panel of 7 signals, no primary endpoint. Family A (textual correspondence, "
-    "rectified cosine max(0, cos) on [0,1]): Obj→Asm, Obj→Act, Obj→Evl, Asm→Obj.  "
+    "Flat panel of 6 signals, no primary endpoint. Family A = the three edges of the "
+    "constructive-alignment triad (textual correspondence, rectified cosine "
+    "max(0, cos) on [0,1]): Obj→Asm, Obj→Act, Act→Asm.  "
     "Family B (cognitive demand, Bloom-derived, no similarity): Cognitive congruence, "
     "Porter (mean of 3 pairwise indices), Webb.\n"
-    "† Asm→Obj is non-directional: a high value can mean no orphan assessment items "
-    "OR items that merely restate the objectives.\n"
     "Cell values omit the leading zero. A red n marks a cell where fewer than half the "
     "scenarios produced a scorable output — a survivorship mean, not comparable with "
     "full-coverage cells."
@@ -492,7 +495,7 @@ def fig_rq2_components(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     comp_names = [n for _, n in RQ2_COMPONENTS]
 
     # wide enough that a 3-glyph value fits inside a column without touching
-    # its neighbour (the 7 signals are narrow by construction)
+    # its neighbour (the 6 panel signals are narrow by construction)
     fig, axes = plt.subplots(1, len(models),
                              figsize=(3.05 * len(models) + 1.6, 2.4 + 0.34 * len(agents)),
                              sharey=True)
@@ -549,7 +552,7 @@ RQ2_FOREST_BASELINE = "react-isd"
 def fig_rq2_forest(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     """Forest plot of paired panel-signal deltas (proposed - RQ2_FOREST_BASELINE).
 
-    Primary failure=0 layer, one facet per size, 7 signals per facet in panel
+    Primary failure=0 layer, one facet per size, 6 signals per facet in panel
     order with the family A|B separator; filled marker = within-signal
     Holm-adjusted p < 0.05. This is the significance view the heatmap
     deliberately does not carry.

@@ -52,47 +52,47 @@ GF = _load_figures_module()
 plt = GF.plt
 
 ARM_DISPLAY = {
-    "alignmentgraph-isd-no-verifier": "A1 — No verifier",
-    "alignmentgraph-isd-no-graph-ctx": "A2 — No graph context",
-    "alignmentgraph-isd-skeleton": "A3 — Skeleton (both off)",
+    "alignmentgraph-isd-single-prose": "A1 — Single-agent, prose context",
+    "alignmentgraph-isd-single-graph": "A2 — Single-agent, graph context",
+    "alignmentgraph-isd-multi-prose": "A3 — Multi-agent, prose context",
 }
 ARM_COLOR = {
-    "alignmentgraph-isd-no-verifier": "#d62728",
-    "alignmentgraph-isd-no-graph-ctx": "#1f77b4",
-    "alignmentgraph-isd-skeleton": "#7f7f7f",
+    "alignmentgraph-isd-single-prose": "#7f7f7f",
+    "alignmentgraph-isd-single-graph": "#d62728",
+    "alignmentgraph-isd-multi-prose": "#1f77b4",
 }
 ARM_LINESTYLE = {
-    "alignmentgraph-isd-no-verifier": "-",
-    "alignmentgraph-isd-no-graph-ctx": "--",
-    "alignmentgraph-isd-skeleton": ":",
+    "alignmentgraph-isd-single-prose": ":",
+    "alignmentgraph-isd-single-graph": "-",
+    "alignmentgraph-isd-multi-prose": "--",
 }
 
 # All four arms (A0 included) for the alignment level figures.
 ARM_ORDER = [
     "alignmentgraph-isd",
-    "alignmentgraph-isd-no-verifier",
-    "alignmentgraph-isd-no-graph-ctx",
-    "alignmentgraph-isd-skeleton",
+    "alignmentgraph-isd-single-graph",
+    "alignmentgraph-isd-multi-prose",
+    "alignmentgraph-isd-single-prose",
 ]
 #: Same arm names as 11_gen_ablation_tables.py's ARM_DISPLAY — figure legends
 #: and table rows come from the same pooled file and must read alike.
 ARM_DISPLAY_FULL = {
-    "alignmentgraph-isd": "A0 — Full pipeline",
-    "alignmentgraph-isd-no-verifier": "A1 — No verifier",
-    "alignmentgraph-isd-no-graph-ctx": "A2 — No graph context",
-    "alignmentgraph-isd-skeleton": "A3 — Skeleton (both off)",
+    "alignmentgraph-isd": "A0 — Multi-agent, graph context",
+    "alignmentgraph-isd-single-prose": "A1 — Single-agent, prose context",
+    "alignmentgraph-isd-single-graph": "A2 — Single-agent, graph context",
+    "alignmentgraph-isd-multi-prose": "A3 — Multi-agent, prose context",
 }
 ARM_COLOR_FULL = {
     "alignmentgraph-isd": "#0048B0",           # blue (full — emphasized)
-    "alignmentgraph-isd-no-verifier": "#d62728",
-    "alignmentgraph-isd-no-graph-ctx": "#1f77b4",
-    "alignmentgraph-isd-skeleton": "#7f7f7f",
+    "alignmentgraph-isd-single-graph": "#d62728",
+    "alignmentgraph-isd-multi-prose": "#1f77b4",
+    "alignmentgraph-isd-single-prose": "#7f7f7f",
 }
 ARM_LS_FULL = {
     "alignmentgraph-isd": "-",
-    "alignmentgraph-isd-no-verifier": "-",
-    "alignmentgraph-isd-no-graph-ctx": "--",
-    "alignmentgraph-isd-skeleton": ":",
+    "alignmentgraph-isd-single-graph": "-",
+    "alignmentgraph-isd-multi-prose": "--",
+    "alignmentgraph-isd-single-prose": ":",
 }
 
 
@@ -213,10 +213,10 @@ FACT_LEAD = "objective_assessment_similarity"
 #: (effect key, condition label) pairs per panel — each panel shows ONE
 #: mechanism's effect under both states of the other mechanism.
 FACT_PANELS = [
-    ("Verifier", [("verifier_effect_given_graphctx_on", "graph context ON", "#0048B0"),
-                  ("verifier_effect_given_graphctx_off", "graph context OFF", "#C42D00")]),
-    ("Graph context", [("graphctx_effect_given_verifier_on", "verifier ON", "#0048B0"),
-                       ("graphctx_effect_given_verifier_off", "verifier OFF", "#C42D00")]),
+    ("Decomposition", [("decomposition_effect_given_context_graph", "context = graph", "#0048B0"),
+                       ("decomposition_effect_given_context_prose", "context = prose", "#C42D00")]),
+    ("Context representation", [("context_effect_given_decomposition_multi", "decomposition = multi", "#0048B0"),
+                                ("context_effect_given_decomposition_single", "decomposition = single", "#C42D00")]),
 ]
 
 

@@ -49,8 +49,8 @@ from isd_evaluator.metrics.alignment import (  # noqa: E402
 # system + the 3 ablation arms.
 AGENTS = ["eduplanner", "baseline", "react-isd", "addie-agent",
           "dick-carey-agent", "rpisd-agent", "alignmentgraph-isd",
-          "alignmentgraph-isd-no-verifier", "alignmentgraph-isd-no-graph-ctx",
-          "alignmentgraph-isd-skeleton"]
+          "alignmentgraph-isd-single-prose", "alignmentgraph-isd-single-graph",
+          "alignmentgraph-isd-multi-prose"]
 STUB_MARKS = ['"미지정"', '"problem_definition": null']
 EXPECTED_SCENARIOS = 90
 

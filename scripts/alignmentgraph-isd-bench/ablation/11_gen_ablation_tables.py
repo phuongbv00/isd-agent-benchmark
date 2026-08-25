@@ -45,16 +45,16 @@ DEFAULT_OUTDIR = BENCH_ROOT / "results" / "generated"
 DEFAULT_POOLED = BENCH_ROOT / "results" / "pooled_ablation.json"
 
 ARM_DISPLAY = {
-    "alignmentgraph-isd": "A0 — Full pipeline",
-    "alignmentgraph-isd-no-verifier": "A1 — No verifier",
-    "alignmentgraph-isd-no-graph-ctx": "A2 — No graph context",
-    "alignmentgraph-isd-skeleton": "A3 — Skeleton (both off)",
+    "alignmentgraph-isd": "A0 — Multi-agent, graph context",
+    "alignmentgraph-isd-single-prose": "A1 — Single-agent, prose context",
+    "alignmentgraph-isd-single-graph": "A2 — Single-agent, graph context",
+    "alignmentgraph-isd-multi-prose": "A3 — Multi-agent, prose context",
 }
 # digit-free macro words per arm (LaTeX macro names cannot contain digits)
 ARM_WORDS = {
-    "alignmentgraph-isd-no-verifier": "NoVerifier",
-    "alignmentgraph-isd-no-graph-ctx": "NoGraphCtx",
-    "alignmentgraph-isd-skeleton": "Skeleton",
+    "alignmentgraph-isd-single-prose": "SingleProse",
+    "alignmentgraph-isd-single-graph": "SingleGraph",
+    "alignmentgraph-isd-multi-prose": "MultiProse",
 }
 SIZE_WORDS = {0.8: "ZeroEightB", 2.0: "TwoB", 4.0: "FourB", 9.0: "NineB"}
 FALLBACK_WORDS = ["SizeA", "SizeB", "SizeC", "SizeD", "SizeE", "SizeF"]
@@ -221,9 +221,10 @@ def gen_tab_ablation(pooled: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-#: Signal the factorial table leads on: the verifier's effect is an alignment
-#: effect, not a judge effect (on ADDIE nothing reaches significance), so the
-#: table is built on the alignment signal and ADDIE is reported beside it.
+#: Signal the factorial table leads on: the decomposition/context effects are
+#: expected as alignment effects, not judge effects (on ADDIE nothing may
+#: reach significance), so the table is built on the alignment signal and
+#: ADDIE is reported beside it.
 FACT_LEAD = "objective_assessment_similarity"
 
 
@@ -248,22 +249,23 @@ def gen_tab_factorial(pooled: dict) -> str:
     lines = [header_comment(pooled, "tab_ablation_factorial.tex — 2x2 simple effects + interaction")]
     lines.append("\\begin{table}[t]")
     lines.append(
-        "  \\caption{$2\\times2$ read (verifier $\\times$ graph context) on"
-        " \\texttt{objective\\_assessment\\_similarity}. Each cell: paired"
-        f" difference, component ON $-$ OFF ({n_clause(per_model)});"
-        " positive favours the component. Interaction = col.~1 $-$ col.~2."
+        "  \\caption{$2\\times2$ read (decomposition $\\times$ context"
+        " representation) on \\texttt{objective\\_assessment\\_similarity}."
+        " Each cell: paired difference, multi-agent $-$ single-agent"
+        f" decomposition ({n_clause(per_model)}); positive favours the"
+        " multi-agent 5-Designer pipeline. Interaction = col.~1 $-$ col.~2."
         " Wilcoxon, uncorrected.}")
     lines.append("  \\label{tab:ablation-factorial}")
     lines.append("  \\small")
     lines.append("  \\begin{tabular}{@{}lrrr@{}}")
     lines.append("    \\toprule")
-    lines.append("    Size & Verifier $|$ ctx on & Verifier $|$ ctx off"
+    lines.append("    Size & Decomp $|$ ctx=graph & Decomp $|$ ctx=prose"
                  " & Interaction \\\\")
     lines.append("    \\midrule")
     for e in per_model:
         cells = []
-        for key in ("verifier_effect_given_graphctx_on",
-                    "verifier_effect_given_graphctx_off", "interaction"):
+        for key in ("decomposition_effect_given_context_graph",
+                    "decomposition_effect_given_context_prose", "interaction"):
             d = _fx(e, key)
             if not d.get("n"):
                 cells.append("--")
@@ -290,6 +292,7 @@ FACT_SIGNAL_DISPLAY = {
     "total_score": "Total (composite)",
     "objective_assessment_similarity": "Obj$\\to$Asm sim.",
     "objective_activity_similarity": "Obj$\\to$Act sim.",
+    "activity_assessment_similarity": "Act$\\to$Asm sim.",
     "objective_evaluation_similarity": "Obj$\\to$Evl sim.",
     "assessment_objective_similarity": "Asm$\\to$Obj sim.$^{\\dagger}$",
     "objective_cognitive_congruence": "Cognitive congruence",
@@ -333,10 +336,11 @@ def gen_tab_factorial_full(pooled: dict) -> str:
     lines.append("\\begin{table*}[t]")
     lines.append(
         "  \\caption{$2\\times2$ read on every reported signal. Each cell:"
-        f" paired difference, component ON $-$ OFF ({n_clause(all_entries)});"
-        " V$|$ctx = verifier effect with ctx on/off, $\\times$ = col.~1 $-$"
-        " col.~2. Row blocks differ in scale; magnitudes are not comparable"
-        " across them.}")
+        f" paired difference, multi-agent $-$ single-agent decomposition"
+        f" ({n_clause(all_entries)}); D$|$ctx = decomposition effect with"
+        " context representation graph/prose, $\\times$ = col.~1 $-$ col.~2."
+        " Row blocks differ in scale; magnitudes are not comparable across"
+        " them.}")
     lines.append("  \\label{tab:ablation-factorial-full}")
     lines.append("  \\scriptsize")
     colspec = "@{}l" + "rrr" * len(labels) + "@{}"
@@ -347,7 +351,7 @@ def gen_tab_factorial_full(pooled: dict) -> str:
     lines.append(f"    & {heads} \\\\")
     cmids = "".join(f"\\cmidrule(lr){{{2 + 3 * i}-{4 + 3 * i}}}" for i in range(len(labels)))
     lines.append(f"    {cmids}")
-    subs = " & ".join(["V$|$ctx on", "V$|$ctx off", "$\\times$"] * len(labels))
+    subs = " & ".join(["D$|$ctx=graph", "D$|$ctx=prose", "$\\times$"] * len(labels))
     lines.append(f"    Signal & {subs} \\\\")
     lines.append("    \\midrule")
     ncols = 1 + 3 * len(labels)
@@ -364,8 +368,8 @@ def gen_tab_factorial_full(pooled: dict) -> str:
             cells = []
             for lb in labels:
                 e = per.get(lb, {})
-                for key in ("verifier_effect_given_graphctx_on",
-                            "verifier_effect_given_graphctx_off", "interaction"):
+                for key in ("decomposition_effect_given_context_graph",
+                            "decomposition_effect_given_context_prose", "interaction"):
                     d = e.get(key) or {}
                     cells.append("--" if not d.get("n") else
                                  f"{fmt_num(d['mean_diff'], 3).replace('-', '$-$')}"
@@ -381,9 +385,10 @@ def gen_tab_factorial_full(pooled: dict) -> str:
         " difference of the two rounded cells beside it."
         " A negative $\\times$ means the two mechanisms substitute for each"
         " other only where both simple effects carry the beneficial sign; where"
-        " they are negative (Trajectory, Total) read $\\times$ as the verifier"
-        " costing less when graph context is on. Column V$|$ctx on is the"
-        " A0-vs-A1 contrast, whose Holm-corrected $p$ is in stats\\_ablation.md.")
+        " they are negative (Trajectory, Total) read $\\times$ as multi-agent"
+        " decomposition costing less when graph context is on. Column"
+        " D$|$ctx=graph is the A0-vs-A2 contrast, whose Holm-corrected $p$ is"
+        " in stats\\_ablation.md.")
     lines.append("\\end{table*}")
     return "\n".join(lines) + "\n"
 
@@ -394,18 +399,18 @@ def factorial_macros(pooled: dict, newcmd) -> None:
         return
     for i, e in enumerate(fact["signals"][FACT_LEAD]["per_model"]):
         w = size_word(e["label"], i)
-        for key, tag in (("verifier_effect_given_graphctx_on", "VerifCtxOn"),
-                         ("verifier_effect_given_graphctx_off", "VerifCtxOff"),
+        for key, tag in (("decomposition_effect_given_context_graph", "DecompCtxGraph"),
+                         ("decomposition_effect_given_context_prose", "DecompCtxProse"),
                          ("interaction", "Interaction")):
             d = _fx(e, key)
             if not d.get("n"):
                 continue
-            what = ("difference of the two simple effects (ctx on minus ctx off)"
+            what = ("difference of the two simple effects (ctx=graph minus ctx=prose)"
                     if key == "interaction"
-                    else "component ON minus OFF")
-            sign = ("POSITIVE = the verifier's effect is larger when graph "
-                    "context is on" if key == "interaction"
-                    else "POSITIVE = the component scores higher")
+                    else "multi-agent minus single-agent decomposition")
+            sign = ("POSITIVE = the decomposition effect is larger when context "
+                    "is graph" if key == "interaction"
+                    else "POSITIVE = the multi-agent pipeline scores higher")
             newcmd(f"abl{tag}{w}", fmt_num(d["mean_diff"], 3),
                    f"{key} = {what} on {FACT_LEAD} @ {e['label']} "
                    f"(paired per-scenario, n={d['n']}; {sign}; OPPOSITE sign "
@@ -413,16 +418,16 @@ def factorial_macros(pooled: dict, newcmd) -> None:
             newcmd(f"abl{tag}P{w}", fmt_p(d["p_raw"]),
                    f"Wilcoxon p (uncorrected) for {key} on {FACT_LEAD} @ "
                    f"{e['label']}")
-    act = pooled.get("verifier_activity") or []
+    act = pooled.get("self_validation_activity") or []
     for i, e in enumerate(act):
         w = size_word(e["label"], i)
         for arm, tag in (("alignmentgraph-isd", "AZero"),
-                         ("alignmentgraph-isd-no-graph-ctx", "NoGraphCtx")):
+                         ("alignmentgraph-isd-multi-prose", "MultiProse")):
             v = (e.get("arms") or {}).get(arm)
             if not v:
                 continue
             newcmd(f"ablRepairs{tag}{w}", fmt_num(v["repair_events_mean"], 2),
-                   f"mean verifier repairs per scenario, {arm} @ {e['label']}")
+                   f"mean self-validation repairs per scenario, {arm} @ {e['label']}")
 
 
 def gen_macros(pooled: dict) -> str:
@@ -480,13 +485,19 @@ def gen_stats_md(pooled: dict) -> str:
              f"Do not edit by hand.")
     L.append("")
     L.append(f"- Design: {pooled['config'].get('design')}")
-    L.append("- Arms: A0 = full pipeline (verifier + graph context), "
-             "A1 = no verifier, A2 = no graph context, A3 = skeleton (both off).")
+    L.append("- Axes: decomposition (multi-agent 5-Designer pipeline vs a "
+             "single monolithic agent) x context representation (structured "
+             "graph injection vs narrative prose). Self-validation is always "
+             "on in both `agent_mode` values, so it is not an ablated axis.")
+    L.append("- Arms: A0 = multi + graph (full pipeline), "
+             "A1 = single + prose (both axes changed), "
+             "A2 = single + graph (decomposition only), "
+             "A3 = multi + prose (context only).")
     L.append("- **Two sign conventions are in play, so every section below "
              "states its own direction.** The arm-vs-A0 sections use "
              "**arm − A0** (flipped from the pooled JSON, which stores "
              "A0 − arm); the 2x2 factorial section uses "
-             "**component ON − component OFF** (unflipped).")
+             "**multi-agent − single-agent** / **graph − prose** (unflipped).")
     L.append(f"- Primary policy: {pooled['config'].get('primary_failure_policy')}; "
              f"Holm family: {pooled['config'].get('holm_family')}.")
     L.append("")
@@ -644,36 +655,66 @@ def gen_stats_md(pooled: dict) -> str:
                  "on each ablation run dir, then re-run "
                  "ablation/08_pool_ablation_runs.py and this script.")
     L.append("")
+    inter = pooled.get("interaction") or {}
+    L.append("")
+    L.append("## H2 / capacity interaction (DiD, largest size − smallest size)")
+    L.append("")
+    if inter.get("per_baseline"):
+        L.append("Direction in this section: delta = **A0 − arm** per scenario (the full "
+                 "architecture's advantage over that ablated cell); DiD = delta(largest) − "
+                 "delta(smallest). **H2 predicts NEGATIVE DiD** — the advantage is largest "
+                 "at the smallest model and shrinks as capacity grows. Near-zero DiD with "
+                 "uniformly positive per-size deltas means the axis helps at every size "
+                 "equally (decomposition/context helps, but not BECAUSE models are small); "
+                 "near-zero DiD with near-zero deltas means the axis does not matter at "
+                 "any size. Same machinery as the ladder pool's interaction layer "
+                 "(Wilcoxon two-sided on per-scenario DiD, bootstrap 95% CI, complete-case); "
+                 "per-signal versions in `interaction_by_signal`.")
+        L.append("")
+        L.append("| Arm | Δ(smallest) | Δ(largest) | DiD | CI95 | p | n | trend by size |")
+        L.append("|---|---|---|---|---|---|---|---|")
+        for r in inter["per_baseline"]:
+            lo, hi = r["did_ci95"]
+            trend = " → ".join(f"{v:+.2f}" for v in r.get("trend_delta_by_size", {}).values())
+            L.append(f"| {ARM_DISPLAY.get(r['baseline'], r['baseline'])} "
+                     f"| {r['delta_smallest_mean']:+.2f} | {r['delta_largest_mean']:+.2f} "
+                     f"| {r['did_mean']:+.2f} | [{lo:+.2f}, {hi:+.2f}] "
+                     f"| {r['did_wilcoxon_p']:.3g} | {r['n_paired_scenarios']} | {trend} |")
+    else:
+        L.append(f"Skipped: {inter.get('note', 'no interaction layer in pooled_ablation.json — re-run ablation/08 (needs >= 2 model sizes)')}")
+    L.append("")
+
     fact = pooled.get("factorial") or {}
     L.append("")
-    L.append("## 2x2 factorial (verifier x graph context)")
+    L.append("## 2x2 factorial (decomposition x context representation)")
     L.append("")
     if "skipped" in fact or not fact.get("signals"):
         L.append(fact.get("skipped", "absent"))
     else:
-        L.append("Direction in this section: **component ON − component OFF** "
-                 "(positive = having the component scores higher). These signs "
-                 "are NOT flipped, i.e. they are the OPPOSITE of the arm − A0 "
-                 "direction used in the two sections above: `verifier | ctx ON` "
-                 "here is A0 − A1, the same quantity the per-size table prints "
-                 "as A1 − A0.")
+        L.append("Direction in this section: **multi-agent − single-agent** / "
+                 "**graph − prose** (positive = the richer setting scores "
+                 "higher). These signs are NOT flipped, i.e. they are the "
+                 "OPPOSITE of the arm − A0 direction used in the two sections "
+                 "above: `decomp | ctx=graph` here is A0 − A2, the same "
+                 "quantity the per-size table prints as A2 − A0.")
         L.append("")
-        L.append("`interaction` = (component ON − OFF given the other ON) − "
-                 "(component ON − OFF given the other OFF). A negative "
-                 "interaction means the two mechanisms substitute for each other "
-                 "ONLY where both simple effects carry the beneficial sign; "
-                 "where both are negative (`trajectory_score`, `total_score`, "
-                 "on which the verifier lowers the score) read it as a magnitude "
-                 "statement — the verifier costs less when graph context is on — "
-                 "and where the two simple effects have opposite signs it is a "
+        L.append("`interaction` = (decomposition effect given ctx=graph) − "
+                 "(decomposition effect given ctx=prose). A negative "
+                 "interaction means the two mechanisms substitute for each "
+                 "other ONLY where both simple effects carry the beneficial "
+                 "sign; where both are negative (`trajectory_score`, "
+                 "`total_score`, on which multi-agent decomposition lowers the "
+                 "score) read it as a magnitude statement — multi-agent "
+                 "decomposition costs less when graph context is on — and "
+                 "where the two simple effects have opposite signs it is a "
                  "crossover, neither substitution nor complementarity.")
         L.append("")
-        L.append("p-values here are uncorrected. Note that the `verifier | ctx "
-                 "ON` and `graphctx | verif ON` columns are the A0-vs-A1 and "
-                 "A0-vs-A2 comparisons, which the sections above report "
-                 "Holm-corrected within their family; only the "
-                 "`| ... OFF` columns and `interaction` are contrasts unique to "
-                 "this section.")
+        L.append("p-values here are uncorrected. Note that the `decomp | "
+                 "ctx=graph` and `ctx | decomp=multi` columns are the A0-vs-A2 "
+                 "and A0-vs-A3 comparisons, which the sections above report "
+                 "Holm-corrected within their family; only the `| ... =prose` "
+                 "/ `| ... =single` columns and `interaction` are contrasts "
+                 "unique to this section.")
         L.append("")
         L.append("Signals in this section are on two scales: `addie_median`, "
                  "`trajectory_score` and `total_score` are rubric points out of "
@@ -684,15 +725,15 @@ def gen_stats_md(pooled: dict) -> str:
             scale = "rubric points /100" if sig in JUDGE_SIGNALS else "[0,1]"
             L.append(f"### {sig} ({scale})")
             L.append("")
-            L.append("| Size | n | verifier \\| ctx ON | verifier \\| ctx OFF "
-                     "| graphctx \\| verif ON | graphctx \\| verif OFF | interaction |")
+            L.append("| Size | n | decomp \\| ctx=graph | decomp \\| ctx=prose "
+                     "| ctx \\| decomp=multi | ctx \\| decomp=single | interaction |")
             L.append("|---|---|---|---|---|---|---|")
             for e in blk["per_model"]:
                 cells = []
-                for key in ("verifier_effect_given_graphctx_on",
-                            "verifier_effect_given_graphctx_off",
-                            "graphctx_effect_given_verifier_on",
-                            "graphctx_effect_given_verifier_off",
+                for key in ("decomposition_effect_given_context_graph",
+                            "decomposition_effect_given_context_prose",
+                            "context_effect_given_decomposition_multi",
+                            "context_effect_given_decomposition_single",
                             "interaction"):
                     d = e.get(key) or {}
                     cells.append("--" if not d.get("n") else
@@ -700,10 +741,15 @@ def gen_stats_md(pooled: dict) -> str:
                                  f"{d['ci95'][1]:+.3f}] p={d['p_raw']:.1e}")
                 L.append(f"| {e['label']} | {e.get('n_scenarios', 0)} | "
                          + " | ".join(cells) + " |")
-    act = pooled.get("verifier_activity") or []
+    act = pooled.get("self_validation_activity") or []
     if act:
         L.append("")
-        L.append("## Verifier activity (mechanism evidence, from trajectories)")
+        L.append("## Self-validation activity (mechanism context, from trajectories)")
+        L.append("")
+        L.append("Self-validation is always on (not one of the two ablated "
+                 "axes), so this section is context for reading the "
+                 "decomposition effect above, not mechanism evidence for an "
+                 "on/off switch.")
         L.append("")
         L.append("| Size | Arm | scenario-runs | verifier events/scen | repairs/scen | % runs with a repair |")
         L.append("|---|---|---|---|---|---|")

@@ -5,22 +5,32 @@ Companion of ../07_pool_ladder_runs.py and a thin orchestrator over its machiner
 (pool_model / compare_model / pool_alignment / pool_tokens are imported and
 reused verbatim). The comparison axis differs from the ladder: instead of the
 proposed agent vs the 6 baseline agents, this compares the ablation arms of
-alignmentgraph-isd — but out of THE SAME run dirs. Since 2026-07-26 the arms
-run inside the ladder (02_run_ladder.sh launches all 10 agents), so every arm
-shares each scenario's judge session (no judge drift in the deltas) AND gets
-the ladder's 3-run averaging. A0 is not a re-run of the full pipeline any more:
-it is literally the ladder's alignmentgraph-isd, which is why no table needs a
-caveat reconciling two different A0 numbers.
+alignmentgraph-isd — but out of THE SAME run dirs. The arms run inside the
+ladder (02_run_ladder.sh launches all 10 agents), so every arm shares each
+scenario's judge session (no judge drift in the deltas) AND gets the ladder's
+3-run averaging. A0 is not a re-run of the full pipeline: it is literally the
+ladder's alignmentgraph-isd, which is why no table needs a caveat reconciling
+two different A0 numbers.
+
+The ablation axis is a 2x2 matrix (see config.py::HarnessRunConfig and the
+architecture plan), not the two boolean switches (verifier/graph-context) of
+the pre-2026-08 design: **decomposition** (`agent_mode`: multi-agent 5-Designer
+pipeline vs a single monolithic agent running the same steps) x **context
+representation** (`context_mode`: structured graph injection vs a narrative
+prose serialization). Self-validation is always on in both `agent_mode`
+values — it is basic correctness, not a variable under test — so it is no
+longer one of the two ablated axes.
 
 Arms (agent ids registered in run_benchmark.py):
-  A0 alignmentgraph-isd                (full pipeline)
-  A1 alignmentgraph-isd-no-verifier    (QC verify+repair off)
-  A2 alignmentgraph-isd-no-graph-ctx   (graph-context prompt injection off)
-  A3 alignmentgraph-isd-skeleton       (both off)
+  A0 alignmentgraph-isd                (multi + graph  — full pipeline)
+  A1 alignmentgraph-isd-single-prose   (single + prose — both axes changed)
+  A2 alignmentgraph-isd-single-graph   (single + graph — decomposition only)
+  A3 alignmentgraph-isd-multi-prose    (multi + prose  — context only)
 
 Direction convention: reusing compare_model with proposed=A0 and baselines=arms
-means every mean_diff / CI is  A0 − arm  = the CONTRIBUTION of the removed
-component(s) (positive = removing it hurts).
+means every mean_diff / CI is  A0 − arm  = the CONTRIBUTION of the removed/
+changed component(s) (positive = the arm's configuration hurts, relative to
+the full multi-agent + graph-context pipeline).
 
 Besides the arm comparisons this script adds two ablation-specific layers:
   * flag sanity check — each arm's *_trajectory.json metadata.run_config must
@@ -64,17 +74,17 @@ LP = _load_ladder_pool_module()
 
 A0_DEFAULT = "alignmentgraph-isd"
 ARMS_DEFAULT = [
-    "alignmentgraph-isd-no-verifier",
-    "alignmentgraph-isd-no-graph-ctx",
-    "alignmentgraph-isd-skeleton",
+    "alignmentgraph-isd-single-prose",
+    "alignmentgraph-isd-single-graph",
+    "alignmentgraph-isd-multi-prose",
 ]
 # What metadata.run_config must say per arm (kwargs pinned by the
 # run_benchmark.py registry; see agents/alignmentgraph-isd adapter).
 EXPECTED_FLAGS = {
-    "alignmentgraph-isd": {"enable_verifier": True, "enable_graph_context": True},
-    "alignmentgraph-isd-no-verifier": {"enable_verifier": False, "enable_graph_context": True},
-    "alignmentgraph-isd-no-graph-ctx": {"enable_verifier": True, "enable_graph_context": False},
-    "alignmentgraph-isd-skeleton": {"enable_verifier": False, "enable_graph_context": False},
+    "alignmentgraph-isd": {"agent_mode": "multi", "context_mode": "graph"},
+    "alignmentgraph-isd-single-prose": {"agent_mode": "single", "context_mode": "prose"},
+    "alignmentgraph-isd-single-graph": {"agent_mode": "single", "context_mode": "graph"},
+    "alignmentgraph-isd-multi-prose": {"agent_mode": "multi", "context_mode": "prose"},
 }
 
 
@@ -196,15 +206,16 @@ def a0_consistency(models: list[dict], a0: str, ladder_pooled_path: Path) -> dic
 
 # ── 2x2 factorial layer ──────────────────────────────────────────────────────
 
-#: The four arms ARE a complete 2x2 (verifier x graph context), so the design
-#: supports simple effects and an interaction — not just each arm against A0.
-#: Reading only "arm vs A0" is a main-effects-only view and it hides the case
-#: where one mechanism does nothing *because the other one already did the job*.
+#: The four arms ARE a complete 2x2 (decomposition x context representation),
+#: so the design supports simple effects and an interaction — not just each
+#: arm against A0. Reading only "arm vs A0" is a main-effects-only view and it
+#: hides the case where one mechanism does nothing *because the other one
+#: already did the job*. Keys: (agent_mode, context_mode).
 FACTORIAL_CELLS = {
-    ("on", "on"): "alignmentgraph-isd",
-    ("off", "on"): "alignmentgraph-isd-no-verifier",
-    ("on", "off"): "alignmentgraph-isd-no-graph-ctx",
-    ("off", "off"): "alignmentgraph-isd-skeleton",
+    ("multi", "graph"): "alignmentgraph-isd",
+    ("single", "graph"): "alignmentgraph-isd-single-graph",
+    ("multi", "prose"): "alignmentgraph-isd-multi-prose",
+    ("single", "prose"): "alignmentgraph-isd-single-prose",
 }
 
 #: Judge signals (read from comparison_report.json rankings).
@@ -264,38 +275,56 @@ def per_scenario_maps(run_dirs: list[Path], agents: list[str]) -> dict:
 
 
 def factorial_effects(maps: dict[str, dict[str, float]]) -> dict:
-    """Simple effects + interaction for one signal at one model size."""
+    """Simple effects + interaction for one signal at one model size.
+
+    Axis 1 (decomposition): multi-agent (5 Designers) vs single (one
+    monolithic agent running the same steps). Axis 2 (context
+    representation): graph (structured injection) vs prose (narrative
+    serialization). Both simple effects are reported as multi/graph MINUS
+    single/prose (i.e. "the richer setting minus the plainer one"), so a
+    positive number always favours multi-agent / graph-context respectively.
+    """
     cells = {k: maps.get(v, {}) for k, v in FACTORIAL_CELLS.items()}
     shared = sorted(set.intersection(*(set(c) for c in cells.values()))) if all(
         cells.values()) else []
     if not shared:
         return {"n": 0, "note": "no scenario scored for all four cells"}
     g = lambda key: [cells[key][s] for s in shared]  # noqa: E731
-    on_on, off_on = g(("on", "on")), g(("off", "on"))
-    on_off, off_off = g(("on", "off")), g(("off", "off"))
-    verif_ctx_on = [a - b for a, b in zip(on_on, off_on)]
-    verif_ctx_off = [a - b for a, b in zip(on_off, off_off)]
-    ctx_verif_on = [a - b for a, b in zip(on_on, on_off)]
-    ctx_verif_off = [a - b for a, b in zip(off_on, off_off)]
-    interaction = [a - b for a, b in zip(verif_ctx_on, verif_ctx_off)]
+    multi_graph, single_graph = g(("multi", "graph")), g(("single", "graph"))
+    multi_prose, single_prose = g(("multi", "prose")), g(("single", "prose"))
+    decomposition_ctx_graph = [a - b for a, b in zip(multi_graph, single_graph)]
+    decomposition_ctx_prose = [a - b for a, b in zip(multi_prose, single_prose)]
+    context_decomp_multi = [a - b for a, b in zip(multi_graph, multi_prose)]
+    context_decomp_single = [a - b for a, b in zip(single_graph, single_prose)]
+    interaction = [a - b for a, b in zip(decomposition_ctx_graph, decomposition_ctx_prose)]
     return {
         "n_scenarios": len(shared),
-        "cell_means": {f"verifier_{k[0]}__graphctx_{k[1]}": LP._mean(list(cells[k][s] for s in shared))
+        "cell_means": {f"agentmode_{k[0]}__contextmode_{k[1]}": LP._mean(list(cells[k][s] for s in shared))
                        for k in FACTORIAL_CELLS},
-        "verifier_effect_given_graphctx_on": _paired(verif_ctx_on),
-        "verifier_effect_given_graphctx_off": _paired(verif_ctx_off),
-        "graphctx_effect_given_verifier_on": _paired(ctx_verif_on),
-        "graphctx_effect_given_verifier_off": _paired(ctx_verif_off),
+        "decomposition_effect_given_context_graph": _paired(decomposition_ctx_graph),
+        "decomposition_effect_given_context_prose": _paired(decomposition_ctx_prose),
+        "context_effect_given_decomposition_multi": _paired(context_decomp_multi),
+        "context_effect_given_decomposition_single": _paired(context_decomp_single),
         "interaction": _paired(interaction),
     }
 
 
-def verifier_activity(run_dirs_by_model: dict[str, list[Path]],
-                      agents: list[str]) -> list[dict]:
-    """How often the verifier fired and repaired, per arm and size.
+def self_validation_activity(run_dirs_by_model: dict[str, list[Path]],
+                             agents: list[str]) -> list[dict]:
+    """How often self-validation fired and repaired, per arm and size.
 
-    Mechanism evidence for the factorial result: it separates "the component
-    never runs" from "it runs but has nothing left to fix".
+    Self-validation is always on (in both `agent_mode` values — see
+    config.py), so this is not "ablation mechanism evidence" the way it was
+    when the verifier itself was one of the two switched axes. It separates
+    "self-validation runs but finds nothing to fix" from "it runs and repairs
+    a lot", which is context for reading the decomposition effect.
+
+    Only comparable across arms for runs produced after 2026-08-25. Before
+    that the single arm never called log_verifier_result and ran one
+    self-validation pass over all checks against multi's one per Designer, so
+    its verifier_events were a constant 1.00/scenario against multi's 7.20 —
+    an instrumentation and budget gap, not a difference in how much either arm
+    found to fix. Numbers from an older run dir will show that artifact here.
     """
     out = []
     for label, dirs in run_dirs_by_model.items():
@@ -344,16 +373,18 @@ def factorial_layer(run_dirs_by_model: dict[str, list[Path]],
                 {"label": label, **factorial_effects(maps[sig])})
     return {
         "definition": (
-            "The four arms form a complete 2x2 (verifier x graph context). "
-            "'verifier_effect_given_graphctx_off' is the verifier's effect when "
-            "graph context is absent, 'interaction' is the difference between "
+            "The four arms form a complete 2x2 (decomposition x context "
+            "representation). 'decomposition_effect_given_context_prose' is "
+            "the multi-agent-minus-single effect when context is prose (no "
+            "structured injection); 'interaction' is the difference between "
             "the two simple effects — a negative interaction means the two "
-            "mechanisms are SUBSTITUTES (each does less when the other is on). "
-            "Paired per scenario (mean of runs), Wilcoxon two-sided + bootstrap "
-            f"CI ({LP.N_BOOT}, seed {LP.BOOT_SEED}). Reported uncorrected: these "
-            "are pre-specified structural contrasts of the design, not a family "
-            "of arm-vs-A0 comparisons."),
-        "cells": {f"verifier_{k[0]}__graphctx_{k[1]}": v
+            "mechanisms are SUBSTITUTES (multi-agent decomposition matters "
+            "less once graph context already carries the structure, or vice "
+            "versa). Paired per scenario (mean of runs), Wilcoxon two-sided + "
+            f"bootstrap CI ({LP.N_BOOT}, seed {LP.BOOT_SEED}). Reported "
+            "uncorrected: these are pre-specified structural contrasts of the "
+            "design, not a family of arm-vs-A0 comparisons."),
+        "cells": {f"agentmode_{k[0]}__contextmode_{k[1]}": v
                   for k, v in FACTORIAL_CELLS.items()},
         "signals": signals,
     }
@@ -381,6 +412,20 @@ def print_report(pooled: dict, a0: str, arms: list[str]) -> None:
                       f"p_holm={r.get('p_holm', float('nan')):.2g}")
             else:
                 print(f"    A0 − {r['baseline']:<34} (no shared scenarios)")
+    inter = pooled.get("interaction", {})
+    if inter.get("per_baseline"):
+        print("\n  H2 / capacity interaction (DiD on addie_median; delta = A0 - arm;")
+        print("  NEGATIVE DiD = the architecture's advantage shrinks as the model grows):")
+        for r in inter["per_baseline"]:
+            lo, hi = r["did_ci95"]
+            print(f"    vs {r['baseline']:34s} "
+                  f"Δ({r['smallest']})={r['delta_smallest_mean']:+6.2f} "
+                  f"Δ({r['largest']})={r['delta_largest_mean']:+6.2f} "
+                  f"DiD={r['did_mean']:+6.2f} CI95[{lo:+.2f},{hi:+.2f}] "
+                  f"p={r['did_wilcoxon_p']:.3g} n={r['n_paired_scenarios']}")
+    elif inter.get("note"):
+        print(f"\n  H2 / capacity interaction: skipped — {inter['note']}")
+
     cons = pooled.get("a0_consistency", {})
     for row in cons.get("per_model", []):
         if "delta" in row:
@@ -456,6 +501,30 @@ def main() -> None:
     else:
         consistency = {"note": f"{ladder_pooled_path} not found — check skipped"}
 
+    # Method x model-size interaction (DiD), reusing the ladder pool's own
+    # machinery so both pools' H2 numbers are computed by the same code path.
+    # Frame here: delta = A0 - arm = the full architecture's advantage over
+    # that ablated cell. interaction_tests' generic definition ("positive DiD
+    # means the advantage GROWS with size") therefore reads, for H2
+    # (capacity interaction — the architecture compensates for limited model
+    # capacity): H2 predicts NEGATIVE DiD — the advantage over the ablated
+    # arm shrinks as the model grows. Stated here once so nobody re-derives
+    # the sign from the generic text and flips it.
+    h2_note = (
+        "Ablation frame: delta = A0 - arm per scenario. H2 (capacity "
+        "interaction) predicts NEGATIVE did_mean: the full architecture's "
+        "advantage over this arm is largest at the smallest model and shrinks "
+        "as capacity grows. A DiD near zero with per-size deltas near zero "
+        "means the axis does not matter at any size; near-zero DiD with "
+        "uniformly positive deltas means it matters equally at every size "
+        "(decomposition/context helps, but not BECAUSE models are small)."
+    )
+    interaction = {"h2_note": h2_note, **LP.interaction_tests(models, args.a0_agent, arms)}
+    interaction_by_signal = {
+        m: {"h2_note": h2_note, **LP.interaction_tests(models, args.a0_agent, arms, metric=m)}
+        for m in LP.RQ1_SIGNALS
+    }
+
     pooled = {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "config": {
@@ -481,18 +550,23 @@ def main() -> None:
         },
         "flag_check": flag_check,
         "models": models,
+        "interaction": interaction,
+        "interaction_by_signal": interaction_by_signal,
         "a0_consistency": consistency,
         "alignment": LP.pool_alignment(models, run_dirs_by_model, agents,
                                        args.a0_agent, arms),
         "token_usage": LP.pool_tokens(run_dirs_by_model, agents),
         "factorial": factorial_layer(run_dirs_by_model, agents),
-        "verifier_activity": verifier_activity(run_dirs_by_model, agents),
+        "self_validation_activity": self_validation_activity(run_dirs_by_model, agents),
     }
 
     print_report(pooled, args.a0_agent, arms)
 
     for model in pooled["models"]:
         model.pop("_totals", None)
+        model.pop("_scores", None)  # raw per-scenario series: consumed by the
+        # comparison/DiD layers above, never meant to reach the JSON (the
+        # ladder pool strips it too; this pool leaked ~12KB/size of it)
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(pooled, indent=2, ensure_ascii=False),

@@ -31,7 +31,7 @@ RATE_LIMIT="${RATE_LIMIT:-turbo}"
 # + the 3 ablation arms (registry-only agent ids, same adapter with the two
 # HarnessRunConfig flags pinned per id). alignmentgraph-isd doubles as the
 # ladder's proposed system and the ablation's A0 arm — that is the point.
-AGENTS="${AGENTS:-eduplanner,baseline,react-isd,addie-agent,dick-carey-agent,rpisd-agent,alignmentgraph-isd,alignmentgraph-isd-no-verifier,alignmentgraph-isd-no-graph-ctx,alignmentgraph-isd-skeleton}"
+AGENTS="${AGENTS:-eduplanner,baseline,react-isd,addie-agent,dick-carey-agent,rpisd-agent,alignmentgraph-isd,alignmentgraph-isd-single-prose,alignmentgraph-isd-single-graph,alignmentgraph-isd-multi-prose}"
 # Run tags: 3 independent runs per model size. Comma- or space-separated
 # full tags (same var and mechanism as RUN_TAGS in 4_run_benchmark.sh).
 # For resume, override e.g.

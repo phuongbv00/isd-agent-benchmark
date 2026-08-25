@@ -1076,8 +1076,10 @@ class AlignmentScore:
     # The other two legs of aligned(o), same mean-max form.
     objective_activity_similarity: Optional[float] = None
     objective_evaluation_similarity: Optional[float] = None
+    # C4: activity prepares_for assessment -- the third edge of the CA triad.
+    activity_assessment_similarity: Optional[float] = None
     # Reverse direction (orphan-item diagnostic). Direction is deliberately
-    # not one-way-good -- see the module docstring.
+    # not one-way-good, and it is NOT a panel signal -- see PANEL_SIGNALS.
     assessment_objective_similarity: Optional[float] = None
     # --- Family B: cognitive demand (Bloom classifier, no similarity) ---
     objective_cognitive_congruence: Optional[float] = None
@@ -1093,6 +1095,7 @@ class AlignmentScore:
             "objective_assessment_similarity": self.objective_assessment_similarity,
             "objective_activity_similarity": self.objective_activity_similarity,
             "objective_evaluation_similarity": self.objective_evaluation_similarity,
+            "activity_assessment_similarity": self.activity_assessment_similarity,
             "assessment_objective_similarity": self.assessment_objective_similarity,
             "objective_cognitive_congruence": self.objective_cognitive_congruence,
             "porter": self.porter,
@@ -1123,18 +1126,39 @@ OBJECTIVE_ENDPOINTS = (
 #: stage and silently dropped by another. Flat by construction: there is no
 #: primary entry and nothing here is a "secondary" index.
 PANEL_SIGNALS: tuple[tuple[str, str], ...] = (
-    ("objective_assessment_similarity", "correspondence"),
-    ("objective_activity_similarity", "correspondence"),
-    ("objective_evaluation_similarity", "correspondence"),
-    ("assessment_objective_similarity", "correspondence"),
+    # Family A is exactly the three edges of the constructive-alignment triad
+    # (Biggs): ILO-AT, ILO-TLA, TLA-AT. Each one mirrors a core relation of the
+    # harness graph (C2, C3, C4), so no panel signal measures something the
+    # ontology does not model.
+    ("objective_assessment_similarity", "correspondence"),   # C2 assessed_by
+    ("objective_activity_similarity", "correspondence"),     # C3 practiced_by
+    ("activity_assessment_similarity", "correspondence"),    # C4 prepares_for
     ("objective_cognitive_congruence", "cognitive"),
     ("porter_mean", "cognitive"),
     ("webb_bloom_consistency", "cognitive"),
 )
 
+#: Computed and stored per scenario, but deliberately NOT panel endpoints.
+#:
+#: ``objective_evaluation_similarity`` was the one family-A signal with no
+#: corresponding core relation, and after the harness dropped ``evaluation`` as
+#: a node type it measured text the graph does not model at all.
+#: ``assessment_objective_similarity`` is the reverse direction, whose value is
+#: not one-way-good; the orphan/filler-item concern it covered is now enforced
+#: on the generation side by the harness's own plan-coverage check.
+#: Both remain in ``alignment_scores.json`` so nothing that reads those files
+#: breaks and the numbers stay recoverable.
+NON_PANEL_DIAGNOSTICS: tuple[str, ...] = (
+    "objective_evaluation_similarity",
+    "assessment_objective_similarity",
+)
+
 #: Panel signals whose direction is not one-way-good, so they are read as
 #: diagnostics and never counted as "legs won".
-NON_DIRECTIONAL_SIGNALS = frozenset({"assessment_objective_similarity"})
+# Empty by construction now: the one non-directional signal was moved out of
+# the panel (see NON_PANEL_DIAGNOSTICS), so every panel signal is one-way-good
+# and the "legs won" denominator equals the panel size.
+NON_DIRECTIONAL_SIGNALS: frozenset[str] = frozenset()
 
 
 def objective_endpoints(
@@ -1368,9 +1392,29 @@ class AlignmentEvaluator:
             sim, levels["objectives"], levels["assessment"], score.notes
         )
 
+        # C4, activity prepares_for assessment: the third edge of the
+        # constructive-alignment triad (Biggs). Mean over activities of the max
+        # rectified cosine to any assessment item -- same form as the two
+        # objective-side legs, so all three edges are measured the same way.
+        if activities and assessments:
+            sim_act_asm = [
+                [_cosine(av, mv) for mv in set_vecs["assessment"]]
+                for av in set_vecs["activities"]
+            ]
+            per_activity_max = [max(row) for row in sim_act_asm if row]
+            if per_activity_max:
+                score.activity_assessment_similarity = (
+                    sum(per_activity_max) / len(per_activity_max))
+        elif activities or assessments:
+            score.activity_assessment_similarity = 0.0
+            score.notes.append(
+                "activity_assessment_similarity = 0.0: one side of the "
+                "activity/assessment pair is empty")
+
         # Reverse direction (does each assessment item bind to some
         # objective?). Threshold-free, and read as a diagnostic: a high value
         # can mean "no orphan items" or "items restate the objectives".
+        # Computed and stored, but NOT a panel signal -- see PANEL_SIGNALS.
         if assessments:
             per_item_max = [
                 max(sim[i][j] for i in range(len(sim))) for j in range(len(assessments))

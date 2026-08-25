@@ -13,7 +13,7 @@ docs/scripts/sync_generated.sh from the thesis repo root):
   tab_rq2_alignment.tex the RQ2 lead similarity signal x model sizes, with n
                         per cell; a placeholder comment file (still valid for
                         \\input) when the pooled JSON carries no alignment layer
-  tab_rq2_panel.tex     all 7 panel signals x sizes x agents
+  tab_rq2_panel.tex     all 6 panel signals x sizes x agents
   stats_macros.tex      \\newcommand macros for every headline number used in
                         prose (deterministic names, documented inline)
   stats_summary.md      human-readable dump of ALL numbers + test statistics +
@@ -510,6 +510,7 @@ def gen_tab_rq2(pooled: dict) -> str:
 PANEL_DISPLAY = {
     "objective_assessment_similarity": "Obj$\\to$Asm sim.",
     "objective_activity_similarity": "Obj$\\to$Act sim.",
+    "activity_assessment_similarity": "Act$\\to$Asm sim.",
     "objective_evaluation_similarity": "Obj$\\to$Evl sim.",
     "assessment_objective_similarity": "Asm$\\to$Obj sim.$^{\\dagger}$",
     "objective_cognitive_congruence": "Cognitive congruence",

@@ -79,20 +79,21 @@ AGENT_DISPLAY = {
     "dick-carey-agent": "Dick-Carey-Agent",
     "react-isd": "ReAct-ISD",
     "alignmentgraph-isd": "AlignmentGraph-ISD",
-    "alignmentgraph-isd-no-verifier": "no verifier",
-    "alignmentgraph-isd-no-graph-ctx": "no graph context",
-    "alignmentgraph-isd-skeleton": "neither (skeleton)",
+    "alignmentgraph-isd-single-prose": "single-agent, prose context",
+    "alignmentgraph-isd-single-graph": "single-agent, graph context",
+    "alignmentgraph-isd-multi-prose": "multi-agent, prose context",
 }
 AGENT_ORDER = [
     "baseline", "eduplanner", "addie-agent", "rpisd-agent",
     "dick-carey-agent", "react-isd", "alignmentgraph-isd",
 ]
 #: Rendered as a separate block under a midrule: they are not baselines, and
-#: their cost is what quantifies the marginal price of each harness component.
+#: their cost is what quantifies the marginal price of each axis of the
+#: decomposition x context-representation ablation matrix.
 ABLATION_ORDER = [
-    "alignmentgraph-isd-no-verifier",
-    "alignmentgraph-isd-no-graph-ctx",
-    "alignmentgraph-isd-skeleton",
+    "alignmentgraph-isd-single-prose",
+    "alignmentgraph-isd-single-graph",
+    "alignmentgraph-isd-multi-prose",
 ]
 PROPOSED = "alignmentgraph-isd"
 
@@ -364,9 +365,9 @@ def ratios(stats: dict, size_labels: list[str], baselines: list[str]) -> dict:
                                    "ratio": max(vals.values())}
             entry[f"{key}_min"] = {"baseline": min(vals, key=vals.get),
                                    "ratio": min(vals.values())}
-        # Marginal cost of each harness component, from the ablation arms that
-        # ran inside the same ladder: what an operator pays for the verifier and
-        # for graph-context prompt injection.
+        # Marginal cost of each ablation axis, from the arms that ran inside
+        # the same ladder: what an operator pays for the multi-agent
+        # decomposition and for graph-context prompt injection.
         comp = {}
         for arm in ABLATION_ORDER:
             s = row.get(arm)
@@ -616,22 +617,25 @@ def gen_macros(stats: dict, collected: dict, rat: dict, cost: dict) -> str:
                    f"proposed / median-across-baselines model-call multiplier at "
                    f"{size_display(lb)}")
         comp = r.get("components", {})
-        if "alignmentgraph-isd-no-verifier" in comp:
-            newcmd(f"costVerifierTokenOverhead{w}",
-                   fmt_num(comp["alignmentgraph-isd-no-verifier"]["token_overhead_pct"], 1),
-                   f"percent extra median total tokens the verifier costs at "
-                   f"{size_display(lb)} (full harness vs the no-verifier arm)")
-        if "alignmentgraph-isd-no-graph-ctx" in comp:
+        if "alignmentgraph-isd-single-graph" in comp:
+            newcmd(f"costDecompositionTokenOverhead{w}",
+                   fmt_num(comp["alignmentgraph-isd-single-graph"]["token_overhead_pct"], 1),
+                   f"percent extra median total tokens the multi-agent "
+                   f"decomposition costs at {size_display(lb)} (full harness "
+                   f"vs the single-agent, graph-context arm; context "
+                   f"representation held constant)")
+        if "alignmentgraph-isd-multi-prose" in comp:
             newcmd(f"costGraphContextTokenOverhead{w}",
-                   fmt_num(comp["alignmentgraph-isd-no-graph-ctx"]["token_overhead_pct"], 1),
+                   fmt_num(comp["alignmentgraph-isd-multi-prose"]["token_overhead_pct"], 1),
                    f"percent extra median total tokens graph-context injection "
                    f"costs at {size_display(lb)} (full harness vs the "
-                   f"no-graph-context arm)")
-        if "alignmentgraph-isd-skeleton" in comp:
+                   f"multi-agent, prose-context arm; decomposition held constant)")
+        if "alignmentgraph-isd-single-prose" in comp:
             newcmd(f"costBothComponentsTokenOverhead{w}",
-                   fmt_num(comp["alignmentgraph-isd-skeleton"]["token_overhead_pct"], 1),
-                   f"percent extra median total tokens both components together "
-                   f"cost at {size_display(lb)} (full harness vs the skeleton arm)")
+                   fmt_num(comp["alignmentgraph-isd-single-prose"]["token_overhead_pct"], 1),
+                   f"percent extra median total tokens both axes together cost "
+                   f"at {size_display(lb)} (full harness vs the single-agent, "
+                   f"prose-context arm)")
         c = cost.get(lb)
         if c:
             newcmd(f"costGpuClass{w}", c["gpu"],
@@ -826,7 +830,7 @@ def gen_stats_md(stats: dict, collected: dict, rat: dict, cost: dict) -> str:
         comp = r.get("components") or {}
         if comp:
             md.append("")
-            md.append("Marginal cost of the harness components at this size "
+            md.append("Marginal cost of each ablation axis at this size "
                       "(full harness vs the ablation arm, median total tokens):")
             md.append("")
             for arm in ABLATION_ORDER:

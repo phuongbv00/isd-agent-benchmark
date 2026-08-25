@@ -24,14 +24,14 @@ contains **no instructional-design logic**; everything lives in the package.
    `HARNESS_REGEN_BACKOFF`; attempt budget via `HARNESS_REGEN_BUDGET`), so
    per-agent retries respect the same concurrency posture as the outer
    scheduler.
-4. **Ablation kwargs** — `AlignmentGraphISDAgent(..., enable_verifier=...,
-   enable_graph_context=...)` forwards the two ablation switches into
-   `HarnessRunConfig` (both default `True` = full pipeline). They are kwargs,
-   not env vars, on purpose: `run_benchmark.py` registers one agent id per
-   ablation arm (`alignmentgraph-isd-no-verifier`, `-no-graph-ctx`,
-   `-skeleton`) with the flags pinned, so an arm can never run the wrong
-   config; the resolved flags land in `metadata.run_config` for post-hoc
-   verification.
+4. **Ablation kwargs** — `AlignmentGraphISDAgent(..., agent_mode=...,
+   context_mode=...)` forwards the two ablation axes into `HarnessRunConfig`
+   (defaults `"multi"` + `"graph"` = full pipeline). They are kwargs, not env
+   vars, on purpose: `run_benchmark.py` registers one agent id per cell of the
+   2×2 matrix (`alignmentgraph-isd` = multi+graph, `alignmentgraph-isd-single-prose`,
+   `alignmentgraph-isd-single-graph`, `alignmentgraph-isd-multi-prose`) with
+   the axes pinned, so an arm can never run the wrong config; the resolved
+   values land in `metadata.run_config` for post-hoc verification.
 5. **Run** — `AlignmentGraphISDAgent.run(scenario)` calls
    `MetaAgent(config).run(brief)` and returns the standard benchmark result
    dict: `{"addie_output", "trajectory", "metadata"}` plus the agent-specific

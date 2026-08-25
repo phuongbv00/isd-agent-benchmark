@@ -439,7 +439,7 @@ def resolve_sensitivity_arms(args, run_dirs_by_model: dict[str, list[Path]]
 
     Covers BOTH sensitivity axes: encoders (family A, ENCODER_PRESETS) and
     Bloom classifiers (family B, BLOOM_PRESETS). Family B is not optional
-    decoration — 3 of the 7 panel signals are Bloom-derived, so leaving it out
+    decoration — 3 of the 6 panel signals are Bloom-derived, so leaving it out
     would mean those three are checked by no axis at all.
 
     The primary configuration is never an arm: its unsuffixed artifact IS
@@ -1735,6 +1735,25 @@ def main() -> None:
         for label, dirs in group_by_glob(args.auto_glob).items():
             run_dirs_by_model.setdefault(label, dirs)
     if not run_dirs_by_model:
+        if args.auto_glob:
+            # Distinguish "you passed nothing" from "what you passed matched
+            # nothing" — telling someone who just used --auto-glob to use
+            # --auto-glob sends them looking for a bug in the script. The
+            # usual cause is a tag mismatch: the ladder writes _r1/_r2/_r3, a
+            # tune run writes whatever RUN_TAGS said (e.g. _tune1), so the
+            # ladder's '*_r*' pattern silently matches no tune run.
+            hits = sorted(globmod.glob(args.auto_glob))
+            if not hits:
+                nearby = sorted(d.name for d in Path("results").glob("*_benchmark_*")
+                                if d.is_dir())[:8]
+                parser.error(
+                    f"--auto-glob {args.auto_glob!r} matched no directory.\n"
+                    + ("  run dirs present: " + ", ".join(nearby) if nearby
+                       else "  no run dirs found under results/"))
+            parser.error(
+                f"--auto-glob {args.auto_glob!r} matched {len(hits)} path(s), but none "
+                "is a run dir named <dataset>_benchmark_<model>[_rN]_<YYYYmmdd_HHMMSS>:\n"
+                + "\n".join(f"  {h}" for h in hits[:8]))
         parser.error("no input: give --model and/or --auto-glob")
 
     for label, dirs in run_dirs_by_model.items():

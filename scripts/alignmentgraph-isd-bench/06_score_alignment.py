@@ -63,6 +63,20 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "evaluator" / "src"))
 
+# The endpoint this script needs (<SLOT>_EMBED_BASE_URLS) is WRITTEN into .env
+# by 05_sync_embed_pod_env.py, so it has to be READ from there too. Without
+# this, 05 would write the value, .env would visibly contain it, and this
+# script would still report "no endpoint" and tell the user to re-run 05 —
+# advice that cannot fix anything. Same guarded import as run_benchmark.py and
+# 05 itself; load_dotenv does not override variables already exported in the
+# shell, so an explicit export still wins.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(REPO_ROOT / ".env")
+except ImportError:
+    pass  # Skip if dotenv is not available
+
 from isd_evaluator.metrics.alignment import (  # noqa: E402
     PANEL_SIGNALS,
     AlignmentEvaluator,
@@ -637,6 +651,8 @@ def summarize(per_agent: dict[str, list[dict]]) -> list[tuple[str, int, dict[str
 _TABLE_COLUMNS = [
     ("objective_assessment_similarity", "AsmSim"),
     ("objective_activity_similarity", "ActSim"),
+    ("activity_assessment_similarity", "ActAsmSim"),
+    # Still emitted, no longer panel endpoints.
     ("objective_evaluation_similarity", "EvlSim"),
     ("assessment_objective_similarity", "RevSim"),
     ("objective_cognitive_congruence", "CogCon"),
@@ -989,7 +1005,7 @@ def main() -> int:
         "--bloom-presets", default=None, metavar="K1,K2,...",
         help="Bloom classifiers to sweep, e.g. "
              f"'{','.join(BLOOM_PRESETS)}'. This is family B's independence "
-             "check: 3 of the 7 panel signals are Bloom-derived, so the lexicon "
+             "check: 3 of the 6 panel signals are Bloom-derived, so the lexicon "
              "needs the same kind of axis the encoder has. Non-primary Bloom "
              "arms always pair with the primary encoder (star design), and cost "
              "nearly nothing — Bloom runs on CPU and the vectors come from the "

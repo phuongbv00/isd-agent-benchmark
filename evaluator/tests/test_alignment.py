@@ -622,7 +622,12 @@ class TestDefaults:
                 == "nvidia/llama-embed-nemotron-8b")
         assert "composite" not in module.COMPONENTS
         assert module.COMPONENTS[0] == "objective_assessment_similarity"
-        assert "objective_evaluation_similarity" in module.COMPONENTS
+        # Family A is the three constructive-alignment triad edges (C2/C3/C4);
+        # objective_evaluation_similarity and the reverse direction are still
+        # computed but are diagnostics, not panel endpoints.
+        assert "activity_assessment_similarity" in module.COMPONENTS
+        assert "objective_evaluation_similarity" not in module.COMPONENTS
+        assert "assessment_objective_similarity" not in module.COMPONENTS
         # the primary encoder owns the unsuffixed artifact pooling reads
         assert module.ENCODER_PRESETS[module.PRIMARY_ENCODER][2] == ""
 
@@ -760,3 +765,43 @@ class TestOpenAIAPIEncoder:
         assert offline.encode(["already cached"]) == warm.encode(["already cached"])
         with pytest.raises(RuntimeError, match="not in the embedding cache"):
             offline.encode(["never seen before"])
+
+
+class TestCATriadCoverage:
+    """Family A must measure all three edges of the constructive-alignment
+    triad (Biggs): ILO-AT, ILO-TLA and TLA-AT. The panel previously measured
+    only the two objective-side edges and spent its third slot on
+    objective_evaluation_similarity, which mirrors no core relation of the
+    harness graph -- and after `evaluation` stopped being a node type, no
+    modelled artifact at all."""
+
+    def test_panel_family_a_is_exactly_the_triad(self):
+        from isd_evaluator.metrics.alignment import PANEL_SIGNALS
+
+        family_a = [s for s, fam in PANEL_SIGNALS if fam == "correspondence"]
+        assert family_a == [
+            "objective_assessment_similarity",   # C2
+            "objective_activity_similarity",     # C3
+            "activity_assessment_similarity",    # C4
+        ]
+
+    def test_panel_has_no_non_directional_signal_left(self):
+        from isd_evaluator.metrics.alignment import (
+            NON_DIRECTIONAL_SIGNALS,
+            PANEL_SIGNALS,
+        )
+
+        assert not {s for s, _ in PANEL_SIGNALS} & NON_DIRECTIONAL_SIGNALS
+
+    def test_dropped_signals_are_still_computed_and_stored(self):
+        """They leave the panel, not the artifact: existing alignment_scores.json
+        readers keep working and the numbers stay recoverable."""
+        from isd_evaluator.metrics.alignment import (
+            NON_PANEL_DIAGNOSTICS,
+            AlignmentScore,
+        )
+
+        stored = AlignmentScore().to_dict()
+        for signal in NON_PANEL_DIAGNOSTICS:
+            assert signal in stored
+        assert "activity_assessment_similarity" in stored

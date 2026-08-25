@@ -57,9 +57,9 @@ JUDGE_SIGNALS = ("addie_median", "trajectory_score", "total_score")
 JUDGE_LEAD = "addie_median"
 
 ARM_LABELS = {
-    "alignmentgraph-isd-no-verifier": "A1 - no verifier",
-    "alignmentgraph-isd-no-graph-ctx": "A2 - no graph context",
-    "alignmentgraph-isd-skeleton": "A3 - skeleton (both off)",
+    "alignmentgraph-isd-single-prose": "A1 - single-agent, prose context",
+    "alignmentgraph-isd-single-graph": "A2 - single-agent, graph context",
+    "alignmentgraph-isd-multi-prose": "A3 - multi-agent, prose context",
 }
 
 MACRO_FILES = ("stats_macros.tex", "abl_macros.tex", "cost_macros.tex", "sens_macros.tex")
@@ -595,18 +595,18 @@ def sec_ablation_tables(abl, lad):
 
     fac = abl.get("factorial") or {}
     if fac:
-        L.append("### 5.3 2x2 factorial (verifier x graph context)\n")
-        L.append("**Direction: `component ON - component OFF`** - the OPPOSITE sign of the "
-                 "`arm - A0` columns above. Positive = having the component scores higher. "
-                 "p-values UNCORRECTED (pre-specified structural contrasts).\n")
+        L.append("### 5.3 2x2 factorial (decomposition x context representation)\n")
+        L.append("**Direction: `multi-agent - single-agent` / `graph - prose`** - the OPPOSITE "
+                 "sign of the `arm - A0` columns above. Positive = the richer setting scores "
+                 "higher. p-values UNCORRECTED (pre-specified structural contrasts).\n")
         L.append("A negative `interaction` means the two mechanisms SUBSTITUTE for each other - "
                  "but only where both simple effects carry the beneficial sign. Where both are "
                  "negative it is a magnitude statement; where the signs differ it is a crossover, "
                  "neither substitution nor complementarity.\n")
         for signal, block in (fac.get("signals") or {}).items():
             L.append(f"#### `{signal}`\n")
-            L.append("| Size | n | verif \\| ctx ON | verif \\| ctx OFF | ctx \\| verif ON | "
-                     "ctx \\| verif OFF | interaction |")
+            L.append("| Size | n | decomp \\| ctx=graph | decomp \\| ctx=prose | ctx \\| decomp=multi | "
+                     "ctx \\| decomp=single | interaction |")
             L.append("|---|---|---|---|---|---|---|")
             digits = 2 if signal in JUDGE_SIGNALS else 3
             for row in block.get("per_model") or []:
@@ -616,18 +616,19 @@ def sec_ablation_tables(abl, lad):
                         return "--"
                     return f"{signed(e.get('mean_diff'), digits)} (p={pval(e.get('p_raw'))})"
                 L.append(f"| {row.get('label','?')} | {row.get('n_scenarios','--')} | "
-                         f"{cell('verifier_effect_given_graphctx_on')} | "
-                         f"{cell('verifier_effect_given_graphctx_off')} | "
-                         f"{cell('graphctx_effect_given_verifier_on')} | "
-                         f"{cell('graphctx_effect_given_verifier_off')} | "
+                         f"{cell('decomposition_effect_given_context_graph')} | "
+                         f"{cell('decomposition_effect_given_context_prose')} | "
+                         f"{cell('context_effect_given_decomposition_multi')} | "
+                         f"{cell('context_effect_given_decomposition_single')} | "
                          f"{cell('interaction')} |")
             L.append("")
 
-    va = abl.get("verifier_activity") or []
+    va = abl.get("self_validation_activity") or []
     if va:
-        L.append("### 5.4 Verifier activity (repairs actually performed)\n")
-        L.append("Operational counts, not a scored signal - this is the evidence for the "
-                 "'backstop' framing.\n")
+        L.append("### 5.4 Self-validation activity (repairs actually performed)\n")
+        L.append("Operational counts, not a scored signal. Self-validation is always on (not "
+                 "one of the two ablated axes), so this is context for the decomposition/context "
+                 "effects above, not mechanism evidence for an on/off switch.\n")
         L.append("| Size | Arm | n scenario-runs | verifier events (mean) | repair events (mean) "
                  "| % runs with a repair |")
         L.append("|---|---|---|---|---|---|")
