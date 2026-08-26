@@ -71,6 +71,7 @@ class AlignmentGraphISDAgent:
         *,
         agent_mode: str = "multi",
         context_mode: str = "graph",
+        control_mode: str = "scripted",
     ) -> None:
         # The factory is the single source of truth for the model; the harness
         # reads model provenance for its metadata by introspecting it (no parallel
@@ -86,9 +87,18 @@ class AlignmentGraphISDAgent:
             context_mode=context_mode,
             **_regen_settings_from_env(),
         )
+        # EXPERIMENTAL: "agentic" routes run() to the package's tool-loop
+        # control mode (alignmentgraph_isd.core.agentic) instead of the
+        # scripted pipeline. Not a HarnessRunConfig field — it selects which
+        # runner is called, not how the pipeline is configured.
+        self.control_mode = control_mode
 
     def run(self, scenario: dict | DesignBrief) -> dict:
         # The result carries the full alignment-graph dump as its own keys
         # ("graph" / "graph_dot"); the benchmark runner writes them to
         # <agent_id>_graph.json / <agent_id>_graph.dot next to the output.
+        if self.control_mode == "agentic":
+            from alignmentgraph_isd.core.agentic import run_agentic_brief
+
+            return run_agentic_brief(self.config, _scenario_to_design_brief(scenario))
         return MetaAgent(self.config).run(_scenario_to_design_brief(scenario))

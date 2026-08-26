@@ -601,6 +601,17 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
             return agent.run(scenario)
         return run_alignmentgraph_isd_multi_prose
 
+    # EXPERIMENTAL (not part of any study arm, not in the ladder scripts):
+    # the package's agentic control mode — same 7 artifact families, each
+    # produced by a JSON-action tool loop over the alignment graph instead of
+    # the scripted pipeline. Registry-only; select explicitly via --agents.
+    elif agent_id == "alignmentgraph-isd-agentic":
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        def run_alignmentgraph_isd_agentic(scenario: dict) -> dict:
+            agent = AlignmentGraphISDAgent(llm_config=llm_config, control_mode="agentic")
+            return agent.run(scenario)
+        return run_alignmentgraph_isd_agentic
+
     elif agent_id == "addie-agent":
         from addie_agent.agent import ADDIEAgent
         def run_addie(scenario: dict) -> dict:
