@@ -569,7 +569,12 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
         return run_alignmentgraph_isd
 
     # Ablation matrix (thesis ablation study): decomposition (agent_mode:
-    # single/multi) x context representation (context_mode: prose/graph).
+    # single/multi) x alignment machinery (context_mode: graph = full
+    # AlignmentGraph pipeline, prose = graph-free blackboard: verbatim-JSON
+    # named-slice context, within-artifact safeguards only, no routing, no
+    # graph artifact — a prose run's result carries no graph/graph_dot keys,
+    # so no <agent_id>_graph.json/.dot files are written for those arms;
+    # instead its raw blackboard is saved as <agent_id>_prose.json).
     # "alignmentgraph-isd" above is the multi+graph cell; these three
     # register the other three cells via constructor kwargs. Registered as
     # separate agent ids so all arms run inside ONE benchmark invocation and get
@@ -685,6 +690,13 @@ def _run_agent_task(
                 if isinstance(graph_dot, str) and graph_dot:
                     with open(output_dir / f"{agent_id}_graph.dot", "w", encoding="utf-8") as f:
                         f.write(graph_dot)
+                # Prose-arm counterpart: the raw blackboard documents
+                # (inspection artifact only — no relations/coverage, so the
+                # "prose ships no alignment audit" contrast is untouched).
+                prose_dump = result.get("prose")
+                if isinstance(prose_dump, dict) and prose_dump.get("documents"):
+                    with open(output_dir / f"{agent_id}_prose.json", "w", encoding="utf-8") as f:
+                        json.dump(prose_dump, f, ensure_ascii=False, indent=2, default=str)
 
             with open(log_path, "w", encoding="utf-8") as f:
                 f.write(f"=== {agent_id} execution log ===\n")
