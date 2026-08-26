@@ -325,11 +325,22 @@ def self_validation_activity(run_dirs_by_model: dict[str, list[Path]],
     its verifier_events were a constant 1.00/scenario against multi's 7.20 —
     an instrumentation and budget gap, not a difference in how much either arm
     found to fix. Numbers from an older run dir will show that artifact here.
+
+    Also counted here, from the same files: **cross-agent routing activity**
+    (``routed_signals`` — the ``*_routed`` attempt counters the checkpoints'
+    router bumps, from ``metadata.task_attempts``; ``revise_reentries`` — the
+    ``revise_*`` actions the routed Designer logged). Routing exists only in
+    the multi+graph arm by construction (the other three cells have no
+    checkpoints or nothing to route to), so these columns are observational
+    evidence that the inter-agent feedback loop actually fires — how often
+    one agent's validation finding redirected another agent — not an ablation
+    contrast.
     """
     out = []
     for label, dirs in run_dirs_by_model.items():
         per_arm: dict[str, dict[str, list[float]]] = {
-            a: {"verifier_events": [], "repair_events": []} for a in agents}
+            a: {"verifier_events": [], "repair_events": [],
+                "routed_signals": [], "revise_reentries": []} for a in agents}
         for run_dir in dirs:
             for _sid, scen_dir in LP.iter_scenario_dirs(run_dir):
                 for a in agents:
@@ -337,12 +348,20 @@ def self_validation_activity(run_dirs_by_model: dict[str, list[Path]],
                     if not path.exists():
                         continue
                     try:
-                        tr = (json.loads(path.read_text(encoding="utf-8"))
-                              .get("trajectory") or {})
+                        doc = json.loads(path.read_text(encoding="utf-8"))
                     except (json.JSONDecodeError, OSError):
                         continue
+                    tr = doc.get("trajectory") or {}
                     per_arm[a]["verifier_events"].append(len(tr.get("verifier_events") or []))
                     per_arm[a]["repair_events"].append(len(tr.get("repair_events") or []))
+                    attempts = ((doc.get("metadata") or {}).get("task_attempts") or {})
+                    per_arm[a]["routed_signals"].append(float(sum(
+                        v for k, v in attempts.items()
+                        if isinstance(v, (int, float)) and str(k).endswith("_routed"))))
+                    per_arm[a]["revise_reentries"].append(float(sum(
+                        1 for stream in ("agent_steps", "recovery_events")
+                        for e in tr.get(stream) or []
+                        if str(e.get("action", "")).startswith("revise_"))))
         out.append({
             "label": label,
             "arms": {
@@ -353,6 +372,11 @@ def self_validation_activity(run_dirs_by_model: dict[str, list[Path]],
                     "pct_scenario_runs_with_repair": (
                         100.0 * sum(1 for x in v["repair_events"] if x > 0)
                         / len(v["repair_events"]) if v["repair_events"] else float("nan")),
+                    "routed_signals_mean": LP._mean(v["routed_signals"]),
+                    "revise_reentries_mean": LP._mean(v["revise_reentries"]),
+                    "pct_scenario_runs_with_routing": (
+                        100.0 * sum(1 for x in v["routed_signals"] if x > 0)
+                        / len(v["routed_signals"]) if v["routed_signals"] else float("nan")),
                 }
                 for a, v in per_arm.items() if v["verifier_events"]
             },
