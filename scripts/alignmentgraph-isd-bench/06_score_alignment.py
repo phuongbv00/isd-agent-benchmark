@@ -672,7 +672,7 @@ def print_table(rows: list[tuple[str, int, dict[str, float | None]]]) -> None:
     print(header)
     print("-" * len(header))
     for agent_id, n, means in rows:
-        cells = " ".join(f"{fmt(means[key]):>6s}" for key, _ in _TABLE_COLUMNS)
+        cells = " ".join(f"{fmt(means.get(key)):>6s}" for key, _ in _TABLE_COLUMNS)
         print(f"{agent_id:30s} {n:3d} {cells}")
 
 

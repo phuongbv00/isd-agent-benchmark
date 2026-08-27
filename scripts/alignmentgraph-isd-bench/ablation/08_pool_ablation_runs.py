@@ -221,6 +221,68 @@ FACTORIAL_CELLS = {
 #: Judge signals (read from comparison_report.json rankings).
 FACTORIAL_JUDGE_SIGNALS = ("addie_median", "trajectory_score", "total_score")
 
+# Trajectory schema v3 (2026-08-27): one event is
+# {timestamp, agent, action, context}. ``action`` is the explicit taxonomy;
+# there is deliberately no redundant type/category field in ``context``.
+# These values are mirrored from alignmentgraph_isd.core.trajectory.
+TAXONOMY_RECOVERY_ACTIONS = frozenset({
+    "retry", "regen_empty_section", "agent_error", "llm_error", "salvage_truncated",
+    "invalid_action", "submit_rejected", "submit_invalid_final", "repeated_tool_call",
+    "commit_invalid_section", "agentic_fallback", "revision",
+})
+
+
+def _structured_activity(tr: dict) -> tuple[int, int, list[dict]]:
+    """Read validation/repair/revision activity across all trajectory schemas.
+
+    v3 writes taxonomy actions + a context object. v2's unified list used a
+    flat ``type`` discriminator, while v1 kept parallel event streams. Keep
+    both fallbacks so the ablation pool remains able to compare existing runs.
+    """
+    events = tr.get("events")
+    if events is None:
+        return (
+            len(tr.get("verifier_events") or []),
+            len(tr.get("repair_events") or []),
+            list(tr.get("recovery_events") or []),
+        )
+
+    if any("type" in event for event in events):
+        return (
+            sum(1 for event in events if event.get("type") == "verifier"),
+            sum(1 for event in events if event.get("type") == "repair"),
+            [event for event in events if event.get("type") == "recovery"],
+        )
+
+    # v3: count only the structured repair record (the one that has a repaired
+    # violation), not a recovery action that happens to apply a repair rule.
+    verifier_n = sum(1 for event in events if event.get("action") == "verify")
+    repair_n = sum(
+        1 for event in events
+        if event.get("action") == "repair"
+        and isinstance(event.get("context"), dict)
+        and "violation_type" in event["context"]
+    )
+    recovery = [
+        event for event in events
+        if event.get("action") in TAXONOMY_RECOVERY_ACTIONS
+        or (
+            event.get("action") == "repair"
+            and isinstance(event.get("context"), dict)
+            and "repair_rule" in event["context"]
+        )
+    ]
+    return verifier_n, repair_n, recovery
+
+
+def _revision_reentries(steps: list[dict], recovery: list[dict]) -> int:
+    """Count targeted revisions in old raw names and the v3 taxonomy."""
+    return sum(
+        1 for event in list(steps) + recovery
+        if event.get("action") == "revision"
+        or str(event.get("action", "")).startswith("revise_")
+    )
+
 #: Every signal the factorial layer is computed on: the three judge signals plus
 #: the whole RQ2 panel. Deliberately exhaustive — the panel's defence against
 #: selective reporting is that every signal is reported for every comparison,
@@ -329,7 +391,8 @@ def self_validation_activity(run_dirs_by_model: dict[str, list[Path]],
     Also counted here, from the same files: **cross-agent routing activity**
     (``routed_signals`` — the ``*_routed`` attempt counters the checkpoints'
     router bumps, from ``metadata.task_attempts``; ``revise_reentries`` — the
-    ``revise_*`` actions the routed Designer logged). Routing exists only in
+    ``revision`` taxonomy action, formerly the ``revise_*`` action names, the
+    routed Designer logged). Routing exists only in
     the multi+graph arm by construction (the other three cells have no
     checkpoints or nothing to route to), so these columns are observational
     evidence that the inter-agent feedback loop actually fires — how often
@@ -352,16 +415,22 @@ def self_validation_activity(run_dirs_by_model: dict[str, list[Path]],
                     except (json.JSONDecodeError, OSError):
                         continue
                     tr = doc.get("trajectory") or {}
-                    per_arm[a]["verifier_events"].append(len(tr.get("verifier_events") or []))
-                    per_arm[a]["repair_events"].append(len(tr.get("repair_events") or []))
+                    verifier_n, repair_n, recovery = _structured_activity(tr)
+                    per_arm[a]["verifier_events"].append(verifier_n)
+                    per_arm[a]["repair_events"].append(repair_n)
                     attempts = ((doc.get("metadata") or {}).get("task_attempts") or {})
                     per_arm[a]["routed_signals"].append(float(sum(
                         v for k, v in attempts.items()
                         if isinstance(v, (int, float)) and str(k).endswith("_routed"))))
-                    per_arm[a]["revise_reentries"].append(float(sum(
-                        1 for stream in ("agent_steps", "recovery_events")
-                        for e in tr.get(stream) or []
-                        if str(e.get("action", "")).startswith("revise_"))))
+                    # Judge-visible steps: `agent_steps` in runs up to 2026-08-26,
+                    # `tool_calls` args since (agent_steps was a full duplicate
+                    # and was dropped from the artifact). Old files carry both,
+                    # so prefer agent_steps to avoid double counting.
+                    steps = tr.get("agent_steps")
+                    if steps is None:
+                        steps = [c.get("args") or {} for c in tr.get("tool_calls") or []]
+                    per_arm[a]["revise_reentries"].append(
+                        float(_revision_reentries(list(steps), recovery)))
         out.append({
             "label": label,
             "arms": {
