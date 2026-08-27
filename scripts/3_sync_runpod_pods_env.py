@@ -32,13 +32,6 @@ The managed block contains, per slot, the benchmark env-quad:
   QWEN2B_AGENT_MODEL_NAME=Qwen/Qwen3.5-2B
   QWEN2B_AGENT_MODEL_API_KEY_ENVS=VLLM_API_KEY
 
-plus the three protective flags every ladder run must have (see
-../docs/benchmark_guides.md, section 4.4, for the incidents that motivated them):
-
-  AGENT_MODEL_MAX_TOKENS_CAP=8192
-  AGENT_MODEL_STREAMING=1
-  AGENT_MODEL_DISABLE_THINKING=1
-
 VLLM_API_KEY itself must already be set in .env -- it is the Bearer
 token the template's vLLM server was started with, not the RunPod API key.
 """
@@ -61,6 +54,7 @@ BLOCK_END = "# <<< qwen-ladder pods <<<"
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv(ENV_PATH)
 except ImportError:
     pass  # Skip if dotenv is not available
@@ -73,12 +67,6 @@ SLOT_PATTERNS = [
     ("qwen2b", re.compile(r"(?<![\d.])2b", re.I)),
     ("qwen4b", re.compile(r"(?<![\d.])4b", re.I)),
     ("qwen9b", re.compile(r"(?<![\d.])9b", re.I)),
-]
-
-PROTECTIVE_FLAGS = [
-    "AGENT_MODEL_MAX_TOKENS_CAP=8192",
-    "AGENT_MODEL_STREAMING=1",
-    "AGENT_MODEL_DISABLE_THINKING=1",
 ]
 
 
@@ -248,7 +236,6 @@ def main() -> None:
          f"# synced {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} -- re-run the script to refresh; do not edit by hand"]
         + env_lines
         + ["# Protective flags (see ../docs/benchmark_guides.md, section 4.4):"]
-        + PROTECTIVE_FLAGS
         + [BLOCK_END]
     ) + "\n"
 
