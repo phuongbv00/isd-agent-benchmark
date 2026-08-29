@@ -13,15 +13,14 @@ from shared.llm.config import LLMConfig
 
 
 def _chat_kwargs(config: LLMConfig) -> dict[str, Any]:
-    from shared.llm.token_accounting import HANDLER
-
     kwargs: dict[str, Any] = {
         "model": config.model,
         "temperature": config.temperature,
         # Construction-time callback -> counts tokens for EVERY agent uniformly
         # (persists across .bind(), so it survives the JSON-mode binding agents
-        # apply). See shared/llm/token_accounting.py.
-        "callbacks": [HANDLER],
+        # apply). config._token_counter, NOT a module-level singleton — see
+        # shared/llm/token_accounting.py for why.
+        "callbacks": [config._token_counter],
     }
     if config.max_tokens is not None:
         kwargs["max_tokens"] = config.max_tokens

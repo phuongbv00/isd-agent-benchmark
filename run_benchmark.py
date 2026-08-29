@@ -521,8 +521,18 @@ def _judge_models_from_env(judge_env: Optional[dict[str, str]]) -> list[str]:
 
 
 def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
-    """Return the run function for the given agent ID (module-based)."""
+    """Return (run function, resolved LLMConfig) for the given agent ID
+    (module-based). The caller (``_run_agent_task``) needs the resolved
+    config back, not just the runner: it reads ``llm_config._token_counter``
+    for this run's token_usage AFTER the runner returns -- see
+    ``shared/llm/token_accounting.py`` for why that has to be the SAME
+    object every closure below captured, not a fresh one re-derived later."""
     llm_config = _normalize_agent_max_tokens(_resolve_llm_config(llm_config))
+    # One fresh accounting scope per run: copy_with() never re-shares
+    # _token_counter (unlike _credential_rr/_endpoint_rr, which round-robin
+    # across the WHOLE benchmark session and must survive every copy) — see
+    # LLMConfig.copy_with's docstring.
+    llm_config = llm_config.copy_with()
     uniform_max_tokens = llm_config.max_tokens
 
     if agent_id == "baseline":
@@ -532,7 +542,7 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
             # (32768) would otherwise override the uniform budget on the config.
             gen = BaselineGenerator(llm_config=llm_config, max_tokens=uniform_max_tokens)
             return gen.generate(scenario)
-        return run_baseline
+        return run_baseline, llm_config
 
     elif agent_id == "eduplanner":
         from eduplanner.agents import EduPlannerAgent
@@ -552,21 +562,21 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
                 "trajectory": result.trajectory.model_dump(),
                 "metadata": result.metadata.model_dump(),
             }
-        return run_eduplanner
+        return run_eduplanner, llm_config
 
     elif agent_id == "react-isd":
         from react_isd.agent import ReActISDAgent
         def run_react(scenario: dict) -> dict:
             agent = ReActISDAgent(llm_config=llm_config)
             return agent.run(scenario)
-        return run_react
+        return run_react, llm_config
 
     elif agent_id == "alignmentgraph-isd":
         from alignmentgraph_isd_agent import AlignmentGraphISDAgent
         def run_alignmentgraph_isd(scenario: dict) -> dict:
             agent = AlignmentGraphISDAgent(llm_config=llm_config)
             return agent.run(scenario)
-        return run_alignmentgraph_isd
+        return run_alignmentgraph_isd, llm_config
 
     # Ablation matrix (thesis ablation study): decomposition (agent_mode:
     # single/multi) x alignment machinery (context_mode: graph = full
@@ -585,21 +595,21 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
         def run_alignmentgraph_isd_single_prose(scenario: dict) -> dict:
             agent = AlignmentGraphISDAgent(llm_config=llm_config, agent_mode="single", context_mode="prose")
             return agent.run(scenario)
-        return run_alignmentgraph_isd_single_prose
+        return run_alignmentgraph_isd_single_prose, llm_config
 
     elif agent_id == "alignmentgraph-isd-single-graph":
         from alignmentgraph_isd_agent import AlignmentGraphISDAgent
         def run_alignmentgraph_isd_single_graph(scenario: dict) -> dict:
             agent = AlignmentGraphISDAgent(llm_config=llm_config, agent_mode="single", context_mode="graph")
             return agent.run(scenario)
-        return run_alignmentgraph_isd_single_graph
+        return run_alignmentgraph_isd_single_graph, llm_config
 
     elif agent_id == "alignmentgraph-isd-multi-prose":
         from alignmentgraph_isd_agent import AlignmentGraphISDAgent
         def run_alignmentgraph_isd_multi_prose(scenario: dict) -> dict:
             agent = AlignmentGraphISDAgent(llm_config=llm_config, agent_mode="multi", context_mode="prose")
             return agent.run(scenario)
-        return run_alignmentgraph_isd_multi_prose
+        return run_alignmentgraph_isd_multi_prose, llm_config
 
     # EXPERIMENTAL (not part of any study arm, not in the ladder scripts):
     # the package's agentic control mode — same 7 artifact families, each
@@ -610,28 +620,28 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
         def run_alignmentgraph_isd_agentic(scenario: dict) -> dict:
             agent = AlignmentGraphISDAgent(llm_config=llm_config, control_mode="agentic")
             return agent.run(scenario)
-        return run_alignmentgraph_isd_agentic
+        return run_alignmentgraph_isd_agentic, llm_config
 
     elif agent_id == "addie-agent":
         from addie_agent.agent import ADDIEAgent
         def run_addie(scenario: dict) -> dict:
             agent = ADDIEAgent(llm_config=llm_config)
             return agent.run(scenario)
-        return run_addie
+        return run_addie, llm_config
 
     elif agent_id == "dick-carey-agent":
         from dick_carey_agent.agent import DickCareyAgent
         def run_dickcarey(scenario: dict) -> dict:
             agent = DickCareyAgent(llm_config=llm_config)
             return agent.run(scenario)
-        return run_dickcarey
+        return run_dickcarey, llm_config
 
     elif agent_id == "rpisd-agent":
         from rpisd_agent.agent import RPISDAgent
         def run_rpisd(scenario: dict) -> dict:
             agent = RPISDAgent(llm_config=llm_config)
             return agent.run(scenario)
-        return run_rpisd
+        return run_rpisd, llm_config
 
     else:
         raise ValueError(f"Unknown agent: {agent_id}")
@@ -659,17 +669,19 @@ def _run_agent_task(
             with open(scenario_path, "r", encoding="utf-8") as f:
                 scenario = json.load(f)
 
-            # Run the agent (module-based). Bracket the run with the thread-local
-            # token accounter so every agent gets a uniform token_usage in its
-            # metadata (baselines included), regardless of whether the agent
-            # tracks tokens itself. See shared/llm/token_accounting.py.
-            from shared.llm import token_accounting
-            token_accounting.reset()
+            # Run the agent (module-based). ``_get_agent_runner`` hands back
+            # the SAME LLMConfig every create_chat_model() call within this
+            # run captures (regardless of which thread makes the call — see
+            # shared/llm/token_accounting.py), so its `_token_counter`
+            # accumulates every agent's token usage uniformly (baselines
+            # included), whether or not the agent tracks tokens itself, and
+            # correctly aggregates a fan-out agent's concurrent LLM calls
+            # instead of losing whichever ones land on a worker thread.
             start_time = time.time()
-            runner = _get_agent_runner(agent_id, llm_config=llm_config)
+            runner, resolved_llm_config = _get_agent_runner(agent_id, llm_config=llm_config)
             result = runner(scenario)
             elapsed = time.time() - start_time
-            token_usage = token_accounting.snapshot()
+            token_usage = resolved_llm_config._token_counter.snapshot()
             if isinstance(result, dict):
                 result.setdefault("metadata", {})
                 if isinstance(result["metadata"], dict):

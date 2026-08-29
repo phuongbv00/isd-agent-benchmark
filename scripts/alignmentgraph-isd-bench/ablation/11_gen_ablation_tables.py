@@ -428,14 +428,6 @@ def factorial_macros(pooled: dict, newcmd) -> None:
                 continue
             newcmd(f"ablRepairs{tag}{w}", fmt_num(v["repair_events_mean"], 2),
                    f"mean self-validation repairs per scenario, {arm} @ {e['label']}")
-        # Routing fires only in the multi+graph arm (A0): observational
-        # evidence the inter-agent feedback loop runs, not an ablation contrast.
-        v = (e.get("arms") or {}).get("alignmentgraph-isd")
-        if v and "routed_signals_mean" in v:
-            newcmd(f"ablRoutedAZero{w}", fmt_num(v["routed_signals_mean"], 2),
-                   f"mean routed cross-agent signals per scenario, A0 @ {e['label']}")
-            newcmd(f"ablReviseAZero{w}", fmt_num(v["revise_reentries_mean"], 2),
-                   f"mean revise() re-entries per scenario, A0 @ {e['label']}")
 
 
 def gen_macros(pooled: dict) -> str:
@@ -759,24 +751,13 @@ def gen_stats_md(pooled: dict) -> str:
                  "decomposition effect above, not mechanism evidence for an "
                  "on/off switch.")
         L.append("")
-        L.append("Routed signals / revise re-entries exist only in the "
-                 "multi+graph arm by construction (no checkpoints or no other "
-                 "Designer elsewhere); nonzero values there are observational "
-                 "evidence the inter-agent feedback loop fires.")
-        L.append("")
-        L.append("| Size | Arm | scenario-runs | verifier events/scen | repairs/scen | % runs with a repair | routed signals/scen | revise re-entries/scen | % runs with routing |")
-        L.append("|---|---|---|---|---|---|---|---|---|")
+        L.append("| Size | Arm | scenario-runs | verifier events/scen | repairs/scen | % runs with a repair |")
+        L.append("|---|---|---|---|---|---|")
         for e in act:
             for arm, v in (e.get("arms") or {}).items():
-                routed = v.get("routed_signals_mean")
-                revise = v.get("revise_reentries_mean")
-                pct_routed = v.get("pct_scenario_runs_with_routing")
                 L.append(f"| {e['label']} | {arm} | {v['n_scenario_runs']} | "
                          f"{v['verifier_events_mean']:.2f} | {v['repair_events_mean']:.2f} | "
-                         f"{v['pct_scenario_runs_with_repair']:.0f}% | "
-                         + ("--" if routed is None else f"{routed:.2f}") + " | "
-                         + ("--" if revise is None else f"{revise:.2f}") + " | "
-                         + ("--" if pct_routed is None else f"{pct_routed:.0f}%") + " |")
+                         f"{v['pct_scenario_runs_with_repair']:.0f}% |")
 
     return "\n".join(L) + "\n"
 

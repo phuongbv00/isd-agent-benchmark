@@ -8,6 +8,8 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Iterable, Optional
 from urllib.parse import urlparse
 
+from shared.llm.token_accounting import TokenCountingHandler
+
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 UPSTAGE_BASE_URL = "https://api.upstage.ai/v1/solar"
@@ -76,11 +78,22 @@ class LLMConfig:
     allow_dummy_api_key: bool = False
     _credential_rr: _RoundRobin = field(default_factory=_RoundRobin, init=False, repr=False)
     _endpoint_rr: _RoundRobin = field(default_factory=_RoundRobin, init=False, repr=False)
+    # This run's token/call tally (see shared/llm/token_accounting.py) —
+    # attached to every chat-model client `create_chat_model` builds off
+    # this config, so it aggregates every LLM call made with it, from any
+    # thread. Deliberately NOT re-shared by copy_with (unlike the two RR
+    # fields above): a fresh copy is how a new accounting scope begins —
+    # see `_get_agent_runner` in run_benchmark.py, which calls
+    # `copy_with()` once per agent run specifically to get a fresh one.
+    _token_counter: TokenCountingHandler = field(default_factory=TokenCountingHandler, init=False, repr=False)
 
     def copy_with(self, **updates: Any) -> "LLMConfig":
         clone = replace(self, **{k: v for k, v in updates.items() if v is not None})
         # Share the rotation state: replace() would have handed the clone fresh
-        # counters, so every copy would start over at the first entry.
+        # counters, so every copy would start over at the first entry. Round-
+        # robin position must persist across the WHOLE benchmark session, so
+        # every copy shares it; _token_counter is the opposite (see its own
+        # field comment) and is deliberately left to its fresh default here.
         clone._credential_rr = self._credential_rr
         clone._endpoint_rr = self._endpoint_rr
         return clone

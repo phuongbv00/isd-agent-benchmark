@@ -221,19 +221,9 @@ FACTORIAL_CELLS = {
 #: Judge signals (read from comparison_report.json rankings).
 FACTORIAL_JUDGE_SIGNALS = ("addie_median", "trajectory_score", "total_score")
 
-# Trajectory schema v3 (2026-08-27): one event is
-# {timestamp, agent, action, context}. ``action`` is the explicit taxonomy;
-# there is deliberately no redundant type/category field in ``context``.
-# These values are mirrored from alignmentgraph_isd.core.trajectory.
-TAXONOMY_RECOVERY_ACTIONS = frozenset({
-    "retry", "regen_empty_section", "agent_error", "llm_error", "salvage_truncated",
-    "invalid_action", "submit_rejected", "submit_invalid_final", "repeated_tool_call",
-    "commit_invalid_section", "agentic_fallback", "revision",
-})
 
-
-def _structured_activity(tr: dict) -> tuple[int, int, list[dict]]:
-    """Read validation/repair/revision activity across all trajectory schemas.
+def _structured_activity(tr: dict) -> tuple[int, int]:
+    """Read validation/repair activity across all trajectory schemas.
 
     v3 writes taxonomy actions + a context object. v2's unified list used a
     flat ``type`` discriminator, while v1 kept parallel event streams. Keep
@@ -244,14 +234,12 @@ def _structured_activity(tr: dict) -> tuple[int, int, list[dict]]:
         return (
             len(tr.get("verifier_events") or []),
             len(tr.get("repair_events") or []),
-            list(tr.get("recovery_events") or []),
         )
 
     if any("type" in event for event in events):
         return (
             sum(1 for event in events if event.get("type") == "verifier"),
             sum(1 for event in events if event.get("type") == "repair"),
-            [event for event in events if event.get("type") == "recovery"],
         )
 
     # v3: count only the structured repair record (the one that has a repaired
@@ -263,25 +251,7 @@ def _structured_activity(tr: dict) -> tuple[int, int, list[dict]]:
         and isinstance(event.get("context"), dict)
         and "violation_type" in event["context"]
     )
-    recovery = [
-        event for event in events
-        if event.get("action") in TAXONOMY_RECOVERY_ACTIONS
-        or (
-            event.get("action") == "repair"
-            and isinstance(event.get("context"), dict)
-            and "repair_rule" in event["context"]
-        )
-    ]
-    return verifier_n, repair_n, recovery
-
-
-def _revision_reentries(steps: list[dict], recovery: list[dict]) -> int:
-    """Count targeted revisions in old raw names and the v3 taxonomy."""
-    return sum(
-        1 for event in list(steps) + recovery
-        if event.get("action") == "revision"
-        or str(event.get("action", "")).startswith("revise_")
-    )
+    return verifier_n, repair_n
 
 #: Every signal the factorial layer is computed on: the three judge signals plus
 #: the whole RQ2 panel. Deliberately exhaustive — the panel's defence against
@@ -387,23 +357,11 @@ def self_validation_activity(run_dirs_by_model: dict[str, list[Path]],
     its verifier_events were a constant 1.00/scenario against multi's 7.20 —
     an instrumentation and budget gap, not a difference in how much either arm
     found to fix. Numbers from an older run dir will show that artifact here.
-
-    Also counted here, from the same files: **cross-agent routing activity**
-    (``routed_signals`` — the ``*_routed`` attempt counters the checkpoints'
-    router bumps, from ``metadata.task_attempts``; ``revise_reentries`` — the
-    ``revision`` taxonomy action, formerly the ``revise_*`` action names, the
-    routed Designer logged). Routing exists only in
-    the multi+graph arm by construction (the other three cells have no
-    checkpoints or nothing to route to), so these columns are observational
-    evidence that the inter-agent feedback loop actually fires — how often
-    one agent's validation finding redirected another agent — not an ablation
-    contrast.
     """
     out = []
     for label, dirs in run_dirs_by_model.items():
         per_arm: dict[str, dict[str, list[float]]] = {
-            a: {"verifier_events": [], "repair_events": [],
-                "routed_signals": [], "revise_reentries": []} for a in agents}
+            a: {"verifier_events": [], "repair_events": []} for a in agents}
         for run_dir in dirs:
             for _sid, scen_dir in LP.iter_scenario_dirs(run_dir):
                 for a in agents:
@@ -415,22 +373,9 @@ def self_validation_activity(run_dirs_by_model: dict[str, list[Path]],
                     except (json.JSONDecodeError, OSError):
                         continue
                     tr = doc.get("trajectory") or {}
-                    verifier_n, repair_n, recovery = _structured_activity(tr)
+                    verifier_n, repair_n = _structured_activity(tr)
                     per_arm[a]["verifier_events"].append(verifier_n)
                     per_arm[a]["repair_events"].append(repair_n)
-                    attempts = ((doc.get("metadata") or {}).get("task_attempts") or {})
-                    per_arm[a]["routed_signals"].append(float(sum(
-                        v for k, v in attempts.items()
-                        if isinstance(v, (int, float)) and str(k).endswith("_routed"))))
-                    # Judge-visible steps: `agent_steps` in runs up to 2026-08-26,
-                    # `tool_calls` args since (agent_steps was a full duplicate
-                    # and was dropped from the artifact). Old files carry both,
-                    # so prefer agent_steps to avoid double counting.
-                    steps = tr.get("agent_steps")
-                    if steps is None:
-                        steps = [c.get("args") or {} for c in tr.get("tool_calls") or []]
-                    per_arm[a]["revise_reentries"].append(
-                        float(_revision_reentries(list(steps), recovery)))
         out.append({
             "label": label,
             "arms": {
@@ -441,11 +386,6 @@ def self_validation_activity(run_dirs_by_model: dict[str, list[Path]],
                     "pct_scenario_runs_with_repair": (
                         100.0 * sum(1 for x in v["repair_events"] if x > 0)
                         / len(v["repair_events"]) if v["repair_events"] else float("nan")),
-                    "routed_signals_mean": LP._mean(v["routed_signals"]),
-                    "revise_reentries_mean": LP._mean(v["revise_reentries"]),
-                    "pct_scenario_runs_with_routing": (
-                        100.0 * sum(1 for x in v["routed_signals"] if x > 0)
-                        / len(v["routed_signals"]) if v["routed_signals"] else float("nan")),
                 }
                 for a, v in per_arm.items() if v["verifier_events"]
             },
