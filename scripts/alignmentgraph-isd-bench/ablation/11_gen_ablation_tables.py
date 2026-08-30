@@ -293,8 +293,6 @@ FACT_SIGNAL_DISPLAY = {
     "objective_assessment_similarity": "Obj$\\to$Asm sim.",
     "objective_activity_similarity": "Obj$\\to$Act sim.",
     "activity_assessment_similarity": "Act$\\to$Asm sim.",
-    "objective_evaluation_similarity": "Obj$\\to$Evl sim.",
-    "assessment_objective_similarity": "Asm$\\to$Obj sim.$^{\\dagger}$",
     "objective_cognitive_congruence": "Cognitive congruence",
     "porter_mean": "Mean Porter index",
     "webb_bloom_consistency": "Webb consistency",
@@ -306,7 +304,7 @@ FACT_SIGNAL_DISPLAY = {
 JUDGE_SIGNALS = ("addie_median", "trajectory_score", "total_score")
 SCALE_BLOCKS = (
     ("Judge rubric signals (rubric points out of 100)", True),
-    ("RQ2 panel signals (0--1)", False),
+    ("Alignment scores (0--1)", False),
 )
 
 
@@ -579,7 +577,7 @@ def gen_stats_md(pooled: dict) -> str:
     L.append("")
 
     align = pooled.get("alignment")
-    L.append("## RQ2 alignment panel (paired, every signal)")
+    L.append("## Alignment panel (paired, every score)")
     L.append("")
     if align and align.get("stats", {}).get("per_model"):
         L.append("Direction in this section: **arm − A0** (negative = removing "
@@ -587,15 +585,14 @@ def gen_stats_md(pooled: dict) -> str:
                  "flipped from the pooled JSON, which stores A0 − arm.")
         L.append("")
         L.append("A FLAT PANEL of 7 signals, no primary endpoint and no "
-                 "composite: every signal is reported win or lose. The four "
+                 "composite: every score is reported win or lose. The three "
                  "textual-correspondence signals are mean-max RECTIFIED cosine, "
                  "max(0, cos) on [0,1] — a scale choice, not a matching cutoff; "
                  "there is no similarity threshold anywhere in the protocol. "
-                 "`assessment_objective_similarity` is NON-DIRECTIONAL: a high "
-                 "value can mean \"no orphan assessment items\" or \"items "
-                 "merely restate the objectives\". The three cognitive-demand "
+                 "The three cognitive-demand "
                  "signals involve no similarity, and `porter_mean` is the MEAN "
-                 "of the three pairwise Porter indices, not a single index.")
+                 "of the three pairwise Porter indices over those same three "
+                 "triad edges, not a single index.")
         L.append("")
         L.append("Per-arm means come from the `align_descriptive` layer "
                  "(per-agent mean over per-scenario values), so their difference "
@@ -718,7 +715,7 @@ def gen_stats_md(pooled: dict) -> str:
         L.append("")
         L.append("Signals in this section are on two scales: `addie_median`, "
                  "`trajectory_score` and `total_score` are rubric points out of "
-                 "100; the 7 RQ2 panel signals are on [0,1]. Magnitudes are not "
+                 "100; the 7 alignment scores are on [0,1]. Magnitudes are not "
                  "comparable across the two groups.")
         for sig, blk in fact["signals"].items():
             L.append("")

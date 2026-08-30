@@ -21,20 +21,24 @@ comparison — win or lose — so there is no selective reporting. The panel
 spans **two mechanically independent instrument families**, each with its own
 sensitivity axis, so that no single family carries the construct on its own:
 
-Family A — *textual correspondence* (measured by the encoder):
+The panel is :data:`PANEL_SIGNALS`, which is the single source of truth for
+its own size — prose that repeats a count goes stale the moment a signal moves,
+so nothing here states one.
+
+Family A — *textual correspondence* (measured by the encoder). Exactly the
+three edges of the constructive-alignment triad (Biggs), each mirroring a core
+relation of the harness graph:
 
 - **objective_assessment_similarity** — mean over learning objectives of the
   maximum rectified cosine to any assessment item; the ``measures`` leg of the
   paper's aligned(o) predicate, the relation at the heart of constructive
-  alignment (Biggs).
-- **objective_activity_similarity** / **objective_evaluation_similarity** —
-  the same mean-max form against activities / evaluation-phase texts (the
-  ``supports`` / ``evaluates`` legs).
-- **assessment_objective_similarity** — the reverse direction (mean over
-  assessment items of the max cosine to any objective): are there orphan
-  items? Direction is deliberately NOT one-way-good — a very high value can
-  mean "no wasted items" or "items merely restate the objectives" — so it is
-  read as a diagnostic, not counted as a leg won.
+  alignment (C2 ``assessed_by``).
+- **objective_activity_similarity** — the same mean-max form against
+  activities: the ``supports`` leg (C3 ``practiced_by``).
+- **activity_assessment_similarity** — the third edge, mean over activities of
+  the max rectified cosine to any assessment item (C4 ``prepares_for``). It
+  does NOT involve objectives, so it stays defined on outputs whose objectives
+  failed to parse.
 
 Family B — *cognitive demand* (measured by the Bloom classifier, no
 similarity involved):
@@ -44,8 +48,9 @@ similarity involved):
   (argmax, no threshold), over objectives with both levels classifiable.
 - **Porter Alignment Index** (Porter 2002; Fulmer 2011)
   ``P = 1 - 0.5 * sum(|X_ij - Y_ij|)`` between two normalized
-  content-topic x Bloom-level distribution matrices, for the pairs
-  objectives<->assessment, <->activities, <->evaluation.
+  content-topic x Bloom-level distribution matrices, over the SAME three
+  triad edges family A measures (see :data:`PORTER_PAIRS`), so the two
+  families differ by instrument and by nothing else.
 - **webb_bloom_consistency** (Webb 1997/1999), item-centric.
 
 Naming rule: a signal is named after what it computes. A metric name is never
@@ -75,7 +80,7 @@ Pluggable pieces:
   never downloads), agreeing with the released expert labels at kappa 0.926 on
   a held-out split. :class:`LexiconBloomClassifier` (English Bloom verb
   lexicon, rule-based, offline, every level assignment traceable to Anderson &
-  Krathwohl, kappa 0.650) is the **sensitivity arm**. Family B feeds 3 of the 7
+  Krathwohl, kappa 0.650) is the **sensitivity arm**. Family B feeds three of the
   panel signals, so it needs an independence check exactly as family A does,
   and a rule instrument derived from the taxonomy is the strongest possible
   check on a model trained from labelled data: the two agree at only kappa
@@ -150,6 +155,11 @@ class BloomClassifier(Protocol):
     name: str
 
     def classify(self, text: str) -> Optional[int]:  # pragma: no cover - protocol
+        ...
+
+    def classify_many(  # pragma: no cover - protocol
+        self, texts: Sequence[str]
+    ) -> list[Optional[int]]:
         ...
 
 
@@ -241,6 +251,15 @@ _NOUN_CONTEXT = re.compile(
     re.IGNORECASE,
 )
 
+# ``of`` is the one determiner-position word that also precedes a GERUND, where
+# the verb is the performed action rather than a noun: "be able/capable of
+# analyzing ...", "consists of evaluating ...". Suppressing those cost the
+# objective its level entirely, and "be able to"/"capable of" phrasing is
+# idiomatic in objective writing, so the loss was systematic rather than
+# incidental. An -ing form after ``of`` is verbal; any other form after ``of``
+# ("a set of tests", "the results of the design") stays nominal and suppressed.
+_OF_CONTEXT = re.compile(r"\bof\s+$", re.IGNORECASE)
+
 # Question-form fallbacks (used only when no verb matched): plain
 # recall-style interrogatives are treated as Remember-level items.
 _QUESTION_FALLBACKS: list[tuple[re.Pattern[str], int]] = [
@@ -322,13 +341,26 @@ class LexiconBloomClassifier:
             pattern = re.compile(rf"\b(?:{alternation})\b", re.IGNORECASE)
             self._patterns.append((pattern, level))
 
+    @staticmethod
+    def _in_noun_position(text: str, match: re.Match[str]) -> bool:
+        # Only the immediate left context matters, and the patterns are
+        # ``$``-anchored, so bound the search rather than slicing a prefix
+        # copy per match.
+        start = match.start()
+        left_from = max(0, start - 24)
+        if not _NOUN_CONTEXT.search(text, left_from, start):
+            return False
+        if _OF_CONTEXT.search(text, left_from, start):
+            return not match.group(0).lower().endswith("ing")
+        return True
+
     def _verbal_matches(self, text: str) -> list[tuple[int, int]]:
         """(offset, level) of every match in non-noun position, in text order."""
         found = [
             (m.start(), level)
             for pattern, level in self._patterns
             for m in pattern.finditer(text)
-            if not _NOUN_CONTEXT.search(text[: m.start()])
+            if not self._in_noun_position(text, m)
         ]
         return sorted(found)
 
@@ -783,6 +815,29 @@ def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
     return max(0.0, min(1.0, dot / (na * nb)))
 
 
+def _l2_normalize(vectors: list[list[float]]) -> list[list[float]]:
+    """Unit-length copies, so cosine reduces to a dot product.
+
+    Every similarity matrix here compares one set against another, so an
+    unnormalized :func:`_cosine` re-derives each vector's norm once per element
+    of the opposing set — with 4096-dim vectors and four matrices per scenario
+    that dominated scoring time. Normalizing once up front is the same
+    arithmetic with the redundant passes removed. A zero vector stays zero, so
+    :func:`_cosine_unit` still floors it at 0.0.
+    """
+    out: list[list[float]] = []
+    for vec in vectors:
+        norm = math.sqrt(sum(x * x for x in vec))
+        out.append([x / norm for x in vec] if norm else list(vec))
+    return out
+
+
+def _cosine_unit(a: Sequence[float], b: Sequence[float]) -> float:
+    """Rectified cosine for vectors already unit-normalized by
+    :func:`_l2_normalize` — identical semantics to :func:`_cosine`, one pass."""
+    return max(0.0, min(1.0, sum(x * y for x, y in zip(a, b))))
+
+
 # ---------------------------------------------------------------------------
 # Text extraction from ADDIE outputs (schema + observed real-run variants)
 # ---------------------------------------------------------------------------
@@ -944,62 +999,6 @@ def extract_activities(addie_output: dict) -> list[str]:
     return unique
 
 
-def extract_evaluation_texts(addie_output: dict) -> list[str]:
-    """Evaluation-phase instrument texts (rubric, feedback, Kirkpatrick...)."""
-    evaluation = addie_output.get("evaluation") or {}
-    texts: list[str] = []
-    texts += _texts_of(evaluation.get("quiz_items"), "question")
-    rubric = evaluation.get("rubric")
-    if isinstance(rubric, dict):
-        texts += _texts_of(rubric.get("criteria"))
-    feedback = evaluation.get("feedback_plan")
-    if isinstance(feedback, str) and feedback.strip():
-        texts.append(feedback.strip())
-    program = evaluation.get("program_evaluation")
-    if isinstance(program, dict):
-        texts += _texts_of(program.get("kirkpatrick_levels"), "name", "method")
-    formative = evaluation.get("formative")
-    if isinstance(formative, dict):
-        data_collection = formative.get("data_collection")
-        if isinstance(data_collection, dict):
-            texts += _texts_of(data_collection.get("methods"))
-        elif isinstance(data_collection, list):
-            texts += _texts_of(data_collection)
-    summative = evaluation.get("summative")
-    if isinstance(summative, dict):
-        texts += _texts_of(summative.get("assessment_tools"), "question")
-    pilot = evaluation.get("pilot_data_collection")
-    if isinstance(pilot, dict):
-        # Observed baseline layout: evaluation may consist solely of a pilot
-        # data-collection plan. Keep instrument/method text (the evidence
-        # actually used to evaluate learning) and avoid administrative fields
-        # such as storage/retention metadata.
-        texts += _texts_of(
-            pilot.get("collection_methods"),
-            "method",
-            "timing",
-            "tool",
-        )
-        texts += _texts_of(pilot.get("instruments"), "name", "type")
-        data_types = pilot.get("data_types")
-        if isinstance(data_types, dict):
-            for items in data_types.values():
-                texts += _texts_of(items, "type", "purpose", "source")
-        timeline = pilot.get("timeline")
-        if isinstance(timeline, list):
-            for stage in timeline:
-                if not isinstance(stage, dict):
-                    continue
-                texts += _texts_of(stage.get("activities"))
-    seen: set[str] = set()
-    unique = []
-    for t in texts:
-        if t not in seen:
-            seen.add(t)
-            unique.append(t)
-    return unique
-
-
 def extract_topics(scenario: Optional[dict]) -> list[str]:
     """Brief-anchored content-topic taxonomy from the scenario itself.
 
@@ -1061,26 +1060,19 @@ def extract_declared_links(addie_output: dict) -> list[tuple[str, str]]:
 class AlignmentScore:
     """The panel of alignment signals; every numeric value lies in [0, 1].
 
-    **No primary endpoint** — the seven signals are a flat panel, each
-    answering a different question, all reported for every comparison. The
+    **No primary endpoint** — :data:`PANEL_SIGNALS` is a flat panel, each
+    signal answering a different question, all reported for every comparison. The
     protocol uses **no similarity threshold anywhere**: the correspondence
-    between an objective and the assessments/activities/evaluation is a
+    between an objective and the assessments/activities is a
     mean-max cosine, not a thresholded rate. There is no composite scalar.
     """
 
     # --- Family A: textual correspondence (encoder) ---
-    # Mean over objectives of the max rectified cosine to any assessment item:
-    # the ``measures`` leg of aligned(o), the relation at the heart of
-    # constructive alignment (Biggs).
-    objective_assessment_similarity: Optional[float] = None
-    # The other two legs of aligned(o), same mean-max form.
-    objective_activity_similarity: Optional[float] = None
-    objective_evaluation_similarity: Optional[float] = None
-    # C4: activity prepares_for assessment -- the third edge of the CA triad.
-    activity_assessment_similarity: Optional[float] = None
-    # Reverse direction (orphan-item diagnostic). Direction is deliberately
-    # not one-way-good, and it is NOT a panel signal -- see PANEL_SIGNALS.
-    assessment_objective_similarity: Optional[float] = None
+    # The three edges of the constructive-alignment triad (Biggs), each the
+    # mean over the left set of the max rectified cosine into the right set.
+    objective_assessment_similarity: Optional[float] = None   # C2 assessed_by
+    objective_activity_similarity: Optional[float] = None     # C3 practiced_by
+    activity_assessment_similarity: Optional[float] = None    # C4 prepares_for
     # --- Family B: cognitive demand (Bloom classifier, no similarity) ---
     objective_cognitive_congruence: Optional[float] = None
     porter: dict[str, Optional[float]] = field(default_factory=dict)
@@ -1094,9 +1086,7 @@ class AlignmentScore:
         return {
             "objective_assessment_similarity": self.objective_assessment_similarity,
             "objective_activity_similarity": self.objective_activity_similarity,
-            "objective_evaluation_similarity": self.objective_evaluation_similarity,
             "activity_assessment_similarity": self.activity_assessment_similarity,
-            "assessment_objective_similarity": self.assessment_objective_similarity,
             "objective_cognitive_congruence": self.objective_cognitive_congruence,
             "porter": self.porter,
             "porter_mean": self.porter_mean,
@@ -1116,7 +1106,6 @@ class AlignmentScore:
 OBJECTIVE_ENDPOINTS = (
     "objective_assessment_similarity",
     "objective_activity_similarity",
-    "objective_evaluation_similarity",
     "objective_cognitive_congruence",
 )
 
@@ -1138,27 +1127,21 @@ PANEL_SIGNALS: tuple[tuple[str, str], ...] = (
     ("webb_bloom_consistency", "cognitive"),
 )
 
-#: Computed and stored per scenario, but deliberately NOT panel endpoints.
+#: The three edges of the constructive-alignment triad, as
+#: ``(key, left set, right set)``. Porter compares the topic x Bloom
+#: distribution of the left set against the right one.
 #:
-#: ``objective_evaluation_similarity`` was the one family-A signal with no
-#: corresponding core relation, and after the harness dropped ``evaluation`` as
-#: a node type it measured text the graph does not model at all.
-#: ``assessment_objective_similarity`` is the reverse direction, whose value is
-#: not one-way-good; the orphan/filler-item concern it covered is now enforced
-#: on the generation side by the harness's own plan-coverage check.
-#: Both remain in ``alignment_scores.json`` so nothing that reads those files
-#: breaks and the numbers stay recoverable.
-NON_PANEL_DIAGNOSTICS: tuple[str, ...] = (
-    "objective_evaluation_similarity",
-    "assessment_objective_similarity",
+#: Family B measures the SAME three edges family A does. It used to hold every
+#: set against ``objectives``, which predated C4 joining the panel and left the
+#: activity<->assessment edge measured by textual correspondence alone while
+#: the other two edges were measured by both instrument families. Mirroring the
+#: edges makes the two families differ by INSTRUMENT and by nothing else, which
+#: is the whole point of having two of them.
+PORTER_PAIRS: tuple[tuple[str, str, str], ...] = (
+    ("objective_assessment", "objectives", "assessment"),   # C2 assessed_by
+    ("objective_activity", "objectives", "activities"),     # C3 practiced_by
+    ("activity_assessment", "activities", "assessment"),    # C4 prepares_for
 )
-
-#: Panel signals whose direction is not one-way-good, so they are read as
-#: diagnostics and never counted as "legs won".
-# Empty by construction now: the one non-directional signal was moved out of
-# the panel (see NON_PANEL_DIAGNOSTICS), so every panel signal is one-way-good
-# and the "legs won" denominator equals the panel size.
-NON_DIRECTIONAL_SIGNALS: frozenset[str] = frozenset()
 
 
 def objective_endpoints(
@@ -1179,17 +1162,22 @@ def objective_endpoints(
     n = len(obj_details)
     out: dict[str, Optional[float]] = dict.fromkeys(OBJECTIVE_ENDPOINTS, None)
     if n == 0:
-        out["objective_assessment_similarity"] = 0.0
-        out["objective_activity_similarity"] = 0.0
-        out["objective_evaluation_similarity"] = 0.0
+        # Every objective-side endpoint floors at 0.0, congruence included.
+        # Congruence is "share of objectives whose best item is at or above
+        # their level" over an empty set of objectives -- an agent failure,
+        # not a classifier limitation, so it scores like the similarity legs
+        # rather than dropping out of the pooled denominator. The undefined
+        # case below (objectives exist, none Bloom-classifiable on both sides)
+        # is the instrument limitation and stays None.
+        for endpoint in OBJECTIVE_ENDPOINTS:
+            out[endpoint] = 0.0
+        notes.append("objective-level endpoints = 0.0: no objectives found")
         return out, notes
     for endpoint, signal, count_key, label in (
         ("objective_assessment_similarity", "best_similarity",
          "assessment", "assessment items"),
         ("objective_activity_similarity", "best_activity_similarity",
          "activities", "activities"),
-        ("objective_evaluation_similarity", "best_evaluation_similarity",
-         "evaluation", "evaluation texts"),
     ):
         if counts.get(count_key, 0):
             out[endpoint] = sum((d.get(signal) or 0.0) for d in obj_details) / n
@@ -1216,12 +1204,17 @@ def reaggregate(score_dict: dict[str, Any]) -> dict[str, Any]:
 
     ``score_dict`` is one agent's :meth:`AlignmentScore.to_dict` payload from
     an ``alignment_scores.json`` file. Reads its ``details.objectives`` +
-    ``counts`` and overwrites the four :data:`OBJECTIVE_ENDPOINTS` — no
-    encoder, no Bloom call, no network. The remaining panel signals
-    (``porter_mean``, ``webb_bloom_consistency``,
-    ``assessment_objective_similarity``) are left untouched: they depend on
-    full matrices not stored per objective, and are unaffected by
-    objective-level metric-definition changes.
+    ``counts`` and overwrites the :data:`OBJECTIVE_ENDPOINTS` — no encoder, no
+    Bloom call, no network.
+
+    The other three panel signals — ``activity_assessment_similarity``,
+    ``porter_mean`` and ``webb_bloom_consistency`` — are left untouched,
+    because they depend on full matrices that are not stored per objective.
+    Note the consequence for ``activity_assessment_similarity`` in particular:
+    it IS a panel signal, so an objective-level definition change applied
+    through here leaves one panel signal on the old definition. When a change
+    touches the panel rather than only the objective-level endpoints, re-score
+    instead of re-aggregating.
     """
     obj_details = (score_dict.get("details") or {}).get("objectives") or []
     counts = score_dict.get("counts") or {}
@@ -1248,12 +1241,11 @@ class AlignmentEvaluator:
       cosine similarity to any assessment item — the ``measures`` leg of
       aligned(o), the relation at the heart of constructive alignment
       (Biggs). Continuous, threshold-free.
-    - ``objective_activity_similarity`` / ``objective_evaluation_similarity``:
-      the same mean-max form against activities / evaluation-phase texts (the
-      ``supports`` / ``evaluates`` legs).
-    - ``assessment_objective_similarity``: the reverse direction (mean over
-      assessment items of the max cosine to any objective) — an orphan-item
-      diagnostic, not a one-way-good score.
+    - ``objective_activity_similarity``: the same mean-max form against
+      activities — the ``supports`` leg.
+    - ``activity_assessment_similarity``: the third triad edge, mean over
+      activities of the max cosine to any assessment item. Independent of
+      objectives, so it survives an output whose objectives failed to parse.
 
     Family B — cognitive demand (the Bloom classifier, no similarity):
 
@@ -1267,20 +1259,25 @@ class AlignmentEvaluator:
 
     Conventions for degenerate inputs (all values stay in [0,1]):
 
-    - No objectives: the family-A objective signals are 0.0; congruence and
-      the family-B indices are undefined.
-    - Objectives present but a counterpart set empty: that signal and the
-      Porter index for the pair are 0.0; ``assessment_objective_similarity``
-      is undefined.
-    - Bloom-dependent values use only texts the classifier can label; when
-      nothing qualifies they are undefined with a note.
+    An ABSENT set and an UNCLASSIFIABLE set are different events and never
+    share a value:
+
+    - A set the agent did not produce is an AGENT failure and scores the 0.0
+      floor, with a note. That covers no objectives, no assessment items and
+      no activities, and it applies to every signal referencing the missing
+      set — the Bloom-derived ones included. Leaving them undefined let the
+      worst outputs drop out of the pooled denominator instead of counting
+      against the agent that produced them.
+    - A set that exists but carries no Bloom-classifiable text is an
+      INSTRUMENT limitation and stays undefined, with a note. This is the
+      only case that legitimately leaves a denominator.
+    - ``activity_assessment_similarity`` never depends on objectives, so it
+      is scored whenever activities and assessment items both exist.
 
     ``details`` additionally carries per-objective best-match info (audit
     trail) and ``validation`` (declared-link agreement — validity evidence).
     There is NO composite scalar and NO threshold.
     """
-
-    PAIRS = ("assessment", "activities", "evaluation")
 
     def __init__(
         self,
@@ -1300,32 +1297,32 @@ class AlignmentEvaluator:
         objectives = extract_objectives(addie_output)
         assessments = extract_assessment_items(addie_output)
         activities = extract_activities(addie_output)
-        evaluations = extract_evaluation_texts(addie_output)
         topics = extract_topics(scenario)
 
         score.counts = {
             "objectives": len(objectives),
             "assessment": len(assessments),
             "activities": len(activities),
-            "evaluation": len(evaluations),
             "topics": len(topics),
         }
 
         if not objectives:
+            # NOT an early return. C4 (activity<->assessment) does not involve
+            # objectives at all, and Porter/Webb still describe the counterpart
+            # sets, so bailing out here used to leave four of the six panel
+            # signals as None on exactly the outputs that failed hardest --
+            # which then dropped out of the pooled means instead of scoring
+            # against the agent that produced them. Fall through; every block
+            # below is guarded for an empty objective set.
             score.notes.append(
                 "no learning objectives found; objective-level signals = 0.0"
             )
-            score.objective_assessment_similarity = 0.0
-            score.objective_activity_similarity = 0.0
-            score.objective_evaluation_similarity = 0.0
-            return score
 
         objective_texts = [o["text"] for o in objectives]
         sets: dict[str, list[str]] = {
             "objectives": objective_texts,
             "assessment": assessments,
             "activities": activities,
-            "evaluation": evaluations,
         }
 
         # One joint encoding call so all vectors share a space (required by
@@ -1337,7 +1334,9 @@ class AlignmentEvaluator:
             offsets[name] = (cursor, cursor + len(texts))
             all_texts += texts
             cursor += len(texts)
-        vectors = self.encoder.encode(all_texts)
+        # Normalize once here so every similarity below is a bare dot product;
+        # see :func:`_l2_normalize`.
+        vectors = _l2_normalize(self.encoder.encode(all_texts))
         topic_vecs = vectors[: len(topics)]
         set_vecs = {
             name: vectors[start:end] for name, (start, end) in offsets.items()
@@ -1352,37 +1351,43 @@ class AlignmentEvaluator:
             for name, vecs in set_vecs.items()
         }
 
-        # Porter alignment index per pair.
-        obj_matrix = self._porter_matrix(
-            topic_ids["objectives"], levels["objectives"], len(topics)
-        )
-        for pair in self.PAIRS:
-            matrix = self._porter_matrix(topic_ids[pair], levels[pair], len(topics))
-            if obj_matrix is None or matrix is None:
-                if sets[pair]:
-                    score.porter[pair] = None
-                    score.notes.append(
-                        f"porter[{pair}] undefined: no Bloom-classifiable text"
-                    )
-                else:
-                    score.porter[pair] = 0.0
-                    score.notes.append(f"porter[{pair}] = 0.0: '{pair}' set is empty")
-                continue
-            score.porter[pair] = self._porter_index(obj_matrix, matrix)
+        # Porter alignment index over the same three triad edges family A
+        # measures (see PORTER_PAIRS).
+        matrices = {
+            name: self._porter_matrix(topic_ids[name], levels[name], len(topics))
+            for name in sets
+        }
+        for key, left, right in PORTER_PAIRS:
+            # An ABSENT set and an UNCLASSIFIABLE set are different events and
+            # must not collapse to the same value. A set the agent never
+            # produced is an agent failure and scores the 0.0 floor, exactly as
+            # the family-A legs do for the same input; a set that exists but
+            # carries no Bloom-classifiable verb is an instrument limitation
+            # and is genuinely undefined. Conflating them let a total parse
+            # failure leave the pooled mean instead of scoring against it.
+            missing = [name for name in (left, right) if not sets[name]]
+            if missing:
+                score.porter[key] = 0.0
+                score.notes.append(
+                    f"porter[{key}] = 0.0: no {' and no '.join(missing)} found")
+            elif matrices[left] is None or matrices[right] is None:
+                score.porter[key] = None
+                score.notes.append(
+                    f"porter[{key}] undefined: no Bloom-classifiable text"
+                )
+            else:
+                score.porter[key] = self._porter_index(
+                    matrices[left], matrices[right])
         defined = [v for v in score.porter.values() if v is not None]
         score.porter_mean = sum(defined) / len(defined) if defined else None
 
         # Similarity between objectives and each counterpart set.
         sim = [
-            [_cosine(ov, av) for av in set_vecs["assessment"]]
+            [_cosine_unit(ov, av) for av in set_vecs["assessment"]]
             for ov in set_vecs["objectives"]
         ]
         sim_act = [
-            [_cosine(ov, av) for av in set_vecs["activities"]]
-            for ov in set_vecs["objectives"]
-        ]
-        sim_eval = [
-            [_cosine(ov, ev) for ev in set_vecs["evaluation"]]
+            [_cosine_unit(ov, av) for av in set_vecs["activities"]]
             for ov in set_vecs["objectives"]
         ]
 
@@ -1398,32 +1403,30 @@ class AlignmentEvaluator:
         # objective-side legs, so all three edges are measured the same way.
         if activities and assessments:
             sim_act_asm = [
-                [_cosine(av, mv) for mv in set_vecs["assessment"]]
+                [_cosine_unit(av, mv) for mv in set_vecs["assessment"]]
                 for av in set_vecs["activities"]
             ]
             per_activity_max = [max(row) for row in sim_act_asm if row]
             if per_activity_max:
                 score.activity_assessment_similarity = (
                     sum(per_activity_max) / len(per_activity_max))
-        elif activities or assessments:
+        else:
+            # Either side empty -- including BOTH empty, which used to fall
+            # through every branch and leave the signal undefined, so the
+            # emptiest possible output was the one excluded from the mean
+            # rather than scored 0.0. Same convention as porter below.
             score.activity_assessment_similarity = 0.0
+            missing = " and ".join(
+                name for name, present in
+                (("activities", activities), ("assessment items", assessments))
+                if not present
+            )
             score.notes.append(
-                "activity_assessment_similarity = 0.0: one side of the "
-                "activity/assessment pair is empty")
-
-        # Reverse direction (does each assessment item bind to some
-        # objective?). Threshold-free, and read as a diagnostic: a high value
-        # can mean "no orphan items" or "items restate the objectives".
-        # Computed and stored, but NOT a panel signal -- see PANEL_SIGNALS.
-        if assessments:
-            per_item_max = [
-                max(sim[i][j] for i in range(len(sim))) for j in range(len(assessments))
-            ]
-            score.assessment_objective_similarity = sum(per_item_max) / len(per_item_max)
+                f"activity_assessment_similarity = 0.0: no {missing} found")
 
         obj_details = self._objective_details(
-            objectives, assessments, activities, evaluations, sim, sim_act,
-            sim_eval, levels, topic_ids["objectives"], topics,
+            objectives, assessments, activities, sim, sim_act,
+            levels, topic_ids["objectives"], topics,
         )
         score.details["objectives"] = obj_details
         score.details["sanity"] = self._sanity_report(
@@ -1448,7 +1451,7 @@ class AlignmentEvaluator:
 
     @staticmethod
     def _argmax_topic(vec: Sequence[float], topic_vecs: list[list[float]]) -> int:
-        sims = [_cosine(vec, tv) for tv in topic_vecs]
+        sims = [_cosine_unit(vec, tv) for tv in topic_vecs]
         return max(range(len(sims)), key=lambda i: sims[i]) if sims else 0
 
     @staticmethod
@@ -1486,6 +1489,13 @@ class AlignmentEvaluator:
         if not item_levels:
             notes.append("webb_bloom_consistency = 0.0: no assessment items found")
             return 0.0
+        if not objective_levels:
+            # No objectives at all: an agent failure, scored at the floor like
+            # every other absent set. Distinct from the next branch, where
+            # objectives exist but the classifier cannot label any of them --
+            # that one is an instrument limitation and stays undefined.
+            notes.append("webb_bloom_consistency = 0.0: no objectives found")
+            return 0.0
         classifiable_objs = [
             i for i, level in enumerate(objective_levels) if level is not None
         ]
@@ -1499,6 +1509,10 @@ class AlignmentEvaluator:
         for j, item_level in enumerate(item_levels):
             if item_level is None:
                 continue
+            # Argmax over CLASSIFIABLE objectives only — the opposite
+            # convention to the congruence leg, which argmaxes over everything
+            # and then abstains. Both are deliberate; see the comment in
+            # _objective_details and docs/rq2_protocol.md section 4.
             target = max(classifiable_objs, key=lambda i: sim[i][j])
             counted += 1
             if item_level >= (objective_levels[target] or 0):
@@ -1515,10 +1529,8 @@ class AlignmentEvaluator:
         objectives: list[dict[str, Any]],
         assessments: list[str],
         activities: list[str],
-        evaluations: list[str],
         sim: list[list[float]],
         sim_act: list[list[float]],
-        sim_eval: list[list[float]],
         levels: dict[str, list[Optional[int]]],
         objective_topics: list[int],
         topics: list[str],
@@ -1531,16 +1543,25 @@ class AlignmentEvaluator:
             best_a = (
                 max(range(len(row_act)), key=lambda j: row_act[j]) if row_act else None
             )
-            row_ev = sim_eval[i] if i < len(sim_eval) else []
-            best_e = (
-                max(range(len(row_ev)), key=lambda j: row_ev[j]) if row_ev else None
-            )
             obj_level = levels["objectives"][i]
             best_item_level = (
                 levels["assessment"][best_j] if best_j is not None else None
             )
             # Congruence uses the argmax-closest assessment item (no
             # threshold); undefined when either level is unclassifiable.
+            #
+            # Note the argmax runs over ALL items and then abstains if the
+            # winner is unclassifiable, whereas _bloom_consistency restricts
+            # its argmax to classifiable candidates. That asymmetry is
+            # deliberate, not an oversight: the closest item is the one that
+            # REPRESENTS this objective, so failing to grade it means we
+            # cannot judge the objective — substituting the next-closest
+            # gradeable item would score a different item than the one the
+            # objective is actually assessed by. The cost is that this
+            # denominator shrinks with the arm's coverage (never for the
+            # transformer, 12.0% of objectives for the lexicon, measured over
+            # the r1 rung). Declared in docs/rq2_protocol.md section 4, same
+            # as the coverage gap between the two arms.
             congruent = (
                 best_item_level >= obj_level
                 if obj_level is not None and best_item_level is not None
@@ -1560,12 +1581,6 @@ class AlignmentEvaluator:
                     ),
                     "best_activity_similarity": (
                         round(row_act[best_a], 4) if best_a is not None else None
-                    ),
-                    "best_evaluation": (
-                        evaluations[best_e] if best_e is not None else None
-                    ),
-                    "best_evaluation_similarity": (
-                        round(row_ev[best_e], 4) if best_e is not None else None
                     ),
                     "cognitively_congruent": congruent,
                 }

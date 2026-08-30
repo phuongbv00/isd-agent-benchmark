@@ -310,9 +310,6 @@ def rollup_panel(lad):
             L.append(f"| `{signal}` | `{baseline}` | {pos}/{len(rows)} | {neg}/{len(rows)} | "
                      f"{ns}/{len(rows)} | {rng} |")
     L.append("")
-    L.append("Reminder: `assessment_objective_similarity` is NON-DIRECTIONAL - a high value can "
-             "mean 'no orphan assessment items' or 'items merely restate the objectives'. Do not "
-             "read its sign as quality without saying which reading you mean.\n")
     return L
 
 

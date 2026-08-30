@@ -41,7 +41,6 @@ sys.path.insert(0, str(REPO_ROOT / "evaluator" / "src"))
 from isd_evaluator.metrics.alignment import (  # noqa: E402
     extract_activities,
     extract_assessment_items,
-    extract_evaluation_texts,
     extract_objectives,
 )
 
@@ -54,13 +53,13 @@ AGENTS = ["eduplanner", "baseline", "react-isd", "addie-agent",
 STUB_MARKS = ['"미지정"', '"problem_definition": null']
 EXPECTED_SCENARIOS = 90
 
-#: Every text the alignment metric consumes — evaluation included, since
-#: objective_evaluation_similarity is a scored panel signal too.
+#: Every text the alignment metric consumes. Evaluation-phase text is NOT in
+#: it: the panel measures the three edges of the constructive-alignment triad
+#: and nothing else, so no signal reads that set.
 SCORED_FIELDS = [
     ("objectives", extract_objectives),
     ("assessments", extract_assessment_items),
     ("activities", extract_activities),
-    ("evaluation", extract_evaluation_texts),
 ]
 
 

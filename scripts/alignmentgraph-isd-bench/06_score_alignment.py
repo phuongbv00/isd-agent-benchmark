@@ -293,6 +293,22 @@ def resolve_arms(args) -> list[tuple[str, str]]:
             f"unknown bloom preset(s) {unknown}; choose from {sorted(BLOOM_PRESETS)}"
         )
 
+    # The star design deviates from the primary on ONE axis per arm. Asking
+    # explicitly for a non-primary encoder AND a non-primary Bloom arm is
+    # therefore not a request this can honour: it used to be rewritten into two
+    # unrelated star arms, so the user got neither the cross they asked for nor
+    # any warning that the label on the resulting artifact meant something else.
+    # --all-arms is the sweep itself and is exempt: it means "every star arm".
+    if not args.all_arms:
+        off_enc = [k for k in enc_keys if k != PRIMARY_ENCODER]
+        off_bloom = [k for k in bloom_keys if k != PRIMARY_BLOOM]
+        if off_enc and off_bloom:
+            raise SystemExit(
+                f"cannot deviate on both axes at once: encoder {off_enc} with "
+                f"bloom {off_bloom}. The sweep is a star, not a grid — run one "
+                f"axis per invocation (or --all-arms for the whole star)."
+            )
+
     if not enc_keys and not bloom_keys:
         return [(PRIMARY_ENCODER, PRIMARY_BLOOM)]
     arms = [(key, PRIMARY_BLOOM) for key in enc_keys]
@@ -568,8 +584,16 @@ def reusable_scores_payload(
     """Load a complete compatible artifact, or explain why it needs re-score.
 
     A mere ``Path.exists()`` is not a safe resume marker: a killed process can
-    leave truncated JSON, and a previous ``--agents`` subset can leave a valid
-    but incomplete artifact. Both cases are repaired automatically.
+    leave truncated JSON, a previous ``--agents`` subset can leave a valid but
+    incomplete artifact, and an artifact written before a panel change can be
+    complete on every OTHER axis while missing a signal outright. All three are
+    repaired automatically.
+
+    The panel-key check is the one that is easy to leave out and expensive to
+    omit: encoder, revision, Bloom arm and agent roster can all still match
+    exactly while the scores predate a signal joining PANEL_SIGNALS, so the
+    artifact reads as complete, is reused verbatim, and the new signal is
+    absent from the pooled panel with nothing recording the mixed vintage.
     """
     try:
         payload = json.loads(scores_path.read_text(encoding="utf-8"))
@@ -603,6 +627,16 @@ def reusable_scores_payload(
         absent = sorted(expected_agents - recorded_agents)
         extra = sorted(recorded_agents - expected_agents)
         return None, f"agent roster mismatch: absent={absent}, extra={extra}"
+    required = set(COMPONENTS)
+    for agent_id, score in agents.items():
+        if not isinstance(score, dict):
+            return None, f"cached score for {agent_id!r} is not an object"
+        stale = sorted(required - set(score))
+        if stale:
+            return None, (
+                f"cached scores predate the current panel "
+                f"({agent_id!r} missing {stale})"
+            )
     return payload, None
 
 
@@ -620,13 +654,23 @@ def write_json_atomic(path: Path, payload: dict) -> None:
 
 
 def summarize(per_agent: dict[str, list[dict]]) -> list[tuple[str, int, dict[str, float | None]]]:
+    """Per-agent means, each with the n it was actually computed over.
+
+    ``means[c]`` filters out scenarios where signal ``c`` is undefined, so the
+    row-level n (scenarios scored) is NOT the denominator of every cell. The
+    per-component count is carried in ``means[c + "_n"]`` and printed, because
+    a mean over a partial set that reports the full n reads as complete.
+
+    """
+    reported = list(COMPONENTS)
     rows = []
     for agent_id in sorted(per_agent):
         entries = per_agent[agent_id]
         means: dict[str, float | None] = {}
-        for component in COMPONENTS:
+        for component in reported:
             values = [e[component] for e in entries if e.get(component) is not None]
             means[component] = statistics.fmean(values) if values else None
+            means[f"{component}_n"] = len(values)
         sanity_values = [
             e["details"]["sanity"]["bloom_vs_declared_agreement"]
             for e in entries
@@ -649,13 +693,10 @@ def summarize(per_agent: dict[str, list[dict]]) -> list[tuple[str, int, dict[str
 #: (COMPONENTS key or extra, console column label) — one entry per column.
 #: Family A first, then family B, then the validity-evidence extra.
 _TABLE_COLUMNS = [
-    ("objective_assessment_similarity", "AsmSim"),
-    ("objective_activity_similarity", "ActSim"),
+    ("objective_assessment_similarity", "ObjAsmSim"),
+    ("objective_activity_similarity", "ObjActSim"),
     ("activity_assessment_similarity", "ActAsmSim"),
-    # Still emitted, no longer panel endpoints.
-    ("objective_evaluation_similarity", "EvlSim"),
-    ("assessment_objective_similarity", "RevSim"),
-    ("objective_cognitive_congruence", "CogCon"),
+    ("objective_cognitive_congruence", "ObjCogCon"),
     ("porter_mean", "Porter"),
     ("webb_bloom_consistency", "BloomC"),
     ("sanity_agreement", "Sanity"),
@@ -663,31 +704,48 @@ _TABLE_COLUMNS = [
 
 
 def print_table(rows: list[tuple[str, int, dict[str, float | None]]]) -> None:
+    """One line per agent. A cell reads ``mean`` when every scored scenario
+    defined that signal, and ``mean/n`` when fewer did — so a thinner
+    denominator is visible in the cell rather than hidden behind the row n."""
+
     def fmt(value: float | None) -> str:
         return f"{value:.3f}" if value is not None else "  -  "
 
     header = f"{'agent':30s} {'n':>3s} " + " ".join(
-        f"{label:>6s}" for _, label in _TABLE_COLUMNS
+        f"{label:>9s}" for _, label in _TABLE_COLUMNS
     )
     print(header)
     print("-" * len(header))
     for agent_id, n, means in rows:
-        cells = " ".join(f"{fmt(means.get(key)):>6s}" for key, _ in _TABLE_COLUMNS)
-        print(f"{agent_id:30s} {n:3d} {cells}")
+        cells = []
+        for key, _ in _TABLE_COLUMNS:
+            cell = fmt(means.get(key))
+            count = means.get(f"{key}_n")
+            if count is not None and count != n:
+                cell = f"{cell.strip()}/{count}"
+            cells.append(f"{cell:>9s}")
+        print(f"{agent_id:30s} {n:3d} " + " ".join(cells))
 
 
 def write_csv(path: Path, rows: list[tuple[str, int, dict[str, float | None]]]) -> None:
+    """CSV mirror of the console table. Every signal column is followed by its
+    own ``<signal>_n``, since the row-level n is not its denominator."""
+    reported = list(COMPONENTS)
     with path.open("w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["agent_id", "n"] + COMPONENTS + ["sanity_agreement"])
+        columns: list[str] = []
+        for component in reported:
+            columns += [component, f"{component}_n"]
+        writer.writerow(["agent_id", "n"] + columns + ["sanity_agreement"])
         for agent_id, n, means in rows:
-            writer.writerow(
-                [agent_id, n]
-                + [
-                    f"{means[c]:.4f}" if means[c] is not None else ""
-                    for c in COMPONENTS + ["sanity_agreement"]
-                ]
-            )
+            cells: list[str] = []
+            for component in reported:
+                value = means.get(component)
+                cells.append(f"{value:.4f}" if value is not None else "")
+                cells.append(str(means.get(f"{component}_n", "")))
+            sanity = means.get("sanity_agreement")
+            cells.append(f"{sanity:.4f}" if sanity is not None else "")
+            writer.writerow([agent_id, n] + cells)
 
 
 #: Agent whose headline number the sweep matrix shows. Purely cosmetic — the
@@ -760,7 +818,7 @@ def print_sweep_matrix(specs: list[EncoderSpec], scored: list[EncoderSpec],
     print(f"\n=== sensitivity sweep summary ({len(specs)} arms selected, "
           f"{len(scored)} scored, {len(specs) - len(scored)} skipped)")
     header = (f"{'arm':22s} {'model':44s} {'suffix':10s} {'status':10s} "
-              f"{'runs':>5s} {'scen':>6s} {SWEEP_FOCUS_AGENT} AsmSim")
+              f"{'runs':>5s} {'scen':>6s} {SWEEP_FOCUS_AGENT} ObjAsmSim")
     print(header)
     print("-" * len(header))
     for spec in specs:

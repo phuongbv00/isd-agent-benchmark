@@ -126,12 +126,8 @@ def point_marker(agent: str) -> str:
 
 # The whole panel, both instrument families. Every signal is plotted because
 # the panel's defence against selective reporting is that nothing is left out;
-# tab_rq2_panel.tex carries the same seven with exact numbers.
-#: The panel, and only the panel: the scorer also emits
-#: objective_evaluation_similarity and assessment_objective_similarity, but
-#: those are diagnostics (see alignment.NON_PANEL_DIAGNOSTICS) and putting them
-#: on a panel heatmap would show six endpoints and two non-endpoints under one
-#: colourbar with nothing distinguishing them.
+# tab_rq2_panel.tex carries the same signals with exact numbers.
+#: The panel, and only the panel — mirror alignment.PANEL_SIGNALS.
 RQ2_COMPONENTS = [
     ("objective_assessment_similarity", "Obj→Asm"),
     ("objective_activity_similarity", "Obj→Act"),
@@ -153,7 +149,7 @@ RQ2_FAMILY_A_N = 3
 #: status, and why some cells carry an n. No non-directionality note any more —
 #: the one non-directional signal left the panel.
 RQ2_PANEL_FOOTNOTE = (
-    "Flat panel of 6 signals, no primary endpoint. Family A = the three edges of the "
+    "Flat panel of 6 alignment scores, no primary endpoint. Family A = the three edges of the "
     "constructive-alignment triad (textual correspondence, rectified cosine "
     "max(0, cos) on [0,1]): Obj→Asm, Obj→Act, Act→Asm.  "
     "Family B (cognitive demand, Bloom-derived, no similarity): Cognitive congruence, "
@@ -592,7 +588,7 @@ def fig_rq2_forest(pooled: dict, outdir: Path, written: list[Path]) -> bool:
     axes[0].set_yticks(ys)
     axes[0].set_yticklabels(comp_names, fontsize=7.5)
     fig.supxlabel(
-        f"Δ signal (proposed − {AGENT_DISPLAY.get(RQ2_FOREST_BASELINE, RQ2_FOREST_BASELINE)}), "
+        f"Δ score (proposed − {AGENT_DISPLAY.get(RQ2_FOREST_BASELINE, RQ2_FOREST_BASELINE)}), "
         "failure=0 layer", fontsize=8)
     fig.text(0.5, -0.06,
              "Paired per-scenario delta with bootstrap 95% CI; filled marker: "

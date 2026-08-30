@@ -37,6 +37,9 @@ Checks, in report order:
                         is defined by one of the generated macro files
   I  language           artifact text is English with a decimal point, so a
                         Vietnamese caption cannot creep back in unnoticed
+  J  protocol integrity the pooled panel carries every PANEL_SIGNALS entry, and
+                        the encoder revision is pinned — both are invisible in
+                        the artifacts yet change what the p-values mean
 
 What counts as required follows the pooled layers that exist: ablation
 artifacts are expected once pooled_ablation.json is there, sensitivity ones
@@ -62,6 +65,10 @@ from datetime import datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]          # isd-agent-benchmark/
+sys.path.insert(0, str(REPO_ROOT / "evaluator" / "src"))
+
+from isd_evaluator.metrics.alignment import PANEL_SIGNALS  # noqa: E402
+
 SRC_DIR = REPO_ROOT / "results" / "generated"
 POOLED_LADDER = REPO_ROOT / "results" / "pooled_ladder.json"
 POOLED_ABLATION = REPO_ROOT / "results" / "pooled_ablation.json"
@@ -106,7 +113,7 @@ class Spec:
 INVENTORY: list[Spec] = [
     # 09 — RQ1/RQ2 tables + prose macros. RQ1 leads on ADDIE and reports Total
     # and Trajectory alongside it; RQ2 leads on one signal and carries the full
-    # 7-signal panel. Every one of those is a separate \input target.
+    # panel (see PANEL_SIGNALS). Every one of those is a separate \input target.
     Spec("tab_rq1.tex", GEN_TABLES, "tex", "always"),
     Spec("tab_rq1_total.tex", GEN_TABLES, "tex", "always"),
     Spec("tab_rq1_traj.tex", GEN_TABLES, "tex", "always"),
@@ -232,6 +239,7 @@ def load_context() -> dict:
         ctx["ladder"] = _ts(pooled.get("generated_at"))
         ctx["sensitivity"] = bool(pooled.get("alignment_sensitivity"))
         ctx["ladder_demo"] = bool(pooled.get("_demo"))
+        ctx["pooled"] = pooled
     if POOLED_ABLATION.exists():
         ctx["ablation"] = _ts(json.loads(_read(POOLED_ABLATION)).get("generated_at"))
     return ctx
@@ -283,6 +291,53 @@ def check_language(rep: Report) -> None:
             rep.add("red", f"I: {path.name} uses the '{{,}}' decimal mark — "
                            "artifacts use a decimal point; check fmt_num and "
                            "size_display in the generator")
+
+
+def check_protocol_integrity(rep: Report, ctx: dict) -> None:
+    """J: the pooled numbers describe the protocol the paper claims.
+
+    Both conditions here are invisible in the artifacts themselves — the tables
+    render, the macros resolve, and nothing looks wrong — so without this check
+    they reach the manuscript silently.
+
+    * A panel signal that was defined on no scenario is dropped by 07, which
+      shrinks the whole-panel Holm family and makes every panel-corrected p
+      less conservative than its own caption says.
+    * An unpinned encoder revision disables 07's mixed-configuration guard:
+      with ``encoder_revision`` null in every run dir they all collapse to one
+      configuration key, so re-pulled encoder weights between runs would pool
+      without complaint, and the embedding cache key omits the revision too.
+    """
+    pooled = ctx.get("pooled")
+    if not pooled or ctx.get("ladder_demo"):
+        return
+    align = pooled.get("alignment") or {}
+    expected = len(PANEL_SIGNALS)
+    declared = {s for s, _f in PANEL_SIGNALS}
+    for model in (align.get("stats") or {}).get("per_model") or []:
+        pooled_panel = set(model.get("panel") or {})
+        label = model.get("label")
+        missing = sorted(declared - pooled_panel)
+        if missing:
+            rep.add("red", f"J: {label} pooled {len(pooled_panel)} panel signals "
+                           f"but {missing} are absent — the whole-panel Holm "
+                           "family is built from what pooled, so every "
+                           "p_holm_panel is corrected over too few comparisons. "
+                           "Re-score with 06_score_alignment.py --overwrite "
+                           "(cached artifacts predating the signal are otherwise "
+                           "valid, so a plain re-run reuses them), then re-pool")
+        stale = sorted(pooled_panel - declared)
+        if stale:
+            rep.add("red", f"J: {label} pooled {stale}, which are no longer in "
+                           "PANEL_SIGNALS — this pooled file predates the current "
+                           "panel and its p_holm_panel was corrected over a "
+                           "different family than the paper describes. Re-pool")
+    if align and not align.get("encoder_revision_pinned"):
+        rep.add("warn", "J: encoder revision is not pinned "
+                        "(encoder_revision null) — 07's one-pool-one-config "
+                        "guard cannot fire, since every run dir collapses to "
+                        "the same key. Set <SLOT>_EMBED_REVISION before scoring "
+                        "to make the guard real and the cache key revision-aware")
 
 
 # ── A. inventory drift ───────────────────────────────────────────────────────
@@ -541,6 +596,7 @@ def main() -> int:
                         "sensitivity artifacts not expected")
 
     check_inventory(rep)
+    check_protocol_integrity(rep, ctx)
     present = check_source(rep, ctx)
     check_figure_pairs(rep, present)
     if not args.no_docs:

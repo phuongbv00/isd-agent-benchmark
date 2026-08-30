@@ -234,7 +234,6 @@ def demo_pooled() -> dict:
             "panel": {
                 signal: {
                     "family": family,
-                    "directional": signal != "assessment_objective_similarity",
                     "align_descriptive": {
                         a: {"n": 90, "mean": align_of(off, i),
                             "ci95": [align_of(off, i) - 0.04,
@@ -263,11 +262,8 @@ def demo_pooled() -> dict:
                     "objective_activity_similarity": {"n_scenarios": 90,
                                             "mean": max(0.0, align_of(off, i) - 0.15),
                                             "sd_across_scenarios": 0.1},
-                    "objective_evaluation_similarity": {"n_scenarios": 90,
+                    "activity_assessment_similarity": {"n_scenarios": 90,
                                             "mean": max(0.0, align_of(off, i) - 0.05),
-                                            "sd_across_scenarios": 0.1},
-                    "assessment_objective_similarity": {"n_scenarios": 90,
-                                            "mean": max(0.0, align_of(off, i) - 0.08),
                                             "sd_across_scenarios": 0.1},
                     "objective_cognitive_congruence": {"n_scenarios": 90,
                                                 "mean": 0.8,
@@ -357,10 +353,10 @@ def gen_tab_rq1(pooled: dict, field: str = "mean_addie",
     colspec = "@{}l" + "r@{\\hskip 3pt}r" * len(models) + "@{}"
     demo_note = " [TBD-DEMO: synthetic values, awaiting real ladder runs]" if demo else ""
     lines = [header_comment(
-        pooled, f"tab_{tag.replace('-', '_')}.tex — RQ1 ladder table on {label}")]
+        pooled, f"tab_{tag.replace('-', '_')}.tex — LLM judge ladder table on {label}")]
     lines.append("\\begin{table*}[t]")
     lines.append(
-        f"  \\caption{{RQ1 on the Qwen size ladder. Cell: {caption_metric},"
+        f"  \\caption{{LLM judge score ({label}) on the Qwen size ladder. Cell: {caption_metric},"
         f" mean-of-runs $\\pm$ run-to-run SD of {label}; $n$ = scenarios scored in"
         " all 3 runs. \\textbf{Bold} = column maximum, not a significance claim."
         + demo_note + "}")
@@ -431,7 +427,7 @@ def gen_tab_rq2(pooled: dict) -> str:
         return (header_comment(pooled, "tab_rq2_alignment.tex — placeholder")
                 + "% No alignment_scores.json data was present in the pooled input.\n"
                   "% Re-run scripts/alignmentgraph-isd-bench/07_pool_ladder_runs.py after the alignment metric\n"
-                  "% (RQ2) lands in the scenario dirs, then regenerate this file.\n"
+                  "% (alignment scoring) lands in the scenario dirs, then regenerate this file.\n"
                   "% This file intentionally renders nothing.\n")
 
     model_labels = [m["label"] for m in pooled["models"] if m["label"] in align["models"]]
@@ -448,13 +444,14 @@ def gen_tab_rq2(pooled: dict) -> str:
     # full-coverage cells and read as comparable.
     n_union = {m["label"]: m["n_scenarios_union"] for m in pooled["models"]}
     colspec = "@{}l" + "r@{\\hskip 3pt}r" * len(model_labels) + "@{}"
-    lines = [header_comment(pooled, "tab_rq2_alignment.tex — RQ2 objective->assessment similarity x model sizes")]
+    lines = [header_comment(pooled, "tab_rq2_alignment.tex — objective->assessment similarity x model sizes")]
     lines.append("\\begin{table}[t]")
     lines.append(
-        "  \\caption{RQ2: objective$\\to$assessment similarity, the"
+        "  \\caption{Objective$\\to$assessment similarity, the"
         " \\emph{measures} leg of \\textit{aligned(o)}. Each cell: mean"
         " per-scenario mean-max rectified cosine (SD), pooled mean-of-runs;"
-        " $n$ = scenarios with at least one scored run. Remaining six panel"
+        " $n$ = scenarios with at least one scored run. Remaining"
+        f" {len(PANEL_SIGNALS) - 1} panel"
         " signals: \\Cref{tab:rq2-panel}." + demo_note + "}")
     lines.append("  \\label{tab:rq2-alignment}")
     lines.append("  \\small")
@@ -496,11 +493,12 @@ def gen_tab_rq2(pooled: dict) -> str:
     note = instrument_note(align)
     if thin:
         note = ("\\textsuperscript{*}$n<$ total scenarios: the agent produced no"
-                " scorable output for the rest, so the cell is conditioned on the"
+                " scorable output for the rest, or none on which this signal was"
+                " defined, so the cell is conditioned on the"
                 " scenarios it survived and is not comparable to a full-coverage"
                 " cell. $n$ counts scenarios with \\emph{at least one} scored run,"
                 " a weaker condition than the all-3-runs complete case used in the"
-                " RQ1 tables. " + note)
+                " LLM judge score tables. " + note)
     lines.append("  \\par\\smallskip\\footnotesize " + note)
     lines.append("\\end{table}")
     return "\n".join(lines) + "\n"
@@ -511,11 +509,9 @@ PANEL_DISPLAY = {
     "objective_assessment_similarity": "Obj$\\to$Asm sim.",
     "objective_activity_similarity": "Obj$\\to$Act sim.",
     "activity_assessment_similarity": "Act$\\to$Asm sim.",
-    "objective_evaluation_similarity": "Obj$\\to$Evl sim.",
-    "assessment_objective_similarity": "Asm$\\to$Obj sim.$^{\\dagger}$",
     "objective_cognitive_congruence": "Cognitive congruence",
-    # porter_mean is the MEAN of the three pairwise Porter indices
-    # (objectives x assessment/activities/evaluation), not a single index.
+    # porter_mean is the MEAN of the three pairwise Porter indices, computed
+    # over the same three triad edges family A measures, not a single index.
     "porter_mean": "Mean Porter index",
     "webb_bloom_consistency": "Webb consistency",
 }
@@ -550,12 +546,12 @@ def gen_tab_rq2_panel(pooled: dict) -> str:
     n_cells = len(PANEL_SIGNALS) * len(model_labels) * len(agents_present)
 
     colspec = "@{}ll" + "r" * len(agents_present) + "@{}"
-    lines = [header_comment(pooled, "tab_rq2_panel.tex — the full RQ2 alignment panel")]
+    lines = [header_comment(pooled, "tab_rq2_panel.tex — the full alignment-score panel")]
     lines.append("\\begin{table*}[t]")
     lines.append(
-        "  \\caption{RQ2 --- the full signal panel. Cell: mean per-scenario value,"
-        " pooled mean-of-runs. No signal is primary; every signal is reported for"
-        " every comparison. $^{\\dagger}$ = non-directional."
+        "  \\caption{The full alignment-score panel. Cell: mean per-scenario value,"
+        " pooled mean-of-runs. No score is primary; every score is reported for"
+        " every comparison."
         " $^{*}$ = fewer scenarios than the full set (see note)."
         + demo_note + "}")
     lines.append("  \\label{tab:rq2-panel}")
@@ -600,14 +596,20 @@ def gen_tab_rq2_panel(pooled: dict) -> str:
     note = instrument_note(align)
     if thin_cells:
         worst = min(thin_cells, key=lambda t: t[3])
-        note = ("\\textsuperscript{*}The agent produced no scorable output for the"
-                " remaining scenarios, so the cell is conditioned on those it"
+        # Two different events thin a cell and the footnote must not assert
+        # only one: the agent produced no scorable output, OR it produced
+        # output on which this particular signal was undefined (no
+        # Bloom-classifiable text, for the cognitive-demand signals). n is
+        # per-signal, so the two are indistinguishable in the cell.
+        note = ("\\textsuperscript{*}The agent either produced no scorable output"
+                " for the remaining scenarios or produced output on which this"
+                " signal was undefined, so the cell is conditioned on those it"
                 f" survived ({len(thin_cells)} of {n_cells} cells; smallest"
                 f" $n={worst[3]}$ at {AGENT_DISPLAY.get(worst[2], worst[2])} /"
                 f" {size_display(worst[1])}). Per-cell $n$ is in"
                 " stats\\_summary.md. $n$ counts scenarios with at least one"
                 " scored run, a weaker condition than the all-3-runs complete"
-                " case used in the RQ1 tables. " + note)
+                " case used in the LLM judge score tables. " + note)
     lines.append("  \\par\\smallskip\\footnotesize " + note)
     lines.append("\\end{table*}")
     return "\n".join(lines) + "\n"
@@ -661,7 +663,7 @@ def gen_macros(pooled: dict) -> tuple[str, str]:
 
         md += [f"## {m['label']} (macro suffix: {w})", ""]
         newcmd(f"rqOneHarnessAddie{w}", fmt_num(harness.get("mean_addie", float("nan"))),
-               f"{proposed} pooled mean ADDIE (RQ1 LEAD signal) at {m['label']}")
+               f"{proposed} pooled mean ADDIE (lead LLM judge score) at {m['label']}")
         newcmd(f"rqOneHarnessTraj{w}", fmt_num(harness.get("mean_traj", float("nan"))),
                f"{proposed} pooled mean Trajectory at {m['label']}")
         newcmd(f"rqOneHarnessTotal{w}", fmt_num(harness.get("mean_total", float("nan"))),
@@ -804,7 +806,7 @@ def gen_macros(pooled: dict) -> tuple[str, str]:
     md.append("")
 
     align = pooled.get("alignment")
-    md.append("## Alignment metrics (RQ2)")
+    md.append("## Alignment metrics")
     if align and align.get("models"):
         for lb, agents_metrics in align["models"].items():
             md.append(f"### {lb}")
@@ -817,9 +819,9 @@ def gen_macros(pooled: dict) -> tuple[str, str]:
     md.append("")
 
     if align and align.get("stats", {}).get("per_model"):
-        md.append("## RQ2 alignment panel (every signal, descriptive + paired, proposed vs baselines)")
+        md.append("## Alignment panel (every score, descriptive + paired, proposed vs baselines)")
         md.append("")
-        md.append("No signal is primary: each is reported for every comparison, "
+        md.append("No score is primary: each is reported for every comparison, "
                   "win or lose. `p_holm` corrects within one signal (6 "
                   "comparisons); `p_panel` corrects over the whole panel x "
                   "baseline family for that size.")
@@ -851,9 +853,10 @@ def gen_macros(pooled: dict) -> tuple[str, str]:
                 if harness_desc and is_lead:
                     newcmd(f"rqTwoHarnessSim{w}", fmt_num(harness_desc["mean"], 3),
                            f"{proposed} mean {LEAD_SIGNAL} at {m['label']} "
-                           f"(1 of the {len(PANEL_SIGNALS)} panel signals; the "
+                           f"(1 of the {len(PANEL_SIGNALS)} alignment scores; the "
                            "panel has no primary endpoint, so this is not a "
-                           "summary of RQ2 — see tab_rq2_panel.tex for all seven)")
+                           "summary of the panel — see tab_rq2_panel.tex for all "
+                           f"{len(PANEL_SIGNALS)})")
                     newcmd(f"rqTwoHarnessSimCILo{w}", fmt_num(harness_desc["ci95"][0], 3),
                            "bootstrap 95% CI lower bound of that mean")
                     newcmd(f"rqTwoHarnessSimCIHi{w}", fmt_num(harness_desc["ci95"][1], 3),
@@ -920,13 +923,13 @@ def gen_macros(pooled: dict) -> tuple[str, str]:
         if all_align_p:
             newcmd("rqTwoSimPHolmMaxAll", fmt_p(max(all_align_p)),
                    f"max Holm-adjusted p across ALL sizes for {LEAD_SIGNAL} ONLY "
-                   f"— 1 of the {len(PANEL_SIGNALS)} panel signals, corrected "
+                   f"— 1 of the {len(PANEL_SIGNALS)} alignment scores, corrected "
                    "within that signal (6 comparisons). For the whole-panel "
                    "family use rqTwoPanelPHolmMaxAll; prose must not present "
                    "this as a panel-wide result")
         if all_panel_p:
             newcmd("rqTwoPanelPHolmMaxAll", fmt_p(max(all_panel_p)),
-                   "max p across ALL sizes and ALL panel signals under the "
+                   "max p across ALL sizes and ALL alignment scores under the "
                    "conservative whole-panel Holm correction")
 
         inter = align["stats"].get("interaction_align")

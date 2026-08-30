@@ -59,7 +59,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "evaluator" / "src"))
 
 from isd_evaluator.metrics.alignment import (  # noqa: E402
-    NON_DIRECTIONAL_SIGNALS,
     PANEL_SIGNALS,
 )
 
@@ -986,15 +985,24 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
             return out
 
         panel: dict[str, dict] = {}
+        absent_signals: list[str] = []
         for signal in PANEL:
             signal_map = align_map if signal == lead_metric else per_scenario(signal)
             if not any(signal_map.values()):
+                # Skipping here keeps the pool usable, but the run is NOT
+                # reportable: the panel's defence against selective reporting is
+                # that every signal is reported for every comparison, and the
+                # whole-panel Holm family is built from `panel` below. A signal
+                # that quietly drops out shrinks that family and makes every
+                # panel-corrected p less conservative than its caption claims.
+                # Collected and raised after the loop so the message can name
+                # all of them at once.
+                absent_signals.append(signal)
                 continue
             zero_map = failure_zero(signal, signal_map)
             maps_by_metric.setdefault(signal, {})[label] = signal_map
             panel[signal] = {
                 "family": dict(PANEL_SIGNALS)[signal],
-                "directional": signal not in NON_DIRECTIONAL_SIGNALS,
                 "align_descriptive": {
                     agent: {
                         "n": len(vals),
@@ -1014,6 +1022,17 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
                     for agent, vals in sorted(zero_map.items()) if vals
                 },
             }
+
+        if absent_signals:
+            raise SystemExit(
+                f"[{label}] panel incomplete: {absent_signals} defined on no "
+                f"scenario, so the pooled panel would carry "
+                f"{len(panel)}/{len(PANEL)} signals and the whole-panel Holm "
+                f"family would shrink to match. Re-score these run dirs with "
+                f"06_score_alignment.py --overwrite (a signal added since the "
+                f"artifacts were written is absent from them, and the cached "
+                f"artifacts are otherwise valid so a plain re-run reuses them)."
+            )
 
         # Holm across the WHOLE panel x baseline family for this model size --
         # the conservative footnote that travels with the per-signal Holm. Same
@@ -1147,8 +1166,7 @@ def pool_alignment(models: list[dict], run_dirs_by_model: dict[str, list[Path]],
                    len(baselines), lead_metric)
             ),
             "panel_signals": [
-                {"signal": signal, "family": family,
-                 "directional": signal not in NON_DIRECTIONAL_SIGNALS}
+                {"signal": signal, "family": family}
                 for signal, family in PANEL_SIGNALS
             ],
             "lead_metric": lead_metric,

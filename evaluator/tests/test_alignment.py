@@ -18,7 +18,6 @@ from isd_evaluator.metrics.alignment import (
     extract_activities,
     extract_assessment_items,
     extract_declared_links,
-    extract_evaluation_texts,
     extract_objectives,
     normalize_declared_level,
     reaggregate,
@@ -114,11 +113,10 @@ def assert_unit_interval(score):
     values = [
         score.objective_assessment_similarity,
         score.objective_activity_similarity,
-        score.objective_evaluation_similarity,
+        score.activity_assessment_similarity,
         score.objective_cognitive_congruence,
         score.porter_mean,
         score.webb_bloom_consistency,
-        score.assessment_objective_similarity,
         *score.porter.values(),
     ]
     for value in values:
@@ -168,7 +166,6 @@ class TestAlignedVsMisaligned:
             assert entry["best_similarity"] > 0
             assert entry["best_activity"] is not None
             assert entry["best_activity_similarity"] > 0
-            assert entry["best_evaluation"] is not None
             assert entry["cognitively_congruent"] is True
             # No threshold-based booleans anymore.
             assert "matched" not in entry
@@ -192,7 +189,7 @@ class TestObjectiveEndpoints:
         score = evaluate(ALIGNED_OUTPUT).to_dict()
         expected = {k: score[k] for k in (
             "objective_assessment_similarity", "objective_activity_similarity",
-            "objective_evaluation_similarity", "objective_cognitive_congruence")}
+            "objective_cognitive_congruence")}
         # Corrupt the top-level signals; reaggregate must restore them.
         for k in expected:
             score[k] = -1.0
@@ -239,21 +236,6 @@ class TestObjectiveEndpoints:
         score = evaluate(output)
         assert score.objective_activity_similarity == 0.0
         assert any("no activities" in note for note in score.notes)
-
-    def test_no_evaluation_zeroes_evaluation_alignment(self):
-        output = {
-            "design": ALIGNED_OUTPUT["design"],
-            "development": {
-                "assessment_tools": [
-                    {"item_id": f"A-{i}", "question": q["question"]}
-                    for i, q in enumerate(ALIGNED_OUTPUT["evaluation"]["quiz_items"])
-                ]
-            },
-        }
-        score = evaluate(output)
-        assert score.objective_assessment_similarity > 0.0
-        assert score.objective_evaluation_similarity == 0.0
-        assert any("no evaluation texts" in note for note in score.notes)
 
 
 # ---------------------------------------------------------------------------
@@ -302,15 +284,67 @@ class TestEdgeCases:
         score = evaluate({"evaluation": ALIGNED_OUTPUT["evaluation"]})
         assert score.objective_assessment_similarity == 0.0
         assert score.objective_activity_similarity == 0.0
-        assert score.objective_evaluation_similarity == 0.0
         assert_unit_interval(score)
+
+    def test_no_objectives_still_scores_every_panel_signal(self):
+        """A parse failure must SCORE on the whole panel, not drop out of it.
+
+        C4 does not involve objectives at all, and leaving the Bloom-side
+        signals undefined let the worst outputs leave the pooled denominator
+        instead of counting against the agent that produced them.
+        """
+        output = {
+            "design": {"instructional_strategy":
+                       ALIGNED_OUTPUT["design"]["instructional_strategy"]},
+            "evaluation": ALIGNED_OUTPUT["evaluation"],
+        }
+        score = evaluate(output)
+        assert score.counts["objectives"] == 0
+        assert score.counts["activities"] > 0
+        assert score.counts["assessment"] > 0
+        # C4 is computable without objectives, so it must carry a real value.
+        assert score.activity_assessment_similarity is not None
+        assert score.activity_assessment_similarity > 0.0
+        # Objective-side signals floor at 0.0 rather than going undefined.
+        assert score.objective_cognitive_congruence == 0.0
+        assert score.webb_bloom_consistency == 0.0
+        # Porter mirrors the same three edges, so the two objective-side pairs
+        # floor while the C4 pair is genuinely measured -- porter_mean is a real
+        # number, not 0.0 and not undefined.
+        assert score.porter["objective_assessment"] == 0.0
+        assert score.porter["objective_activity"] == 0.0
+        assert score.porter["activity_assessment"] > 0.0
+        assert score.porter_mean is not None
+        assert 0.0 < score.porter_mean < 1.0
+
+    def test_activity_assessment_zero_when_both_sides_empty(self):
+        """Producing nothing must not score better than producing one side."""
+        one_side = evaluate({"design": {"learning_objectives":
+                                        ALIGNED_OUTPUT["design"]["learning_objectives"]}})
+        neither = evaluate({})
+        assert one_side.activity_assessment_similarity == 0.0
+        assert neither.activity_assessment_similarity == 0.0
+
+    def test_unclassifiable_objectives_stay_undefined(self):
+        """The other half of the rule: an INSTRUMENT limit is not a zero.
+
+        Objectives that exist but carry no lexicon verb are undefined, so they
+        are excluded from the Bloom denominators rather than scored 0.0.
+        """
+        score = evaluate({
+            "design": {"learning_objectives": [{"statement": "Blorp the frobnitz."}]},
+            "evaluation": ALIGNED_OUTPUT["evaluation"],
+        })
+        assert score.counts["objectives"] == 1
+        assert score.objective_cognitive_congruence is None
+        assert score.webb_bloom_consistency is None
 
     def test_objectives_but_no_items(self):
         output = {"design": {"learning_objectives":
                              ALIGNED_OUTPUT["design"]["learning_objectives"]}}
         score = evaluate(output)
         assert score.objective_assessment_similarity == 0.0
-        assert score.porter["assessment"] == 0.0
+        assert score.porter["objective_assessment"] == 0.0
         assert_unit_interval(score)
 
     def test_no_scenario_falls_back_to_single_topic(self):
@@ -539,50 +573,6 @@ class TestExtraction:
             "Review a peer's protocol.",
         ]
 
-    def test_pilot_data_collection_layout_observed_in_baselines(self):
-        output = {
-            "evaluation": {
-                "pilot_data_collection": {
-                    "collection_methods": [
-                        {
-                            "method": "Test/quiz",
-                            "timing": "Before and after training",
-                            "tool": "LMS",
-                        }
-                    ],
-                    "instruments": [
-                        {"name": "Pre-post test", "type": "Knowledge assessment"}
-                    ],
-                    "data_types": {
-                        "quantitative": [
-                            {
-                                "type": "Post-test scores",
-                                "purpose": "Learning outcome measurement",
-                                "source": "Learners",
-                            }
-                        ]
-                    },
-                    "timeline": [
-                        {
-                            "phase": "Immediately after",
-                            "activities": ["Post-test", "Satisfaction survey"],
-                        }
-                    ],
-                    "data_management": {
-                        "storage": "Secure storage",
-                        "retention_period": "3 years",
-                    },
-                }
-            }
-        }
-        assert extract_evaluation_texts(output) == [
-            "Test/quiz Before and after training LMS",
-            "Pre-post test Knowledge assessment",
-            "Post-test scores Learning outcome measurement Learners",
-            "Post-test",
-            "Satisfaction survey",
-        ]
-
     def test_sanity_report_agreement(self):
         score = evaluate(ALIGNED_OUTPUT)
         sanity = score.details["sanity"]
@@ -622,12 +612,8 @@ class TestDefaults:
                 == "nvidia/llama-embed-nemotron-8b")
         assert "composite" not in module.COMPONENTS
         assert module.COMPONENTS[0] == "objective_assessment_similarity"
-        # Family A is the three constructive-alignment triad edges (C2/C3/C4);
-        # objective_evaluation_similarity and the reverse direction are still
-        # computed but are diagnostics, not panel endpoints.
+        # Family A is the three constructive-alignment triad edges (C2/C3/C4).
         assert "activity_assessment_similarity" in module.COMPONENTS
-        assert "objective_evaluation_similarity" not in module.COMPONENTS
-        assert "assessment_objective_similarity" not in module.COMPONENTS
         # the primary encoder owns the unsuffixed artifact pooling reads
         assert module.ENCODER_PRESETS[module.PRIMARY_ENCODER][2] == ""
 
@@ -768,12 +754,11 @@ class TestOpenAIAPIEncoder:
 
 
 class TestCATriadCoverage:
-    """Family A must measure all three edges of the constructive-alignment
-    triad (Biggs): ILO-AT, ILO-TLA and TLA-AT. The panel previously measured
-    only the two objective-side edges and spent its third slot on
-    objective_evaluation_similarity, which mirrors no core relation of the
-    harness graph -- and after `evaluation` stopped being a node type, no
-    modelled artifact at all."""
+    """Both families must measure all three edges of the constructive-alignment
+    triad (Biggs): ILO-AT, ILO-TLA and TLA-AT. Evaluation-phase text mirrors no
+    core relation of the harness graph, and once `evaluation` stopped being a
+    node type it described no modelled artifact at all, so it was removed from
+    the measurement outright rather than kept as a diagnostic."""
 
     def test_panel_family_a_is_exactly_the_triad(self):
         from isd_evaluator.metrics.alignment import PANEL_SIGNALS
@@ -785,23 +770,33 @@ class TestCATriadCoverage:
             "activity_assessment_similarity",    # C4
         ]
 
-    def test_panel_has_no_non_directional_signal_left(self):
-        from isd_evaluator.metrics.alignment import (
-            NON_DIRECTIONAL_SIGNALS,
-            PANEL_SIGNALS,
-        )
+    def test_family_b_covers_the_same_three_edges(self):
+        """Porter must mirror family A's edges, not hold everything against
+        objectives. Before the C4 edge joined the panel, family B compared
+        objectives to each other set, which left activity<->assessment measured
+        by textual correspondence alone while the other two edges were measured
+        by both instrument families."""
+        from isd_evaluator.metrics.alignment import PORTER_PAIRS
 
-        assert not {s for s, _ in PANEL_SIGNALS} & NON_DIRECTIONAL_SIGNALS
+        assert [key for key, _l, _r in PORTER_PAIRS] == [
+            "objective_assessment",   # C2
+            "objective_activity",     # C3
+            "activity_assessment",    # C4
+        ]
+        assert [(l, r) for _k, l, r in PORTER_PAIRS] == [
+            ("objectives", "assessment"),
+            ("objectives", "activities"),
+            ("activities", "assessment"),
+        ]
 
-    def test_dropped_signals_are_still_computed_and_stored(self):
-        """They leave the panel, not the artifact: existing alignment_scores.json
-        readers keep working and the numbers stay recoverable."""
-        from isd_evaluator.metrics.alignment import (
-            NON_PANEL_DIAGNOSTICS,
-            AlignmentScore,
-        )
+    def test_evaluation_text_is_gone_from_the_measurement(self):
+        """No signal, no stored field and no count reads evaluation-phase text."""
+        from isd_evaluator.metrics import alignment as mod
 
-        stored = AlignmentScore().to_dict()
-        for signal in NON_PANEL_DIAGNOSTICS:
-            assert signal in stored
-        assert "activity_assessment_similarity" in stored
+        assert not hasattr(mod, "extract_evaluation_texts")
+        stored = mod.AlignmentScore().to_dict()
+        assert "objective_evaluation_similarity" not in stored
+        assert "assessment_objective_similarity" not in stored
+        score = evaluate(ALIGNED_OUTPUT)
+        assert "evaluation" not in score.counts
+        assert not any("evaluation" in k for k in score.porter)
