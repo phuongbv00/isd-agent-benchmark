@@ -79,23 +79,50 @@ class LLMConfig:
     _credential_rr: _RoundRobin = field(default_factory=_RoundRobin, init=False, repr=False)
     _endpoint_rr: _RoundRobin = field(default_factory=_RoundRobin, init=False, repr=False)
     # This run's token/call tally (see shared/llm/token_accounting.py) —
-    # attached to every chat-model client `create_chat_model` builds off
-    # this config, so it aggregates every LLM call made with it, from any
-    # thread. Deliberately NOT re-shared by copy_with (unlike the two RR
-    # fields above): a fresh copy is how a new accounting scope begins —
-    # see `_get_agent_runner` in run_benchmark.py, which calls
-    # `copy_with()` once per agent run specifically to get a fresh one.
+    # attached to every chat-model client `create_chat_model` builds off this
+    # config, so it aggregates every LLM call made with it, from any thread.
+    # Like the two round-robin fields above, it FOLLOWS THE CONFIG LINEAGE:
+    # `copy_with` re-shares it, and only `new_token_scope()` starts a fresh one.
+    #
+    # It used to be the opposite — copy_with left the clone a fresh counter, and
+    # `_get_agent_runner` relied on that side effect to open each run's scope.
+    # That made "the agent must never copy the config it was handed" a silent
+    # precondition, and every agent breaks it: all six baselines call
+    # `copy_with(model=..., temperature=...)` in their constructor, so from
+    # 2026-08-29 they all reported token_usage 0 while alignmentgraph-isd —
+    # whose own copy sits behind an `if max_tokens is None` guard that the
+    # benchmark's uniform max_tokens never trips — kept reporting real numbers.
+    # A cost comparison that flatters the agent under study is the worst
+    # possible direction for that bug to fail in.
     _token_counter: TokenCountingHandler = field(default_factory=TokenCountingHandler, init=False, repr=False)
 
     def copy_with(self, **updates: Any) -> "LLMConfig":
+        """A variant of this config that keeps its run-scoped state.
+
+        `replace()` would hand the clone fresh counters, so a copy would restart
+        round-robin at the first entry and lose the token tally. Both are
+        properties of the RUN, not of the field values being overridden, so a
+        copy shares them. Agents legitimately copy the config they are handed
+        (to pin a model or temperature); none of them should have to know that
+        doing so silently detaches the benchmark's accounting.
+        """
         clone = replace(self, **{k: v for k, v in updates.items() if v is not None})
-        # Share the rotation state: replace() would have handed the clone fresh
-        # counters, so every copy would start over at the first entry. Round-
-        # robin position must persist across the WHOLE benchmark session, so
-        # every copy shares it; _token_counter is the opposite (see its own
-        # field comment) and is deliberately left to its fresh default here.
         clone._credential_rr = self._credential_rr
         clone._endpoint_rr = self._endpoint_rr
+        clone._token_counter = self._token_counter
+        return clone
+
+    def new_token_scope(self, **updates: Any) -> "LLMConfig":
+        """A copy that starts a FRESH token/call tally.
+
+        The one deliberate way to break the accounting lineage, so the decision
+        is made where it belongs — `run_benchmark._get_agent_runner`, once per
+        agent run — instead of falling out of whether some agent happened to
+        copy its config. Round-robin state still carries over: endpoint and
+        credential rotation must persist across the whole benchmark session.
+        """
+        clone = self.copy_with(**updates)
+        clone._token_counter = TokenCountingHandler()
         return clone
 
     @property

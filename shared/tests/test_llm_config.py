@@ -151,3 +151,76 @@ def test_rotation_survives_copy_with(monkeypatch):
     keys = [base.copy_with(max_tokens=16384).resolve_api_key() for _ in range(4)]
     assert urls == ["https://a/v1", "https://b/v1"] * 2
     assert keys == ["key-1", "key-2"] * 2
+
+
+# ── token accounting follows the config lineage ─────────────────────────────
+#
+# run_benchmark reads `resolved_llm_config._token_counter` AFTER the agent
+# returns, so an agent whose LLM calls report into a different counter object
+# ships token_usage 0. Copies used to get a fresh counter, which made "never
+# copy the config you were handed" a silent precondition that every baseline
+# broke in its constructor.
+
+def _usage(config) -> dict[str, int]:
+    return config._token_counter.snapshot()
+
+
+class _Result:
+    """The OpenAI-shaped LLMResult the handler reads usage off."""
+
+    def __init__(self, prompt: int, completion: int) -> None:
+        self.llm_output = {
+            "token_usage": {"prompt_tokens": prompt, "completion_tokens": completion}
+        }
+
+
+def _record(config, prompt: int, completion: int) -> None:
+    """One LLM call's worth of usage, exactly as the callback would report it."""
+    config._token_counter.on_llm_end(_Result(prompt, completion))
+
+
+def test_the_token_counter_survives_copy_with():
+    base = LLMConfig(model="m")
+    _record(base.copy_with(temperature=0.3), 10, 5)
+    _record(base.copy_with(model="other"), 1, 2)
+    assert _usage(base) == {
+        "prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18, "llm_calls": 2,
+    }
+
+
+def test_a_copy_of_a_copy_still_reports_home():
+    """Agents chain copies (benchmark pins max_tokens, agent then pins model)."""
+    base = LLMConfig(model="m")
+    _record(base.copy_with(max_tokens=16384).copy_with(model="x", temperature=0.1), 3, 4)
+    assert _usage(base)["total_tokens"] == 7
+
+
+def test_new_token_scope_is_the_only_thing_that_resets_the_tally():
+    base = LLMConfig(model="m")
+    _record(base, 10, 5)
+
+    scope = base.new_token_scope()
+    assert _usage(scope) == {
+        "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "llm_calls": 0,
+    }
+    _record(scope.copy_with(temperature=0.2), 7, 3)
+    assert _usage(scope)["total_tokens"] == 10
+    assert _usage(base)["total_tokens"] == 15      # the earlier scope is untouched
+
+
+def test_new_token_scope_keeps_the_rotation(monkeypatch):
+    """A new accounting scope must not restart endpoint/credential round-robin:
+    that rotates across the WHOLE benchmark session, not per agent run."""
+    monkeypatch.setenv("K1", "key-1")
+    monkeypatch.setenv("K2", "key-2")
+    base = LLMConfig(
+        model="m",
+        base_urls=("https://a/v1", "https://b/v1"),
+        endpoint_strategy="round_robin",
+        api_key_envs=("K1", "K2"),
+        credential_strategy="round_robin",
+    )
+    assert base.new_token_scope().resolve_base_url() == "https://a/v1"
+    assert base.new_token_scope().resolve_base_url() == "https://b/v1"
+    assert base.new_token_scope().resolve_api_key() == "key-1"
+    assert base.new_token_scope().resolve_api_key() == "key-2"

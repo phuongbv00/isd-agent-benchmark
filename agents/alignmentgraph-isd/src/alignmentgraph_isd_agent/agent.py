@@ -6,15 +6,70 @@ from alignmentgraph_isd import DesignBrief, MetaAgent
 from alignmentgraph_isd.config import ChatModelFactory, HarnessRunConfig
 
 
+#: In-flight LLM requests this agent allows itself, per benchmark rate preset.
+#:
+#: The benchmark's posture (``-r``) bounds how many AGENTS run at once, which is
+#: all an orchestrator can bound. This agent's own topology fans out — the multi
+#: arm runs content_designer and rubric_designer in the SAME superstep and each
+#: issues one Developer call per work set, peaking at ~12 concurrent requests
+#: from a single run — so it has to bound itself, and this table is where it
+#: translates the benchmark's posture into its own limit. Owning the mapping here
+#: keeps ``run_benchmark.py`` free of any agent's internal knobs: it publishes
+#: ``BENCHMARK_RATE_LIMIT`` and nothing more.
+#:
+#: A shared endpoint answered the unbounded overflow with HTTP 429 on the two
+#: multi arms only (9-25 per run over three runs, against 0-2 on the sequential
+#: single arms), so the throttling sat on the ``agent_mode`` ablation axis.
+LLM_CONCURRENCY_BY_RATE_LIMIT = {
+    "conservative": 2,
+    "moderate": 3,
+    "aggressive": 4,
+    "turbo": 6,
+}
+#: Used when the benchmark names no preset (direct package use, an older
+#: launcher). Parallel enough to keep the fan-out meaningful, well inside a
+#: typical per-user concurrency cap.
+DEFAULT_LLM_MAX_CONCURRENCY = 4
+
+
+def _llm_concurrency_from_env() -> int:
+    """Requests this run may keep in flight: the explicit override if set,
+    otherwise whatever the benchmark's rate preset implies."""
+    override = os.getenv("HARNESS_LLM_MAX_CONCURRENCY")
+    if override is not None:
+        try:
+            return max(0, int(override))
+        except ValueError:
+            pass
+    preset = (os.getenv("BENCHMARK_RATE_LIMIT") or "").strip().lower()
+    return LLM_CONCURRENCY_BY_RATE_LIMIT.get(preset, DEFAULT_LLM_MAX_CONCURRENCY)
+
+
 def _regen_settings_from_env() -> dict[str, Any]:
-    """Rate-limit posture for the package's empty-section regen loop, sourced from
-    the benchmark environment. The regen backoff defaults to the benchmark's own
-    rate knob (``BENCHMARK_DELAY``, set by the ``-r`` preset) so per-agent re-runs
-    respect the same concurrency posture as the outer scheduler; a 429 window then
-    gets a chance to drain rather than being hammered by immediate retries.
+    """Rate-limit posture for the package, sourced from the benchmark environment.
+
+    The regen backoff defaults to the benchmark's own rate knob
+    (``BENCHMARK_DELAY``, set by the ``-r`` preset) so per-agent re-runs respect
+    the same concurrency posture as the outer scheduler; a 429 window then gets a
+    chance to drain rather than being hammered by immediate retries.
     ``HARNESS_REGEN_BACKOFF`` overrides the delay, ``HARNESS_REGEN_BUDGET`` the
-    number of extra attempts."""
-    settings: dict[str, Any] = {}
+    number of extra attempts.
+
+    The call-gate cap comes from ``BENCHMARK_RATE_LIMIT`` via
+    :data:`LLM_CONCURRENCY_BY_RATE_LIMIT`; ``HARNESS_LLM_MAX_CONCURRENCY``
+    overrides it (0 opts out). The outer scheduler only ever counted a whole
+    agent as one unit, so without this the in-agent fan-out was outside the rate
+    posture entirely. ``HARNESS_LLM_MIN_INTERVAL`` additionally spaces call
+    starts, for an endpoint that meters rate rather than concurrency."""
+    settings: dict[str, Any] = {
+        "llm_max_concurrency": _llm_concurrency_from_env(),
+    }
+    interval = os.getenv("HARNESS_LLM_MIN_INTERVAL")
+    if interval is not None:
+        try:
+            settings["llm_min_interval_seconds"] = max(0.0, float(interval))
+        except ValueError:
+            pass
     backoff = os.getenv("HARNESS_REGEN_BACKOFF") or os.getenv("BENCHMARK_DELAY")
     if backoff is not None:
         try:

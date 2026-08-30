@@ -528,11 +528,11 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
     ``shared/llm/token_accounting.py`` for why that has to be the SAME
     object every closure below captured, not a fresh one re-derived later."""
     llm_config = _normalize_agent_max_tokens(_resolve_llm_config(llm_config))
-    # One fresh accounting scope per run: copy_with() never re-shares
-    # _token_counter (unlike _credential_rr/_endpoint_rr, which round-robin
-    # across the WHOLE benchmark session and must survive every copy) — see
-    # LLMConfig.copy_with's docstring.
-    llm_config = llm_config.copy_with()
+    # One fresh accounting scope per run — stated here, which is the only place
+    # entitled to decide it. The counter otherwise follows the config lineage
+    # (copy_with re-shares it), so an agent that copies the config to pin its
+    # own model or temperature still reports into the tally read below.
+    llm_config = llm_config.new_token_scope()
     uniform_max_tokens = llm_config.max_tokens
 
     if agent_id == "baseline":
@@ -669,14 +669,15 @@ def _run_agent_task(
             with open(scenario_path, "r", encoding="utf-8") as f:
                 scenario = json.load(f)
 
-            # Run the agent (module-based). ``_get_agent_runner`` hands back
-            # the SAME LLMConfig every create_chat_model() call within this
-            # run captures (regardless of which thread makes the call — see
-            # shared/llm/token_accounting.py), so its `_token_counter`
-            # accumulates every agent's token usage uniformly (baselines
-            # included), whether or not the agent tracks tokens itself, and
-            # correctly aggregates a fan-out agent's concurrent LLM calls
-            # instead of losing whichever ones land on a worker thread.
+            # Run the agent (module-based). ``_get_agent_runner`` opens one
+            # token scope per run; the counter then follows the config lineage,
+            # so every create_chat_model() call within this run reports into it
+            # — from any thread (see shared/llm/token_accounting.py) and through
+            # any copy_with() an agent makes to pin its own model/temperature.
+            # That gives one comparable token_usage across every agent
+            # (baselines included), whether or not the agent counts tokens
+            # itself, and aggregates a fan-out agent's concurrent calls instead
+            # of losing whichever ones land on a worker thread.
             start_time = time.time()
             runner, resolved_llm_config = _get_agent_runner(agent_id, llm_config=llm_config)
             result = runner(scenario)
@@ -1490,7 +1491,8 @@ def main():
         default="conservative",
         help="Rate limit mode as agents x scenarios in flight: conservative "
              "(2x2=4), moderate (3x4=12), aggressive (7x8=56), turbo "
-             "(10x15=150). Default: conservative",
+             "(10x15=150). Published to agents as BENCHMARK_RATE_LIMIT / "
+             "BENCHMARK_DELAY. Default: conservative",
     )
     parser.add_argument(
         "--agent-model-provider",
@@ -1641,7 +1643,13 @@ def main():
     if args.scenario_max_workers == 8:  # default value
         args.scenario_max_workers = rate_config["scenario_max_workers"]
 
+    # The rate posture, published for the agents to read. max_workers and
+    # scenario_max_workers bound how many AGENTS run at once, which is all this
+    # orchestrator can bound; an agent whose own topology fans out (calls issued
+    # in parallel from inside one run) has to bound itself, and needs to know
+    # which posture it is running under to do so.
     os.environ["BENCHMARK_DELAY"] = str(rate_config["delay"])
+    os.environ["BENCHMARK_RATE_LIMIT"] = args.rate_limit
 
     if args.install:
         success = install_agents()

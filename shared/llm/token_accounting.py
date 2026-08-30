@@ -5,13 +5,21 @@ source of LLM configuration), which attaches a ``TokenCountingHandler`` as a
 construction-time callback -- so counting tokens for ALL agents needs no
 change to any agent code. The handler comes from the ``LLMConfig`` object
 itself (``config._token_counter``, see ``shared/llm/config.py``), NOT a
-module-level singleton: ``run_benchmark.py``'s ``_get_agent_runner`` gives
-each agent run a freshly-cloned ``LLMConfig`` (via ``copy_with()``, which
-deliberately does NOT re-share ``_token_counter`` the way it re-shares the
-credential/endpoint round-robin state), and every ``create_chat_model()``
-call made during that run -- directly or from any thread an agent spawns
-internally -- receives the SAME config object and so reports into the SAME
-counter.
+module-level singleton: ``run_benchmark.py``'s ``_get_agent_runner`` opens one
+scope per agent run with ``new_token_scope()``, and from there the counter
+FOLLOWS THE CONFIG LINEAGE -- ``copy_with()`` re-shares it, exactly as it
+re-shares the credential/endpoint round-robin state -- so every
+``create_chat_model()`` call made during that run reports into the same
+counter, whether it is made directly, from a thread the agent spawned, or
+off a copy the agent made to pin its own model or temperature.
+
+That last clause is load-bearing. When ``copy_with()`` handed the clone a
+fresh counter and ``_get_agent_runner`` leaned on that side effect, the
+contract silently required agents never to copy the config they were given
+-- and all six baselines copy it in their constructor, so their
+``token_usage`` was 0 on every run from 2026-08-29 until the lineage rule
+replaced it. Only ``alignmentgraph-isd`` kept reporting real numbers, and
+only because its own copy sits behind a guard the benchmark never trips.
 
 That object-reference approach, not a thread-local or a contextvar, is
 deliberate: an agent whose own execution model fans work out across a
