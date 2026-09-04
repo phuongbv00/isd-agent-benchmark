@@ -581,10 +581,18 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
     # Ablation matrix (thesis ablation study): decomposition (agent_mode:
     # single/multi) x alignment machinery (context_mode: graph = full
     # AlignmentGraph pipeline, prose = graph-free blackboard: verbatim-JSON
-    # named-slice context, within-artifact safeguards only, no routing, no
-    # graph artifact — a prose run's result carries no graph/graph_dot keys,
-    # so no <agent_id>_graph.json/.dot files are written for those arms;
-    # instead its raw blackboard is saved as <agent_id>_prose.json).
+    # named-slice context, within-artifact safeguards only, no graph artifact —
+    # a prose run's result carries no graph/graph_dot keys, so no
+    # <agent_id>_graph.json/.dot files are written for those arms; instead its
+    # raw blackboard is saved as <agent_id>_prose.json).
+    #
+    # All four arms run the AGENTIC control mode (the adapter default since
+    # 2026-08-31): every stage is a native tool-calling act->observe loop. The
+    # ADDIE stage ORDER is instructed identically in both decomposition arms —
+    # agent_mode is the CONTEXT BOUNDARY and nothing else: "multi" starts each
+    # stage in a fresh context under that stage's specialist identity, "single"
+    # carries one context across all seven under one identity.
+    #
     # "alignmentgraph-isd" above is the multi+graph cell; these three
     # register the other three cells via constructor kwargs. Registered as
     # separate agent ids so all arms run inside ONE benchmark invocation and get
@@ -610,17 +618,6 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
             agent = AlignmentGraphISDAgent(llm_config=llm_config, agent_mode="multi", context_mode="prose")
             return agent.run(scenario)
         return run_alignmentgraph_isd_multi_prose, llm_config
-
-    # EXPERIMENTAL (not part of any study arm, not in the ladder scripts):
-    # the package's agentic control mode — same 7 artifact families, each
-    # produced by a JSON-action tool loop over the alignment graph instead of
-    # the scripted pipeline. Registry-only; select explicitly via --agents.
-    elif agent_id == "alignmentgraph-isd-agentic":
-        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
-        def run_alignmentgraph_isd_agentic(scenario: dict) -> dict:
-            agent = AlignmentGraphISDAgent(llm_config=llm_config, control_mode="agentic")
-            return agent.run(scenario)
-        return run_alignmentgraph_isd_agentic, llm_config
 
     elif agent_id == "addie-agent":
         from addie_agent.agent import ADDIEAgent

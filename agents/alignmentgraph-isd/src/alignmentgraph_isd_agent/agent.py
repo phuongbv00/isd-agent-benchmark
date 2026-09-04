@@ -82,6 +82,24 @@ def _regen_settings_from_env() -> dict[str, Any]:
             settings["regen_budget"] = int(budget)
         except ValueError:
             pass
+    # The transcript budget is derived from the SERVING window rather than a
+    # constant. ``AGENT_MODEL_CONTEXT_WINDOW`` is the window the pods were
+    # launched with (the ladder runs 16384); left unset, the harness keeps its
+    # historical 24,000-character default and nothing changes.
+    #
+    # The reserve is what must be left for the answer, so it reads the same
+    # ``AGENT_MODEL_MAX_TOKENS_CAP`` the benchmark applies uniformly to every
+    # agent: a prompt that eats into the completion allowance makes the
+    # generation fail, which is a far worse failure than trimming history.
+    for env_name, key in (("AGENT_MODEL_CONTEXT_WINDOW", "llm_context_window"),
+                          ("AGENT_MODEL_MAX_TOKENS_CAP", "llm_completion_reserve")):
+        raw = os.getenv(env_name)
+        if raw is None:
+            continue
+        try:
+            settings[key] = int(raw)
+        except ValueError:
+            pass
     return settings
 
 
@@ -126,7 +144,6 @@ class AlignmentGraphISDAgent:
         *,
         agent_mode: str = "multi",
         context_mode: str = "graph",
-        control_mode: str = "scripted",
     ) -> None:
         # The factory is the single source of truth for the model; the harness
         # reads model provenance for its metadata by introspecting it (no parallel
@@ -136,24 +153,19 @@ class AlignmentGraphISDAgent:
         # registry pins them per agent_id (alignmentgraph-isd-single-prose etc.),
         # so an arm can never run with the wrong config because of a missing
         # export. Defaults = the full multi-agent, graph-context pipeline.
+        # There is one executor (native tool-calling act->observe loops per
+        # stage), so nothing selects it.
         self.config = HarnessRunConfig(
             llm_factory=llm_factory or _llm_factory_from_benchmark_config(llm_config),
             agent_mode=agent_mode,
             context_mode=context_mode,
             **_regen_settings_from_env(),
         )
-        # EXPERIMENTAL: "agentic" routes run() to the package's tool-loop
-        # control mode (alignmentgraph_isd.core.agentic) instead of the
-        # scripted pipeline. Not a HarnessRunConfig field — it selects which
-        # runner is called, not how the pipeline is configured.
-        self.control_mode = control_mode
 
     def run(self, scenario: dict | DesignBrief) -> dict:
         # The result carries the full alignment-graph dump as its own keys
         # ("graph" / "graph_dot"); the benchmark runner writes them to
-        # <agent_id>_graph.json / <agent_id>_graph.dot next to the output.
-        if self.control_mode == "agentic":
-            from alignmentgraph_isd.core.agentic import run_agentic_brief
-
-            return run_agentic_brief(self.config, _scenario_to_design_brief(scenario))
+        # <agent_id>_graph.json / <agent_id>_graph.dot next to the output. A
+        # prose-arm run has neither and ships "prose" instead — that absence is
+        # the reported auditability contrast.
         return MetaAgent(self.config).run(_scenario_to_design_brief(scenario))
