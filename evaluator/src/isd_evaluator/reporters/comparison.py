@@ -9,6 +9,24 @@ from pathlib import Path
 from typing import Optional
 
 
+def _addie_score(r: dict) -> float:
+    """Return ADDIE score across old and multi-judge result schemas."""
+    for value in (
+        r.get("addie_median"),
+        r.get("addie_score"),
+        r.get("output_score"),
+        r.get("scores", {}).get("addie_median"),
+    ):
+        if value is not None:
+            return value
+    return 0
+
+
+def _score_cell(scores: dict, key: str) -> str:
+    value = scores.get(key)
+    return f"{value:.1f}" if value is not None else "N/A"
+
+
 class ComparisonReporter:
     """비교 리포터"""
 
@@ -62,7 +80,7 @@ class ComparisonReporter:
         for r in rankings:
             traj = r.get("trajectory_score")
             traj_str = f"{traj:.1f}" if traj is not None else "N/A"
-            addie_score = r.get("addie_score", r.get("output_score", 0))
+            addie_score = _addie_score(r)
             lines.append(
                 f"| {r['rank']} | {r['agent_id']} | "
                 f"{r['total_score']:.1f} | {addie_score:.1f} | {traj_str} |"
@@ -88,11 +106,11 @@ class ComparisonReporter:
 
             lines.append(
                 f"| {r['agent_id']} | "
-                f"{phase_scores.get('analysis', 0):.1f} | "
-                f"{phase_scores.get('design', 0):.1f} | "
-                f"{phase_scores.get('development', 0):.1f} | "
-                f"{phase_scores.get('implementation', 0):.1f} | "
-                f"{phase_scores.get('evaluation', 0):.1f} |"
+                f"{_score_cell(phase_scores, 'analysis')} | "
+                f"{_score_cell(phase_scores, 'design')} | "
+                f"{_score_cell(phase_scores, 'development')} | "
+                f"{_score_cell(phase_scores, 'implementation')} | "
+                f"{_score_cell(phase_scores, 'evaluation')} |"
             )
 
         lines.append("")
@@ -118,19 +136,19 @@ class ComparisonReporter:
 
             lines.append(
                 f"| {r['agent_id']} | "
-                f"{item_scores.get('A1', 0):.1f} | "
-                f"{item_scores.get('A2', 0):.1f} | "
-                f"{item_scores.get('A3', 0):.1f} | "
-                f"{item_scores.get('D1', 0):.1f} | "
-                f"{item_scores.get('D2', 0):.1f} | "
-                f"{item_scores.get('D3', 0):.1f} | "
-                f"{item_scores.get('Dev1', 0):.1f} | "
-                f"{item_scores.get('Dev2', 0):.1f} | "
-                f"{item_scores.get('I1', 0):.1f} | "
-                f"{item_scores.get('I2', 0):.1f} | "
-                f"{item_scores.get('E1', 0):.1f} | "
-                f"{item_scores.get('E2', 0):.1f} | "
-                f"{item_scores.get('E3', 0):.1f} |"
+                f"{_score_cell(item_scores, 'A1')} | "
+                f"{_score_cell(item_scores, 'A2')} | "
+                f"{_score_cell(item_scores, 'A3')} | "
+                f"{_score_cell(item_scores, 'D1')} | "
+                f"{_score_cell(item_scores, 'D2')} | "
+                f"{_score_cell(item_scores, 'D3')} | "
+                f"{_score_cell(item_scores, 'Dev1')} | "
+                f"{_score_cell(item_scores, 'Dev2')} | "
+                f"{_score_cell(item_scores, 'I1')} | "
+                f"{_score_cell(item_scores, 'I2')} | "
+                f"{_score_cell(item_scores, 'E1')} | "
+                f"{_score_cell(item_scores, 'E2')} | "
+                f"{_score_cell(item_scores, 'E3')} |"
             )
 
         lines.append("")
@@ -254,7 +272,7 @@ class ComparisonReporter:
             print(f"\n#{r['rank']} {r['agent_id']}")
             print(f"   총점: {r['total_score']:.1f}/100")
 
-            addie_score = r.get("addie_score", r.get("output_score", 0))
+            addie_score = _addie_score(r)
             print(f"   ADDIE: {addie_score:.1f}")
 
             if r.get("trajectory_score") is not None:

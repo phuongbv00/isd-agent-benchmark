@@ -27,6 +27,7 @@ except ImportError:
 import typer
 
 from isd_evaluator.metrics import CompositeEvaluator, MultiJudgeEvaluator
+from isd_evaluator.metrics.multi_judge import load_judges_from_env, DEFAULT_JUDGES
 from isd_evaluator.runners import AgentRunner
 from isd_evaluator.reporters import ComparisonReporter
 
@@ -85,7 +86,7 @@ def evaluate(
     multi_judge: bool = typer.Option(
         False,
         "--multi-judge/--single-judge",
-        help="Use multi-judge evaluation (5 LLMs)",
+        help="Use multi-judge evaluation",
     ),
     verbose: bool = typer.Option(
         False,
@@ -125,8 +126,9 @@ def evaluate(
 
     # Run evaluation
     if multi_judge:
-        typer.echo("Using Multi-Judge evaluation (5 LLMs)...")
-        evaluator = MultiJudgeEvaluator(parallel=True, max_workers=5)
+        judges = load_judges_from_env() or DEFAULT_JUDGES
+        typer.echo(f"Using Multi-Judge evaluation ({len(judges)} LLMs)...")
+        evaluator = MultiJudgeEvaluator(judges=judges, parallel=True, max_workers=max(1, len(judges)))
         multi_result = evaluator.evaluate(
             addie_output=addie_output,
             scenario=scenario,
@@ -240,7 +242,7 @@ def compare(
     multi_judge: bool = typer.Option(
         False,
         "--multi-judge/--single-judge",
-        help="Use multi-judge evaluation (5 LLMs: solar-pro3, gpt-5.2, gemini-3-pro-preview, deepseek-v3.2, claude-opus-4.5)",
+        help="Use multi-judge evaluation",
     ),
     verbose: bool = typer.Option(
         False,
@@ -294,7 +296,7 @@ def compare(
             typer.echo("기존 결과 로드 중...")
 
         output_dir = Path(output_dir)
-        target_agents = agent_list or ["eduplanner", "baseline-solarpro2", "react-isd"]
+        target_agents = agent_list or ["eduplanner", "baseline", "react-isd"]
 
         for agent_id in target_agents:
             output_path = output_dir / f"{agent_id}_output.json"
@@ -326,15 +328,13 @@ def compare(
         typer.echo("Evaluating...")
 
     if multi_judge:
-        typer.echo("Using Multi-Judge evaluation (5 LLMs)...")
-        typer.echo("  - solar-pro3 (Upstage)")
-        typer.echo("  - openai/gpt-5.2 (OpenRouter)")
-        typer.echo("  - google/gemini-3-pro-preview (OpenRouter)")
-        typer.echo("  - deepseek/deepseek-v3.2 (OpenRouter)")
-        typer.echo("  - anthropic/claude-opus-4.5 (OpenRouter)")
+        judges = load_judges_from_env() or DEFAULT_JUDGES
+        typer.echo(f"Using Multi-Judge evaluation ({len(judges)} LLMs)...")
+        for judge in judges:
+            typer.echo(f"  - {judge.model} ({judge.provider})")
         typer.echo()
 
-        evaluator = MultiJudgeEvaluator(parallel=True, max_workers=5)
+        evaluator = MultiJudgeEvaluator(judges=judges, parallel=True, max_workers=max(1, len(judges)))
         comparison = evaluator.compare_agents(results, scenario)
 
         # Print detailed results for multi-judge
@@ -412,7 +412,7 @@ def info() -> None:
     typer.echo()
     typer.echo("지원 Agent:")
     typer.echo("  - eduplanner (3-Agent 협업)")
-    typer.echo("  - baseline-solarpro2 (단일 프롬프트)")
+    typer.echo("  - baseline (단일 프롬프트)")
     typer.echo("  - react-isd (ReAct 패턴)")
     typer.echo()
     typer.echo("버전: 0.2.0")

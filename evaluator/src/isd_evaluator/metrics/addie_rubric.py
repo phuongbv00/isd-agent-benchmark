@@ -481,45 +481,51 @@ class ADDIERubricEvaluator:
         phase_weights: Optional[Dict[ADDIEPhase, float]] = None,
         include_benchmarks: bool = True,  # Benchmark Examples 포함 여부 (기본 ON)
         temperature: float = 0.0,  # LLM temperature (0.0=결정적, 0.7=일반적)
+        base_url: Optional[str] = None,
+        api_key_env: Optional[str] = None,
     ):
-        self.provider = provider or os.getenv("ADDIE_EVAL_PROVIDER", "upstage")
+        self.provider = provider or os.getenv("ADDIE_EVAL_PROVIDER") or os.getenv("JUDGE_MODEL_PROVIDER", "upstage")
         self.phase_weights = phase_weights or DEFAULT_PHASE_WEIGHTS.copy()
         self.temperature = temperature
 
-        # API client configuration (5 providers supported)
-        # Upstage uses UPSTAGE_API_KEY, others use OPENROUTER_API_KEY
+        # API client configuration. Judges may override base_url/key via JUDGE_MODEL_*.
         OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+        direct_api_key = api_key or os.getenv("ADDIE_EVAL_API_KEY") or os.getenv("JUDGE_MODEL_API_KEY")
+        api_key_env = api_key_env or os.getenv("ADDIE_EVAL_API_KEY_ENV") or os.getenv("JUDGE_MODEL_API_KEY_ENV")
+        base_url = base_url or os.getenv("ADDIE_EVAL_BASE_URL") or os.getenv("JUDGE_MODEL_BASE_URL")
 
         if self.provider == "upstage":
             self.model = model or os.getenv("ADDIE_EVAL_MODEL", "solar-pro3")
-            self.client = OpenAI(
-                api_key=api_key or os.getenv("UPSTAGE_API_KEY"),
-                base_url="https://api.upstage.ai/v1/solar",
-            )
+            api_key_env = api_key_env or "UPSTAGE_API_KEY"
+            base_url = base_url or "https://api.upstage.ai/v1/solar"
         elif self.provider == "google":
             self.model = model or os.getenv("ADDIE_EVAL_MODEL", "google/gemini-3-pro-preview")
-            self.client = OpenAI(
-                api_key=api_key or os.getenv("OPENROUTER_API_KEY"),
-                base_url=OPENROUTER_BASE_URL,
-            )
+            api_key_env = api_key_env or "OPENROUTER_API_KEY"
+            base_url = base_url or OPENROUTER_BASE_URL
         elif self.provider == "deepseek":
             self.model = model or os.getenv("ADDIE_EVAL_MODEL", "deepseek/deepseek-v3.2")
-            self.client = OpenAI(
-                api_key=api_key or os.getenv("OPENROUTER_API_KEY"),
-                base_url=OPENROUTER_BASE_URL,
-            )
+            api_key_env = api_key_env or "OPENROUTER_API_KEY"
+            base_url = base_url or OPENROUTER_BASE_URL
         elif self.provider == "anthropic":
             self.model = model or os.getenv("ADDIE_EVAL_MODEL", "anthropic/claude-opus-4.5")
-            self.client = OpenAI(
-                api_key=api_key or os.getenv("OPENROUTER_API_KEY"),
-                base_url=OPENROUTER_BASE_URL,
-            )
-        else:  # openai (default)
+            api_key_env = api_key_env or "OPENROUTER_API_KEY"
+            base_url = base_url or OPENROUTER_BASE_URL
+        else:  # openai/openrouter/local/custom
             self.model = model or os.getenv("ADDIE_EVAL_MODEL", "openai/gpt-5.2")
-            self.client = OpenAI(
-                api_key=api_key or os.getenv("OPENROUTER_API_KEY"),
-                base_url=OPENROUTER_BASE_URL,
-            )
+            api_key_env = api_key_env or "OPENROUTER_API_KEY"
+            base_url = base_url or OPENROUTER_BASE_URL
+
+        resolved_api_key = direct_api_key or os.getenv(api_key_env or "")
+        if not resolved_api_key and base_url:
+            from urllib.parse import urlparse
+            host = urlparse(base_url).hostname or ""
+            if host in {"localhost", "127.0.0.1", "::1", "0.0.0.0"}:
+                resolved_api_key = "not-needed"
+
+        client_kwargs = {"api_key": resolved_api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        self.client = OpenAI(**client_kwargs)
 
         # Benchmark Examples 설정 (Few-shot 프롬프트용)
         self.include_benchmarks = include_benchmarks
