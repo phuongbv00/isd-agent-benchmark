@@ -22,8 +22,11 @@
       "description": "Agent 식별자",
       "enum": [
         "eduplanner",
-        "baseline-solarpro2",
-        "react-isd"
+        "baseline",
+        "react-isd",
+        "addie-agent",
+        "dick-carey-agent",
+        "rpisd-agent"
       ]
     },
     "timestamp": {
