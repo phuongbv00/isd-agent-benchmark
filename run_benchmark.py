@@ -286,7 +286,7 @@ except ImportError:
 # Project root path (isd-agent-bench-en directory)
 PROJECT_ROOT = Path(__file__).parent
 SCENARIOS_DIR = PROJECT_ROOT / "scenarios"
-RESULTS_DIR = PROJECT_ROOT / "results"
+RESULTS_DIR = Path(os.environ.get("RESULTS_DIR") or (PROJECT_ROOT / "results"))
 VENV_BIN = PROJECT_ROOT / ".venv" / "bin"
 
 # Environment setup (for running agents)
