@@ -387,6 +387,7 @@ def install_agents() -> bool:
         PROJECT_ROOT / "agents" / "addie-agent",
         PROJECT_ROOT / "agents" / "dick-carey-agent",
         PROJECT_ROOT / "agents" / "rpisd-agent",
+        PROJECT_ROOT / "agents" / "alignmentgraph-isd",
         PROJECT_ROOT / "evaluator",
     ]
 
@@ -414,6 +415,7 @@ def check_agents_installed() -> dict[str, bool]:
         "addie-agent": False,
         "dick-carey-agent": False,
         "rpisd-agent": False,
+        "alignmentgraph-isd": False,
     }
 
     # Module import test
@@ -432,6 +434,12 @@ def check_agents_installed() -> dict[str, bool]:
     try:
         from react_isd.agent import ReActISDAgent
         agents["react-isd"] = True
+    except ImportError:
+        pass
+
+    try:
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        agents["alignmentgraph-isd"] = True
     except ImportError:
         pass
 
@@ -562,6 +570,54 @@ def _get_agent_runner(agent_id: str, llm_config: Optional[LLMConfig] = None):
             agent = ReActISDAgent(llm_config=llm_config)
             return agent.run(scenario)
         return run_react, llm_config
+
+    elif agent_id == "alignmentgraph-isd":
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        def run_alignmentgraph_isd(scenario: dict) -> dict:
+            agent = AlignmentGraphISDAgent(llm_config=llm_config)
+            return agent.run(scenario)
+        return run_alignmentgraph_isd, llm_config
+
+    # Ablation matrix (thesis ablation study): decomposition (agent_mode:
+    # single/multi) x alignment machinery (context_mode: graph = full
+    # AlignmentGraph pipeline, prose = graph-free blackboard: verbatim-JSON
+    # named-slice context, within-artifact safeguards only, no graph artifact —
+    # a prose run's result carries no graph key, so no
+    # <agent_id>_graph.json file is written for those arms; instead its
+    # raw blackboard is saved as <agent_id>_prose.json).
+    #
+    # All four arms run the AGENTIC control mode (the adapter default since
+    # 2026-08-31): every stage is a native tool-calling act->observe loop. The
+    # ADDIE stage ORDER is instructed identically in both decomposition arms —
+    # agent_mode is the CONTEXT BOUNDARY and nothing else: "multi" starts each
+    # stage in a fresh context under that stage's specialist identity, "single"
+    # carries one context across all seven under one identity.
+    #
+    # "alignmentgraph-isd" above is the multi+graph cell; these three
+    # register the other three cells via constructor kwargs. Registered as
+    # separate agent ids so all arms run inside ONE benchmark invocation and get
+    # judged in the same session as the full pipeline. Not part of the default
+    # agent list — select explicitly via --agents.
+    elif agent_id == "alignmentgraph-isd-single-prose":
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        def run_alignmentgraph_isd_single_prose(scenario: dict) -> dict:
+            agent = AlignmentGraphISDAgent(llm_config=llm_config, agent_mode="single", context_mode="prose")
+            return agent.run(scenario)
+        return run_alignmentgraph_isd_single_prose, llm_config
+
+    elif agent_id == "alignmentgraph-isd-single-graph":
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        def run_alignmentgraph_isd_single_graph(scenario: dict) -> dict:
+            agent = AlignmentGraphISDAgent(llm_config=llm_config, agent_mode="single", context_mode="graph")
+            return agent.run(scenario)
+        return run_alignmentgraph_isd_single_graph, llm_config
+
+    elif agent_id == "alignmentgraph-isd-multi-prose":
+        from alignmentgraph_isd_agent import AlignmentGraphISDAgent
+        def run_alignmentgraph_isd_multi_prose(scenario: dict) -> dict:
+            agent = AlignmentGraphISDAgent(llm_config=llm_config, agent_mode="multi", context_mode="prose")
+            return agent.run(scenario)
+        return run_alignmentgraph_isd_multi_prose, llm_config
 
     elif agent_id == "addie-agent":
         from addie_agent.agent import ADDIEAgent
