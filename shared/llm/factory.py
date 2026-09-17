@@ -63,10 +63,6 @@ def create_chat_model(config: LLMConfig):
         if _env_flag("AGENT_MODEL_STREAMING"):
             kwargs["streaming"] = True
             kwargs["stream_usage"] = True
-        if _env_flag("AGENT_MODEL_DISABLE_THINKING"):
-            kwargs["extra_body"] = {
-                "chat_template_kwargs": {"enable_thinking": False}
-            }
         return ChatOpenAI(**kwargs)
 
     raise ValueError(f"Unsupported LLM API spec: {config.api_spec}")
