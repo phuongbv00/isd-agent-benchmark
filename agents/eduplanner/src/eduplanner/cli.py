@@ -40,6 +40,7 @@ import typer
 
 from eduplanner.agents import EduPlannerAgent
 from eduplanner.models.schemas import ScenarioInput
+from shared.llm import llm_config_from_env
 
 app = typer.Typer(
     name="eduplanner",
@@ -220,17 +221,14 @@ def run(
 
     from eduplanner.agents.base import AgentConfig
 
-    # 환경변수에서 provider와 model 읽기
-    provider = os.getenv("MODEL_PROVIDER", "upstage")
-    env_model = os.getenv("MODEL_NAME")
-    if env_model:
-        model = env_model
+    llm_config = llm_config_from_env(model=model)
 
     if verbose:
-        typer.echo(f"  Provider: {provider}")
-        typer.echo(f"  Model: {model}")
+        typer.echo(f"  Model Provider: {llm_config.provider}")
+        typer.echo(f"  Model API Spec: {llm_config.api_spec}")
+        typer.echo(f"  Model: {llm_config.model}")
 
-    config = AgentConfig(model=model, provider=provider)
+    config = AgentConfig(model=llm_config.model, provider=llm_config.provider, llm_config=llm_config)
 
     agent = EduPlannerAgent(
         config=config,

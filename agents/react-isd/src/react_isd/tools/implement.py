@@ -6,63 +6,14 @@ LLM을 활용하여 맥락에 맞는 깊이 있는 실행 계획을 생성합니
 """
 
 import json
-import os
 from typing import Optional
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
 
+from shared.llm import create_chat_model, get_default_llm_config
 
-# API URLs
-UPSTAGE_BASE_URL = "https://api.upstage.ai/v1/solar"
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-
-# Round-robin for Upstage API keys
-_upstage_keys = None
-_upstage_idx = 0
-_upstage_lock = None
-
-def _get_upstage_key():
-    """Get Upstage API key with round-robin"""
-    global _upstage_keys, _upstage_idx, _upstage_lock
-    import threading
-    if _upstage_lock is None:
-        _upstage_lock = threading.Lock()
-    if _upstage_keys is None:
-        keys = []
-        for env in ["UPSTAGE_API_KEY", "UPSTAGE_API_KEY2", "UPSTAGE_API_KEY3"]:
-            k = os.getenv(env)
-            if k:
-                keys.append(k)
-        _upstage_keys = keys if keys else [None]
-    with _upstage_lock:
-        key = _upstage_keys[_upstage_idx % len(_upstage_keys)]
-        _upstage_idx += 1
-        return key
-
-# LLM client (singleton for OpenRouter, round-robin for Upstage)
-_llm_openrouter = None
 
 def get_llm():
-    global _llm_openrouter
-    provider = os.getenv("MODEL_PROVIDER", "upstage")
-    model = os.getenv("MODEL_NAME", "solar-mini")
-
-    if provider == "openrouter":
-        if _llm_openrouter is None:
-            _llm_openrouter = ChatOpenAI(
-                model=model,
-                temperature=0.7,
-                api_key=os.getenv("OPENROUTER_API_KEY"),
-                base_url=OPENROUTER_BASE_URL,
-            )
-        return _llm_openrouter
-    else:  # upstage - create new client each time for round-robin
-        return ChatOpenAI(
-            model="solar-mini",
-            temperature=0.7,
-            api_key=_get_upstage_key(),
-            base_url=UPSTAGE_BASE_URL,
-        )
+    return create_chat_model(get_default_llm_config())
 
 
 @tool

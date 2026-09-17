@@ -399,14 +399,14 @@ def map_to_addie_output(state: RPISDState) -> dict:
             # A1: 요구분석 (소항목 1-4)
             "needs_analysis": {
                 # [1] 문제 확인 및 정의
-                "problem_definition": gap.get("performance_gap", "") or f"현재: {gap.get('current_state', '')}, 목표: {gap.get('desired_state', '')}",
+                "problem_definition": gap.get("performance_gap", "") or f"Current: {gap.get('current_state', '')}, Target: {gap.get('desired_state', '')}",
                 # [2] 차이분석
                 "gap_analysis": gap.get("gaps", []) if isinstance(gap.get("gaps"), list) else [
                     {"current": gap.get("current_state", ""), "target": gap.get("desired_state", ""), "gap": g}
                     for g in (gap.get("gaps", []) or [])
                 ],
                 # [3] 수행분석
-                "performance_analysis": f"교육 솔루션: {perf.get('is_training_solution', True)}. 원인: {_format_causes(perf.get('causes'))}",
+                "performance_analysis": f"Training solution: {perf.get('is_training_solution', True)}. Causes: {_format_causes(perf.get('causes'))}",
                 # [4] 요구 우선순위 결정
                 "priority_matrix": {
                     "high_priority": (gap.get("training_needs") or [])[:3],
@@ -427,12 +427,12 @@ def map_to_addie_output(state: RPISDState) -> dict:
                 "environment": (
                     scenario_context.get("learning_environment", "") or
                     kickoff.get("scope", {}).get("delivery_format", "") or
-                    "온라인/오프라인 혼합 학습 환경"
+                    "Blended online/offline learning environment"
                 ),
-                "constraints": kickoff.get("constraints", []) or scenario.get("constraints", {}).get("resources", []) or ["시간 제약", "예산 제약"],
+                "constraints": kickoff.get("constraints", []) or scenario.get("constraints", {}).get("resources", []) or ["Time constraints", "Budget constraints"],
                 # resources: 시나리오에서 가용 자원 추출 또는 기본값 (#78)
                 "resources": _extract_resources(scenario, kickoff, implementation),
-                "technical_requirements": implementation.get("technical_requirements", []) or ["LMS 접근 권한", "안정적인 인터넷 연결"],
+                "technical_requirements": implementation.get("technical_requirements", []) or ["LMS access rights", "Stable internet connection"],
             },
             # A3: 과제 및 목표분석 (소항목 7-10)
             "task_analysis": {
@@ -443,7 +443,7 @@ def map_to_addie_output(state: RPISDState) -> dict:
                 # [9] 출발점 행동 분석
                 "prerequisites": task.get("prerequisites", []),
                 # [10] 과제분석 결과 검토·정리
-                "review_summary": f"주제: {', '.join((task.get('main_topics') or [])[:3])}. 교육 필요성: {perf.get('is_training_solution', True)}",
+                "review_summary": f"Topics: {', '.join((task.get('main_topics') or [])[:3])}. Training need: {perf.get('is_training_solution', True)}",
             },
         },
 
@@ -453,8 +453,8 @@ def map_to_addie_output(state: RPISDState) -> dict:
             "learning_objectives": design.get("objectives", []),
             # [12] 평가 계획 수립
             "assessment_plan": {
-                "formative": [{"description": "프로토타입 검증 퀴즈"}, {"description": "사용성 테스트"}],
-                "summative": [{"description": "최종 평가 퀴즈"}, {"description": "수행 평가"}],
+                "formative": [{"description": "Prototype validation quiz"}, {"description": "Usability test"}],
+                "summative": [{"description": "Final assessment quiz"}, {"description": "Performance assessment"}],
                 "assessment_criteria": rubric.get("criteria", []),
             },
             # [13] 교수 내용 선정
@@ -467,7 +467,7 @@ def map_to_addie_output(state: RPISDState) -> dict:
             "instructional_strategies": {
                 "methods": design.get("methods", []) or design.get("strategy", {}).get("methods", []),
                 "activities": [e.get("activity", "") for e in (design.get("sequence") or [])[:5]],
-                "rationale": f"모델: {design.get('strategy', {}).get('model', '')}",
+                "rationale": f"Model: {design.get('strategy', {}).get('model', '')}",
             },
             # [15] 비교수적 전략 수립
             "non_instructional_strategies": {
@@ -486,18 +486,18 @@ def map_to_addie_output(state: RPISDState) -> dict:
             # [18] 스토리보드/화면 흐름 설계
             "storyboard": {
                 "screens": [
-                    {"screen_id": "S001", "title": "도입 화면", "content": "학습 목표 및 개요 제시", "media": "텍스트/이미지"},
-                    {"screen_id": "S002", "title": "학습 내용 화면", "content": "핵심 개념 설명 및 예시", "media": "텍스트/영상"},
-                    {"screen_id": "S003", "title": "실습 화면", "content": "학습자 활동 및 피드백", "media": "인터랙티브"},
-                    {"screen_id": "S004", "title": "평가 화면", "content": "형성평가 및 결과 확인", "media": "퀴즈"},
-                    {"screen_id": "S005", "title": "정리 화면", "content": "학습 내용 요약 및 다음 단계 안내", "media": "텍스트"},
+                    {"screen_id": "S001", "title": "Introduction screen", "content": "Present learning objectives and overview", "media": "Text/Image"},
+                    {"screen_id": "S002", "title": "Learning content screen", "content": "Core concept explanation and examples", "media": "Text/Video"},
+                    {"screen_id": "S003", "title": "Practice screen", "content": "Learner activities and feedback", "media": "Interactive"},
+                    {"screen_id": "S004", "title": "Assessment screen", "content": "Formative assessment and results review", "media": "Quiz"},
+                    {"screen_id": "S005", "title": "Wrap-up screen", "content": "Summary of learning content and next-step guidance", "media": "Text"},
                 ],
-                "navigation_flow": "S001(도입) → S002(학습) → S003(실습) → S004(평가) → S005(정리), 각 화면에서 이전/다음 이동 가능, 메뉴를 통한 직접 이동 지원",
+                "navigation_flow": "S001(Introduction) → S002(Learning) → S003(Practice) → S004(Assessment) → S005(Wrap-up), previous/next navigation available on each screen, direct navigation via menu supported",
                 "interactions": [
-                    {"type": "클릭", "description": "버튼 클릭으로 다음 화면 이동"},
-                    {"type": "드래그앤드롭", "description": "실습 활동에서 요소 배치"},
-                    {"type": "입력", "description": "텍스트 입력을 통한 답변 제출"},
-                    {"type": "선택", "description": "객관식 문항 선택"},
+                    {"type": "Click", "description": "Move to the next screen by clicking a button"},
+                    {"type": "Drag and drop", "description": "Arrange elements in practice activities"},
+                    {"type": "Input", "description": "Submit answers via text input"},
+                    {"type": "Selection", "description": "Select a multiple-choice option"},
                 ],
             },
         },
@@ -518,23 +518,23 @@ def map_to_addie_output(state: RPISDState) -> dict:
             "instructor_guide": {
                 "overview": implementation.get("facilitator_guide", ""),
                 "session_guides": [m.get("title", "") for m in development.get("modules", [])],
-                "facilitation_tips": ["학습자 참여 유도", "질문 활용"],
-                "troubleshooting": ["기술적 문제 대응"],
+                "facilitation_tips": ["Encourage learner participation", "Use questioning"],
+                "troubleshooting": ["Respond to technical issues"],
             },
             # [21] 운영자용 매뉴얼 개발
             "operator_manual": {
                 "system_setup": implementation.get("operator_guide", "") or _generate_operator_guide(implementation),
-                "operation_procedures": ["등록 관리", "출석 관리"],
-                "support_procedures": ["학습자 문의 대응"],
-                "escalation_process": "문제 발생 시 담당자에게 보고",
+                "operation_procedures": ["Enrollment management", "Attendance management"],
+                "support_procedures": ["Respond to learner inquiries"],
+                "escalation_process": "Report to the responsible party when an issue occurs",
             },
             # [22] 평가 도구·문항 개발
             "assessment_tools": assessment_tools,
             # [23] 전문가 검토
             "expert_review": {
-                "reviewers": ["내용 전문가", "교수설계 전문가"],
-                "review_criteria": ["내용 정확성", "교수 설계 적절성"],
-                "feedback_summary": f"사용성 점수: {usability.get('aggregated_score', 0):.2f}",
+                "reviewers": ["Subject-matter expert", "Instructional design expert"],
+                "review_criteria": ["Content accuracy", "Instructional design appropriateness"],
+                "feedback_summary": f"Usability score: {usability.get('aggregated_score', 0):.2f}",
                 "revisions_made": usability.get("recommendations", []),
             },
         },
@@ -543,28 +543,28 @@ def map_to_addie_output(state: RPISDState) -> dict:
         "implementation": {
             # [24] 교수자·운영자 오리엔테이션
             "instructor_orientation": {
-                "orientation_objectives": ["프로그램 이해", "운영 절차 숙지"],
-                "schedule": implementation.get("orientation_plan", {}).get("pre_training", "") or "사전 1주일 전",
-                "materials": ["교수자 가이드", "운영 매뉴얼"],
-                "competency_checklist": ["내용 이해도", "진행 능력"],
+                "orientation_objectives": ["Understand the program", "Master operational procedures"],
+                "schedule": implementation.get("orientation_plan", {}).get("pre_training", "") or "One week in advance",
+                "materials": ["Facilitator guide", "Operations manual"],
+                "competency_checklist": ["Content comprehension", "Facilitation ability"],
             },
             # [25] 시스템/환경 점검
             "system_check": {
-                "checklist": implementation.get("technical_requirements", ["네트워크 연결", "장비 점검"]),
-                "technical_validation": "시스템 테스트 완료",
-                "contingency_plans": ["비상 대응 계획 수립"],
+                "checklist": implementation.get("technical_requirements", ["Network connectivity", "Equipment check"]),
+                "technical_validation": "System test completed",
+                "contingency_plans": ["Establish contingency response plan"],
             },
             # [26] 프로토타입 실행
             "prototype_execution": {
-                "pilot_scope": implementation.get("pilot_plan", {}).get("phase", "") or "소규모 파일럿 테스트",
-                "participants": implementation.get("pilot_plan", {}).get("participants", "") or "10-20명",
-                "execution_log": [f"프로토타입 v{p.get('version')} 테스트" for p in prototype_versions],
+                "pilot_scope": implementation.get("pilot_plan", {}).get("phase", "") or "Small-scale pilot test",
+                "participants": implementation.get("pilot_plan", {}).get("participants", "") or "10-20 participants",
+                "execution_log": [f"Prototype v{p.get('version')} test" for p in prototype_versions],
                 "issues_encountered": usability.get("improvement_areas", []),
             },
             # [27] 운영 모니터링 및 지원
             "monitoring": {
-                "monitoring_criteria": ["학습 진도", "참여율", "만족도"],
-                "support_channels": ["이메일", "전화", "온라인 게시판"],
+                "monitoring_criteria": ["Learning progress", "Participation rate", "Satisfaction"],
+                "support_channels": ["Email", "Phone", "Online message board"],
                 "issue_resolution_log": [],
                 "real_time_adjustments": usability.get("recommendations", []),
             },
@@ -576,30 +576,30 @@ def map_to_addie_output(state: RPISDState) -> dict:
             "formative": {
                 # [28] 파일럿/초기 실행 중 자료 수집
                 "data_collection": {
-                    "methods": ["의뢰인 평가", "전문가 평가", "학습자 평가", "사전/사후 테스트", "관찰 기록"],
+                    "methods": ["Client evaluation", "Expert evaluation", "Learner evaluation", "Pre/post test", "Observation records"],
                     "learner_feedback": usability.get("learner_feedback", {}).get("feedback_items", []) or [
-                        "학습 내용 이해도 피드백",
-                        "학습 자료 활용 편의성",
-                        "어려웠던 모듈 및 개선 요청",
+                        "Feedback on comprehension of learning content",
+                        "Ease of use of learning materials",
+                        "Difficult modules and improvement requests",
                     ],
                     "performance_data": {
                         "client_score": usability.get("client_feedback", {}).get("overall_score", 0) or 0.8,
                         "expert_score": usability.get("expert_feedback", {}).get("overall_score", 0) or 0.85,
                         "learner_score": usability.get("learner_feedback", {}).get("overall_score", 0) or 0.75,
                     },
-                    "observations": ["학습 진행 속도 관찰", "참여도 및 집중도 모니터링", "학습자 간 상호작용 패턴"],
+                    "observations": ["Observation of learning pace", "Monitoring of engagement and concentration", "Interaction patterns among learners"],
                     "pilot_difficulties": {
-                        "identified_modules": ["개념 심화 모듈", "실습 응용 모듈"],
-                        "difficulty_reasons": ["내용 복잡성", "실습 가이드 부족"],
-                        "improvement_suggestions": ["단계별 설명 추가", "실습 예시 확대"],
+                        "identified_modules": ["Concept deepening module", "Practice application module"],
+                        "difficulty_reasons": ["Content complexity", "Insufficient practice guidance"],
+                        "improvement_suggestions": ["Add step-by-step explanations", "Expand practice examples"],
                     },
                 },
                 # [29] 형성평가 결과 기반 1차 프로그램 개선
                 "improvements": [
                     {
                         "issue_identified": area.get("area") if isinstance(area, dict) else str(area),
-                        "improvement_action": "개선 조치",
-                        "priority": area.get("priority", "보통") if isinstance(area, dict) else "보통",
+                        "improvement_action": "Improvement action",
+                        "priority": area.get("priority", "medium") if isinstance(area, dict) else "medium",
                     }
                     for area in usability.get("improvement_areas", [])
                 ],
@@ -620,15 +620,15 @@ def map_to_addie_output(state: RPISDState) -> dict:
                     "decision": evaluation.get("adoption_decision", {}).get("recommendation", "") or _generate_adoption_decision(state).get("recommendation", ""),
                     "rationale": evaluation.get("adoption_decision", {}).get("rationale", "") or _generate_adoption_decision(state).get("rationale", ""),
                     "conditions": evaluation.get("adoption_decision", {}).get("conditions", []),
-                    "stakeholder_approval": "승인 대기",
+                    "stakeholder_approval": "Pending approval",
                 },
             },
             # [33] E3: 프로그램 개선 및 환류
             "improvement_plan": {
-                "feedback_summary": f"최종 품질 점수: {state.get('current_quality', 0):.2f}",
+                "feedback_summary": f"Final quality score: {state.get('current_quality', 0):.2f}",
                 "improvement_areas": usability.get("improvement_areas", []),
                 "action_items": usability.get("recommendations", []),
-                "feedback_loop": "평가 결과를 바탕으로 다음 교육 과정에 반영",
+                "feedback_loop": "Reflect evaluation results in the next training cycle",
                 "next_iteration_goals": evaluation.get("adoption_decision", {}).get("next_steps", []),
             },
         },
@@ -646,11 +646,11 @@ def _extract_resources(scenario: dict, kickoff: dict, implementation: dict) -> l
     constraints = scenario.get("constraints", {})
     if isinstance(constraints, dict):
         if constraints.get("resources"):
-            resources.append(f"가용 자원: {constraints.get('resources')}")
+            resources.append(f"Available resources: {constraints.get('resources')}")
         if constraints.get("budget"):
-            resources.append(f"예산: {constraints.get('budget')}")
+            resources.append(f"Budget: {constraints.get('budget')}")
         if constraints.get("timeline"):
-            resources.append(f"일정: {constraints.get('timeline')}")
+            resources.append(f"Timeline: {constraints.get('timeline')}")
 
     # kickoff에서 추가 자원 정보 추출
     scope = kickoff.get("scope", {})
@@ -663,14 +663,14 @@ def _extract_resources(scenario: dict, kickoff: dict, implementation: dict) -> l
     # implementation에서 기술 요구사항 추출
     tech_reqs = implementation.get("technical_requirements", [])
     if tech_reqs:
-        resources.extend([f"기술: {req}" for req in tech_reqs[:2]])
+        resources.extend([f"Technology: {req}" for req in tech_reqs[:2]])
 
     # 기본값 제공 (빈 경우)
     if not resources:
         resources = [
-            "LMS 플랫폼",
-            "교육 콘텐츠 제작 도구",
-            "평가 시스템",
+            "LMS platform",
+            "Training content authoring tools",
+            "Assessment system",
         ]
 
     return resources
@@ -678,45 +678,45 @@ def _extract_resources(scenario: dict, kickoff: dict, implementation: dict) -> l
 
 def _generate_operator_guide(implementation: dict) -> str:
     """운영자 가이드 생성 헬퍼"""
-    delivery = implementation.get("delivery_method", "블렌디드 러닝")
-    return f"""본 교육 프로그램 운영을 위한 가이드입니다.
+    delivery = implementation.get("delivery_method", "Blended learning")
+    return f"""This is the operations guide for running this training program.
 
-1. 사전 준비
-   - LMS 설정 및 수강생 등록 확인
-   - 교육 자료 업로드 및 접근 권한 설정
-   - 기술 환경 점검 (화상회의, 프로젝터 등)
+1. Advance preparation
+   - Configure the LMS and verify participant enrollment
+   - Upload training materials and set access permissions
+   - Check the technical environment (video conferencing, projector, etc.)
 
-2. 교육 당일
-   - 출석 확인 및 참여 독려
-   - 기술 지원 대기
-   - 강사-학습자 소통 지원
+2. Training day
+   - Check attendance and encourage participation
+   - Stand by for technical support
+   - Support instructor-learner communication
 
-3. 교육 후
-   - 만족도 조사 실시
-   - 결과 리포트 작성
-   - 개선 사항 정리
+3. After training
+   - Conduct a satisfaction survey
+   - Write the results report
+   - Compile improvement items
 
-전달 방식: {delivery}"""
+Delivery mode: {delivery}"""
 
 
 def _generate_pilot_plan(prototype_versions: list) -> dict:
     """파일럿 실행 계획 생성 헬퍼"""
     num_versions = len(prototype_versions)
     return {
-        "phase": "파일럿 테스트",
+        "phase": "Pilot test",
         "prototype_tested": num_versions,
-        "participants": "10-20명 (대표 샘플)",
-        "duration": "1-2주",
+        "participants": "10-20 participants (representative sample)",
+        "duration": "1-2 weeks",
         "evaluation_criteria": [
-            "학습 목표 달성률",
-            "사용성 점수",
-            "학습자 만족도",
+            "Learning objective attainment rate",
+            "Usability score",
+            "Learner satisfaction",
         ],
         "success_threshold": 0.8,
         "feedback_collection": [
-            "설문조사",
-            "인터뷰",
-            "관찰",
+            "Survey",
+            "Interview",
+            "Observation",
         ],
     }
 
@@ -727,24 +727,24 @@ def _generate_program_evaluation(state: RPISDState) -> dict:
         "evaluation_model": "Kirkpatrick 4-Level",
         "levels": {
             "level_1_reaction": {
-                "description": "학습자 만족도 평가",
-                "timing": "교육 직후",
-                "methods": ["만족도 설문"],
+                "description": "Learner satisfaction evaluation",
+                "timing": "Immediately after training",
+                "methods": ["Satisfaction survey"],
             },
             "level_2_learning": {
-                "description": "학습 성취도 평가",
-                "timing": "교육 중/후",
-                "methods": ["퀴즈", "실습 평가"],
+                "description": "Learning achievement evaluation",
+                "timing": "During/after training",
+                "methods": ["Quiz", "Practical assessment"],
             },
             "level_3_behavior": {
-                "description": "현업 적용도 평가",
-                "timing": "교육 후 1-3개월",
-                "methods": ["현업 적용 체크리스트"],
+                "description": "On-the-job application evaluation",
+                "timing": "1-3 months after training",
+                "methods": ["On-the-job application checklist"],
             },
             "level_4_results": {
-                "description": "조직 성과 평가",
-                "timing": "교육 후 6-12개월",
-                "methods": ["성과 지표 분석"],
+                "description": "Organizational results evaluation",
+                "timing": "6-12 months after training",
+                "methods": ["Performance indicator analysis"],
             },
         },
     }
@@ -758,13 +758,13 @@ def _generate_adoption_decision(state: RPISDState) -> dict:
 
     if score >= 0.8:
         recommendation = "adopt"
-        rationale = f"품질 점수 {score:.1%}로 성공 기준을 충족하여 프로그램 채택을 권고합니다."
+        rationale = f"With a quality score of {score:.1%}, the success criteria are met and adoption of the program is recommended."
     elif score >= 0.6:
         recommendation = "conditional_adopt"
-        rationale = f"품질 점수 {score:.1%}로 조건부 채택을 권고합니다. 개선 사항 반영 후 재검토가 필요합니다."
+        rationale = f"With a quality score of {score:.1%}, conditional adoption is recommended. A re-review is needed after the improvements are incorporated."
     else:
         recommendation = "revise"
-        rationale = f"품질 점수 {score:.1%}로 추가 개선이 필요합니다. 피드백을 반영하여 재개발을 권고합니다."
+        rationale = f"With a quality score of {score:.1%}, further improvement is needed. Redevelopment incorporating the feedback is recommended."
 
     return {
         "recommendation": recommendation,

@@ -23,40 +23,40 @@ from eduplanner.models.schemas import (
 from eduplanner.models.skill_tree import LearnerProfile
 
 
-ANALYST_SYSTEM_PROMPT = """당신은 12년 경력의 교수설계 분석 전문가입니다.
+ANALYST_SYSTEM_PROMPT = """You are an instructional design analysis expert with 12 years of experience.
 
-## 역할
-교수설계 산출물을 체계적으로 분석하여 오류, 누락, 불일치를 발견합니다.
+## Role
+Systematically analyze instructional design outputs to find errors, omissions, and inconsistencies.
 
-## 분석 관점
-1. 논리적 일관성: 학습 목표와 평가의 정렬, 분석 결과와 설계의 연결
-2. 완전성 검사: ADDIE 각 단계 필수 요소, Bloom's Taxonomy, Gagné's 9 Events
-3. 학습자 적합성: Skill-Tree 수준 매칭, 인지 부하 적정성
-4. 실행 가능성: 시간 배분의 현실성, 자원 요구사항의 타당성
+## Analysis Perspectives
+1. Logical consistency: Alignment of learning objectives and assessment, connection between analysis results and design
+2. Completeness check: Required elements of each ADDIE stage, Bloom's Taxonomy, Gagné's 9 Events
+3. Learner suitability: Skill-Tree level matching, appropriateness of cognitive load
+4. Feasibility: Realism of time allocation, validity of resource requirements
 
-## 출력 형식 (반드시 JSON으로 출력)
+## Output Format (must output as JSON)
 
-반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.
+Respond only in the JSON format below. Do not include any other text.
 
 ```json
 {
-  "quality": "상|중|하",
+  "quality": "High|Medium|Low",
   "feedback": [
-    "가장 심각한 문제점 (1줄)",
-    "두 번째 문제점 또는 누락 요소 (1줄)",
-    "세 번째 개선 권고 (1줄)"
+    "Most serious problem (1 line)",
+    "Second problem or missing element (1 line)",
+    "Third improvement recommendation (1 line)"
   ]
 }
 ```
 
-예시:
+Example:
 ```json
 {
-  "quality": "중",
+  "quality": "Medium",
   "feedback": [
-    "학습 목표가 Bloom's Taxonomy 동사를 사용하지 않음",
-    "평가 문항이 학습 목표와 정렬되지 않음",
-    "Gagné 9 Events 중 동기유발 단계 누락"
+    "Learning objectives do not use Bloom's Taxonomy verbs",
+    "Assessment items are not aligned with learning objectives",
+    "The motivation-eliciting stage is missing from Gagné's 9 Events"
   ]
 }
 ```
@@ -68,7 +68,7 @@ class AnalysisResult:
 
     def __init__(
         self,
-        quality_level: str = "중",
+        quality_level: str = "Medium",
         summary: str = "",
         errors: list[dict] = None,
         missing_elements: list[dict] = None,
@@ -120,7 +120,7 @@ class AnalystAgent(BaseAgent):
 
     @property
     def role(self) -> str:
-        return "교수설계 산출물의 오류와 문제점을 분석합니다."
+        return "Analyzes errors and problems in instructional design outputs."
 
     def run(
         self,
@@ -168,22 +168,22 @@ class AnalystAgent(BaseAgent):
 
         # 원본 시나리오
         if scenario_input:
-            prompt_parts.append("## 원본 시나리오\n")
-            prompt_parts.append(f"**제목:** {scenario_input.title}")
-            prompt_parts.append(f"**대상:** {scenario_input.context.target_audience}")
-            prompt_parts.append(f"**시간:** {scenario_input.context.duration}")
-            prompt_parts.append(f"**환경:** {scenario_input.context.learning_environment}")
-            prompt_parts.append(f"**목표:** {', '.join(scenario_input.learning_goals)}\n")
+            prompt_parts.append("## Original Scenario\n")
+            prompt_parts.append(f"**Title:** {scenario_input.title}")
+            prompt_parts.append(f"**Target:** {scenario_input.context.target_audience}")
+            prompt_parts.append(f"**Duration:** {scenario_input.context.duration}")
+            prompt_parts.append(f"**Environment:** {scenario_input.context.learning_environment}")
+            prompt_parts.append(f"**Goals:** {', '.join(scenario_input.learning_goals)}\n")
 
         # 학습자 프로필
         if learner_profile:
             prompt_parts.append(learner_profile.skill_tree.to_prompt_context())
 
         # ADDIE 산출물
-        prompt_parts.append("## 분석 대상 교수설계 산출물\n")
+        prompt_parts.append("## Instructional Design Output to Analyze\n")
         prompt_parts.append(self._format_addie_output_detailed(addie_output))
 
-        prompt_parts.append("\n위 교수설계 산출물을 체계적으로 분석해주세요.")
+        prompt_parts.append("\nPlease systematically analyze the instructional design output above.")
 
         return "\n".join(prompt_parts)
 
@@ -210,124 +210,124 @@ class AnalystAgent(BaseAgent):
 
     def _format_analysis_phase(self, sections: list, analysis: Analysis) -> None:
         """분석 단계 포맷팅"""
-        sections.append("### 1. 분석 (Analysis)")
+        sections.append("### 1. Analysis")
 
         # 학습자 분석
         la = analysis.learner_analysis
-        sections.append("**학습자 분석:**")
-        sections.append(f"  - 대상: {la.target_audience}")
-        sections.append(f"  - 특성: {', '.join(la.characteristics) or '미정의'}")
-        sections.append(f"  - 사전지식: {la.prior_knowledge or '미정의'}")
-        sections.append(f"  - 학습 선호: {', '.join(la.learning_preferences) or '미정의'}")
-        sections.append(f"  - 동기: {la.motivation or '미정의'}")
-        sections.append(f"  - 예상 어려움: {', '.join(la.challenges) or '미정의'}")
+        sections.append("**Learner Analysis:**")
+        sections.append(f"  - Target: {la.target_audience}")
+        sections.append(f"  - Characteristics: {', '.join(la.characteristics) or 'Undefined'}")
+        sections.append(f"  - Prior knowledge: {la.prior_knowledge or 'Undefined'}")
+        sections.append(f"  - Learning preferences: {', '.join(la.learning_preferences) or 'Undefined'}")
+        sections.append(f"  - Motivation: {la.motivation or 'Undefined'}")
+        sections.append(f"  - Anticipated challenges: {', '.join(la.challenges) or 'Undefined'}")
 
         # 환경 분석
         ca = analysis.context_analysis
-        sections.append("\n**환경 분석:**")
-        sections.append(f"  - 환경: {ca.environment}")
-        sections.append(f"  - 시간: {ca.duration}")
-        sections.append(f"  - 제약: {', '.join(ca.constraints) or '미정의'}")
-        sections.append(f"  - 자원: {', '.join(ca.resources) or '미정의'}")
-        sections.append(f"  - 기술요구: {', '.join(ca.technical_requirements) or '미정의'}")
+        sections.append("\n**Context Analysis:**")
+        sections.append(f"  - Environment: {ca.environment}")
+        sections.append(f"  - Duration: {ca.duration}")
+        sections.append(f"  - Constraints: {', '.join(ca.constraints) or 'Undefined'}")
+        sections.append(f"  - Resources: {', '.join(ca.resources) or 'Undefined'}")
+        sections.append(f"  - Technical requirements: {', '.join(ca.technical_requirements) or 'Undefined'}")
 
         # 과제 분석
         ta = analysis.task_analysis
-        sections.append("\n**과제 분석:**")
-        sections.append(f"  - 주제: {', '.join(ta.main_topics) or '미정의'}")
-        sections.append(f"  - 세부: {', '.join(ta.subtopics) or '미정의'}")
-        sections.append(f"  - 선수학습: {', '.join(ta.prerequisites) or '미정의'}")
+        sections.append("\n**Task Analysis:**")
+        sections.append(f"  - Topics: {', '.join(ta.main_topics) or 'Undefined'}")
+        sections.append(f"  - Subtopics: {', '.join(ta.subtopics) or 'Undefined'}")
+        sections.append(f"  - Prerequisites: {', '.join(ta.prerequisites) or 'Undefined'}")
 
     def _format_design_phase(self, sections: list, design: Design) -> None:
         """설계 단계 포맷팅"""
-        sections.append("\n### 2. 설계 (Design)")
+        sections.append("\n### 2. Design")
 
         # 학습 목표
-        sections.append("**학습 목표:**")
+        sections.append("**Learning Objectives:**")
         if design.learning_objectives:
             for obj in design.learning_objectives:
                 sections.append(
                     f"  - [{obj.id}] [{obj.level}] {obj.statement} "
-                    f"(동사: {obj.bloom_verb}, 측정가능: {obj.measurable})"
+                    f"(verb: {obj.bloom_verb}, measurable: {obj.measurable})"
                 )
         else:
-            sections.append("  - (목표 없음)")
+            sections.append("  - (No objectives)")
 
         # 평가 계획
         ap = design.assessment_plan
-        sections.append("\n**평가 계획:**")
-        sections.append(f"  - 진단평가: {', '.join(ap.diagnostic) or '미정의'}")
-        sections.append(f"  - 형성평가: {', '.join(ap.formative) or '미정의'}")
-        sections.append(f"  - 총괄평가: {', '.join(ap.summative) or '미정의'}")
+        sections.append("\n**Assessment Plan:**")
+        sections.append(f"  - Diagnostic: {', '.join(ap.diagnostic) or 'Undefined'}")
+        sections.append(f"  - Formative: {', '.join(ap.formative) or 'Undefined'}")
+        sections.append(f"  - Summative: {', '.join(ap.summative) or 'Undefined'}")
 
         # 교수 전략
         ist = design.instructional_strategy
-        sections.append("\n**교수 전략:**")
-        sections.append(f"  - 모델: {ist.model}")
-        sections.append(f"  - 방법: {', '.join(ist.methods) or '미정의'}")
+        sections.append("\n**Instructional Strategy:**")
+        sections.append(f"  - Model: {ist.model}")
+        sections.append(f"  - Methods: {', '.join(ist.methods) or 'Undefined'}")
         if ist.sequence:
-            sections.append("  - 교수사태:")
+            sections.append("  - Instructional events:")
             for event in ist.sequence:
                 sections.append(f"    * {event.event}: {event.activity}")
 
     def _format_development_phase(self, sections: list, dev: Development) -> None:
         """개발 단계 포맷팅"""
-        sections.append("\n### 3. 개발 (Development)")
+        sections.append("\n### 3. Development")
 
         # 레슨 플랜
-        sections.append(f"**레슨 플랜:** 총 {dev.lesson_plan.total_duration}")
+        sections.append(f"**Lesson Plan:** total {dev.lesson_plan.total_duration}")
         if dev.lesson_plan.modules:
             for mod in dev.lesson_plan.modules:
                 sections.append(f"  - {mod.title} ({mod.duration})")
                 for obj in mod.objectives:
-                    sections.append(f"    목표: {obj}")
+                    sections.append(f"    Objective: {obj}")
                 for act in mod.activities:
-                    sections.append(f"    활동: {act.time} - {act.activity}")
+                    sections.append(f"    Activity: {act.time} - {act.activity}")
         else:
-            sections.append("  - (모듈 없음)")
+            sections.append("  - (No modules)")
 
         # 학습 자료
-        sections.append("\n**학습 자료:**")
+        sections.append("\n**Learning Materials:**")
         if dev.materials:
             for mat in dev.materials:
                 details = []
                 if mat.slides:
-                    details.append(f"슬라이드 {mat.slides}장")
+                    details.append(f"{mat.slides} slides")
                 if mat.duration:
                     details.append(mat.duration)
                 if mat.pages:
-                    details.append(f"{mat.pages}페이지")
+                    details.append(f"{mat.pages} pages")
                 detail_str = f" ({', '.join(details)})" if details else ""
                 sections.append(f"  - [{mat.type}] {mat.title}{detail_str}")
         else:
-            sections.append("  - (자료 없음)")
+            sections.append("  - (No materials)")
 
     def _format_implementation_phase(self, sections: list, impl: Implementation) -> None:
         """실행 단계 포맷팅"""
-        sections.append("\n### 4. 실행 (Implementation)")
-        sections.append(f"**전달 방식:** {impl.delivery_method}")
-        sections.append(f"**진행자 가이드:** {impl.facilitator_guide or '미정의'}")
-        sections.append(f"**학습자 가이드:** {impl.learner_guide or '미정의'}")
-        sections.append(f"**기술 요구사항:** {', '.join(impl.technical_requirements) or '미정의'}")
-        sections.append(f"**지원 계획:** {impl.support_plan or '미정의'}")
+        sections.append("\n### 4. Implementation")
+        sections.append(f"**Delivery method:** {impl.delivery_method}")
+        sections.append(f"**Facilitator guide:** {impl.facilitator_guide or 'Undefined'}")
+        sections.append(f"**Learner guide:** {impl.learner_guide or 'Undefined'}")
+        sections.append(f"**Technical requirements:** {', '.join(impl.technical_requirements) or 'Undefined'}")
+        sections.append(f"**Support plan:** {impl.support_plan or 'Undefined'}")
 
     def _format_evaluation_phase(self, sections: list, eval_section: Evaluation) -> None:
         """평가 단계 포맷팅"""
-        sections.append("\n### 5. 평가 (Evaluation)")
+        sections.append("\n### 5. Evaluation")
 
         # 퀴즈 문항
-        sections.append(f"**퀴즈 문항:** {len(eval_section.quiz_items)}개")
-        for item in eval_section.quiz_items[:3]:  # 최대 3개만 표시
+        sections.append(f"**Quiz items:** {len(eval_section.quiz_items)}")
+        for item in eval_section.quiz_items[:3]:  # show at most 3
             sections.append(f"  - [{item.type}] {item.question[:50]}...")
 
         # 루브릭
         if eval_section.rubric:
-            sections.append(f"\n**루브릭 기준:** {', '.join(eval_section.rubric.criteria)}")
+            sections.append(f"\n**Rubric criteria:** {', '.join(eval_section.rubric.criteria)}")
         else:
-            sections.append("\n**루브릭:** 미정의")
+            sections.append("\n**Rubric:** Undefined")
 
         # 피드백 계획
-        sections.append(f"**피드백 계획:** {eval_section.feedback_plan or '미정의'}")
+        sections.append(f"**Feedback plan:** {eval_section.feedback_plan or 'Undefined'}")
 
     def _parse_response(self, response_text: str) -> AnalysisResult:
         """LLM 응답을 AnalysisResult로 파싱 (JSON 형식)"""
@@ -363,10 +363,10 @@ class AnalystAgent(BaseAgent):
 
         except json.JSONDecodeError:
             # JSON 파싱 실패 시 기존 텍스트 파싱 시도
-            quality_match = re.search(r"(상|중|하)", response_text)
+            quality_match = re.search(r"(High|Medium|Low)", response_text)
             if quality_match:
                 result.quality_level = quality_match.group(1)
-            result.summary = response_text[:500]  # 처음 500자만
+            result.summary = response_text[:500]  # first 500 characters only
 
         return result
 

@@ -17,10 +17,10 @@ from pydantic import BaseModel, Field
 
 class SkillNode(BaseModel):
     """Skill-Tree의 개별 노드"""
-    name: str = Field(..., description="역량 이름")
-    level: int = Field(..., ge=1, le=5, description="역량 수준 (1-5)")
-    description: str = Field(..., description="역량 설명")
-    indicators: list[str] = Field(default_factory=list, description="수준별 지표")
+    name: str = Field(..., description="Competency name")
+    level: int = Field(..., ge=1, le=5, description="Competency level (1-5)")
+    description: str = Field(..., description="Competency description")
+    indicators: list[str] = Field(default_factory=list, description="Indicators by level")
 
 
 class SkillTree(BaseModel):
@@ -28,23 +28,23 @@ class SkillTree(BaseModel):
 
     prior_knowledge: SkillNode = Field(
         ...,
-        description="사전 지식 수준"
+        description="Prior knowledge level"
     )
     learning_preference: SkillNode = Field(
         ...,
-        description="학습 선호도 (시각/청각/운동감각 등)"
+        description="Learning preference (visual/auditory/kinesthetic, etc.)"
     )
     motivation: SkillNode = Field(
         ...,
-        description="학습 동기 수준"
+        description="Learning motivation level"
     )
     self_directedness: SkillNode = Field(
         ...,
-        description="자기주도 학습 능력"
+        description="Self-directed learning ability"
     )
     tech_literacy: SkillNode = Field(
         ...,
-        description="기술/디지털 활용 능력"
+        description="Technology/digital literacy"
     )
 
     def get_levels(self) -> list[int]:
@@ -64,35 +64,35 @@ class SkillTree(BaseModel):
 
     def to_prompt_context(self) -> str:
         """프롬프트에 포함할 학습자 프로필 문자열 생성"""
-        return f"""## 학습자 역량 프로필 (Skill-Tree)
+        return f"""## Learner Competency Profile (Skill-Tree)
 
-1. **사전 지식 수준**: {self.prior_knowledge.level}/5
+1. **Prior Knowledge Level**: {self.prior_knowledge.level}/5
    - {self.prior_knowledge.description}
 
-2. **학습 선호도**: {self.learning_preference.level}/5
+2. **Learning Preference**: {self.learning_preference.level}/5
    - {self.learning_preference.description}
 
-3. **학습 동기**: {self.motivation.level}/5
+3. **Learning Motivation**: {self.motivation.level}/5
    - {self.motivation.description}
 
-4. **자기주도성**: {self.self_directedness.level}/5
+4. **Self-Directedness**: {self.self_directedness.level}/5
    - {self.self_directedness.description}
 
-5. **기술 활용 능력**: {self.tech_literacy.level}/5
+5. **Technology Literacy**: {self.tech_literacy.level}/5
    - {self.tech_literacy.description}
 
-**종합 수준**: {self.average_level():.1f}/5
+**Overall Level**: {self.average_level():.1f}/5
 """
 
 
 class LearnerProfile(BaseModel):
     """학습자 프로필"""
 
-    profile_id: str = Field(..., description="프로필 ID")
-    name: str = Field(..., description="프로필 이름 (예: 신입사원, 초등학생)")
-    skill_tree: SkillTree = Field(..., description="역량 Skill-Tree")
-    characteristics: list[str] = Field(default_factory=list, description="특성")
-    challenges: list[str] = Field(default_factory=list, description="예상 어려움")
+    profile_id: str = Field(..., description="Profile ID")
+    name: str = Field(..., description="Profile name (e.g. new hire, elementary school student)")
+    skill_tree: SkillTree = Field(..., description="Competency Skill-Tree")
+    characteristics: list[str] = Field(default_factory=list, description="Characteristics")
+    challenges: list[str] = Field(default_factory=list, description="Anticipated difficulties")
 
     @classmethod
     def from_scenario(
@@ -136,81 +136,81 @@ class LearnerProfile(BaseModel):
         }
 
         # 대상자별 조정
-        if "신입" in audience_lower or "초보" in audience_lower:
+        if "new hire" in audience_lower or "beginner" in audience_lower:
             base_levels["prior_knowledge"] = 2
             base_levels["motivation"] = 4
-        elif "초등" in audience_lower:
+        elif "elementary" in audience_lower:
             base_levels["prior_knowledge"] = 2
             base_levels["self_directedness"] = 2
             base_levels["tech_literacy"] = 2
-        elif "직장인" in audience_lower or "성인" in audience_lower:
+        elif "employee" in audience_lower or "adult" in audience_lower:
             base_levels["prior_knowledge"] = 3
             base_levels["motivation"] = 4
             base_levels["self_directedness"] = 4
             base_levels["tech_literacy"] = 4
-        elif "전문가" in audience_lower or "고급" in audience_lower:
+        elif "expert" in audience_lower or "advanced" in audience_lower:
             base_levels["prior_knowledge"] = 5
             base_levels["self_directedness"] = 5
 
         return SkillTree(
             prior_knowledge=SkillNode(
-                name="사전 지식",
+                name="Prior Knowledge",
                 level=base_levels["prior_knowledge"],
-                description=prior_knowledge or "해당 분야 기초 지식 보유",
+                description=prior_knowledge or "Has basic knowledge of the relevant field",
                 indicators=[
-                    "Lv1: 관련 지식 없음",
-                    "Lv2: 기초 개념 이해",
-                    "Lv3: 중급 수준",
-                    "Lv4: 고급 수준",
-                    "Lv5: 전문가 수준",
+                    "Lv1: No related knowledge",
+                    "Lv2: Understands basic concepts",
+                    "Lv3: Intermediate level",
+                    "Lv4: Advanced level",
+                    "Lv5: Expert level",
                 ],
             ),
             learning_preference=SkillNode(
-                name="학습 선호도",
+                name="Learning Preference",
                 level=base_levels["learning_preference"],
-                description="다양한 학습 방식에 대한 수용성",
+                description="Receptiveness to a variety of learning modes",
                 indicators=[
-                    "Lv1: 특정 방식만 선호",
-                    "Lv2: 제한적 수용",
-                    "Lv3: 보통",
-                    "Lv4: 유연한 수용",
-                    "Lv5: 모든 방식 적응",
+                    "Lv1: Prefers only one specific mode",
+                    "Lv2: Limited receptiveness",
+                    "Lv3: Average",
+                    "Lv4: Flexible receptiveness",
+                    "Lv5: Adapts to all modes",
                 ],
             ),
             motivation=SkillNode(
-                name="학습 동기",
+                name="Learning Motivation",
                 level=base_levels["motivation"],
-                description="학습에 대한 내적/외적 동기 수준",
+                description="Level of intrinsic/extrinsic motivation for learning",
                 indicators=[
-                    "Lv1: 동기 부족",
-                    "Lv2: 외적 동기 위주",
-                    "Lv3: 보통",
-                    "Lv4: 높은 동기",
-                    "Lv5: 매우 높은 내적 동기",
+                    "Lv1: Lacks motivation",
+                    "Lv2: Mainly extrinsic motivation",
+                    "Lv3: Average",
+                    "Lv4: High motivation",
+                    "Lv5: Very high intrinsic motivation",
                 ],
             ),
             self_directedness=SkillNode(
-                name="자기주도성",
+                name="Self-Directedness",
                 level=base_levels["self_directedness"],
-                description="스스로 학습을 계획하고 실행하는 능력",
+                description="Ability to plan and carry out learning independently",
                 indicators=[
-                    "Lv1: 전적으로 지도 필요",
-                    "Lv2: 부분적 지도 필요",
-                    "Lv3: 보통",
-                    "Lv4: 대부분 자기주도",
-                    "Lv5: 완전 자기주도",
+                    "Lv1: Requires full guidance",
+                    "Lv2: Requires partial guidance",
+                    "Lv3: Average",
+                    "Lv4: Mostly self-directed",
+                    "Lv5: Fully self-directed",
                 ],
             ),
             tech_literacy=SkillNode(
-                name="기술 활용",
+                name="Technology Literacy",
                 level=base_levels["tech_literacy"],
-                description="디지털 도구 및 기술 활용 능력",
+                description="Ability to use digital tools and technology",
                 indicators=[
-                    "Lv1: 기술 활용 어려움",
-                    "Lv2: 기본 활용 가능",
-                    "Lv3: 보통",
-                    "Lv4: 능숙한 활용",
-                    "Lv5: 전문적 활용",
+                    "Lv1: Struggles with technology",
+                    "Lv2: Can use basic features",
+                    "Lv3: Average",
+                    "Lv4: Proficient use",
+                    "Lv5: Expert use",
                 ],
             ),
         )
@@ -221,23 +221,23 @@ class LearnerProfile(BaseModel):
         audience_lower = target_audience.lower()
         characteristics = []
 
-        if "신입" in audience_lower:
+        if "new hire" in audience_lower:
             characteristics.extend([
-                "조직 문화 적응 필요",
-                "빠른 성장 욕구",
-                "실무 적용 중시",
+                "Needs to adapt to organizational culture",
+                "Desire for rapid growth",
+                "Values practical application on the job",
             ])
-        elif "초등" in audience_lower:
+        elif "elementary" in audience_lower:
             characteristics.extend([
-                "짧은 집중 시간",
-                "게임/놀이 기반 학습 선호",
-                "시각적 자료 효과적",
+                "Short attention span",
+                "Prefers game/play-based learning",
+                "Visual materials are effective",
             ])
-        elif "직장인" in audience_lower:
+        elif "employee" in audience_lower:
             characteristics.extend([
-                "시간 제약 있음",
-                "실무 적용 중시",
-                "효율적 학습 선호",
+                "Has time constraints",
+                "Values practical application on the job",
+                "Prefers efficient learning",
             ])
 
         return characteristics
@@ -251,13 +251,13 @@ class LearnerProfile(BaseModel):
         challenges = []
         audience_lower = target_audience.lower()
 
-        if "신입" in audience_lower or "초보" in audience_lower:
-            challenges.append("기초 개념 이해 부족 가능")
-        if "초등" in audience_lower:
-            challenges.append("추상적 개념 이해 어려움")
-            challenges.append("장시간 집중 어려움")
-        if prior_knowledge and "없" in prior_knowledge:
-            challenges.append("선수 학습 필요")
+        if "new hire" in audience_lower or "beginner" in audience_lower:
+            challenges.append("May lack understanding of basic concepts")
+        if "elementary" in audience_lower:
+            challenges.append("Difficulty understanding abstract concepts")
+            challenges.append("Difficulty concentrating for long periods")
+        if prior_knowledge and "none" in prior_knowledge:
+            challenges.append("Prerequisite learning required")
 
         return challenges
 
@@ -266,86 +266,86 @@ class LearnerProfile(BaseModel):
 PROFILE_TEMPLATES = {
     "beginner": LearnerProfile(
         profile_id="TPL-BEG",
-        name="초보 학습자",
+        name="Beginner Learner",
         skill_tree=SkillTree(
             prior_knowledge=SkillNode(
-                name="사전 지식", level=2,
-                description="기초 개념만 이해", indicators=[]
+                name="Prior Knowledge", level=2,
+                description="Understands only basic concepts", indicators=[]
             ),
             learning_preference=SkillNode(
-                name="학습 선호도", level=3,
-                description="시각적 자료 선호", indicators=[]
+                name="Learning Preference", level=3,
+                description="Prefers visual materials", indicators=[]
             ),
             motivation=SkillNode(
-                name="학습 동기", level=3,
-                description="보통 수준의 동기", indicators=[]
+                name="Learning Motivation", level=3,
+                description="Average level of motivation", indicators=[]
             ),
             self_directedness=SkillNode(
-                name="자기주도성", level=2,
-                description="지도가 필요함", indicators=[]
+                name="Self-Directedness", level=2,
+                description="Requires guidance", indicators=[]
             ),
             tech_literacy=SkillNode(
-                name="기술 활용", level=3,
-                description="기본 활용 가능", indicators=[]
+                name="Technology Literacy", level=3,
+                description="Can use basic features", indicators=[]
             ),
         ),
-        characteristics=["기초부터 시작 필요", "단계별 안내 필요"],
-        challenges=["복잡한 개념 이해 어려움"],
+        characteristics=["Needs to start from the basics", "Needs step-by-step guidance"],
+        challenges=["Difficulty understanding complex concepts"],
     ),
     "intermediate": LearnerProfile(
         profile_id="TPL-INT",
-        name="중급 학습자",
+        name="Intermediate Learner",
         skill_tree=SkillTree(
             prior_knowledge=SkillNode(
-                name="사전 지식", level=3,
-                description="중급 수준 지식 보유", indicators=[]
+                name="Prior Knowledge", level=3,
+                description="Has intermediate-level knowledge", indicators=[]
             ),
             learning_preference=SkillNode(
-                name="학습 선호도", level=4,
-                description="다양한 방식 수용", indicators=[]
+                name="Learning Preference", level=4,
+                description="Receptive to various modes", indicators=[]
             ),
             motivation=SkillNode(
-                name="학습 동기", level=4,
-                description="높은 학습 의지", indicators=[]
+                name="Learning Motivation", level=4,
+                description="Strong willingness to learn", indicators=[]
             ),
             self_directedness=SkillNode(
-                name="자기주도성", level=4,
-                description="대부분 자기주도", indicators=[]
+                name="Self-Directedness", level=4,
+                description="Mostly self-directed", indicators=[]
             ),
             tech_literacy=SkillNode(
-                name="기술 활용", level=4,
-                description="능숙한 활용", indicators=[]
+                name="Technology Literacy", level=4,
+                description="Proficient use", indicators=[]
             ),
         ),
-        characteristics=["심화 학습 가능", "자기주도적"],
-        challenges=["고급 개념으로의 도약"],
+        characteristics=["Capable of advanced learning", "Self-directed"],
+        challenges=["Leap to advanced concepts"],
     ),
     "advanced": LearnerProfile(
         profile_id="TPL-ADV",
-        name="고급 학습자",
+        name="Advanced Learner",
         skill_tree=SkillTree(
             prior_knowledge=SkillNode(
-                name="사전 지식", level=5,
-                description="전문가 수준", indicators=[]
+                name="Prior Knowledge", level=5,
+                description="Expert level", indicators=[]
             ),
             learning_preference=SkillNode(
-                name="학습 선호도", level=5,
-                description="모든 방식 적응", indicators=[]
+                name="Learning Preference", level=5,
+                description="Adapts to all modes", indicators=[]
             ),
             motivation=SkillNode(
-                name="학습 동기", level=5,
-                description="매우 높은 내적 동기", indicators=[]
+                name="Learning Motivation", level=5,
+                description="Very high intrinsic motivation", indicators=[]
             ),
             self_directedness=SkillNode(
-                name="자기주도성", level=5,
-                description="완전 자기주도", indicators=[]
+                name="Self-Directedness", level=5,
+                description="Fully self-directed", indicators=[]
             ),
             tech_literacy=SkillNode(
-                name="기술 활용", level=5,
-                description="전문적 활용", indicators=[]
+                name="Technology Literacy", level=5,
+                description="Expert use", indicators=[]
             ),
         ),
-        characteristics=["전문성 심화", "리더십 역할 가능"],
-        challenges=["새로운 도전 필요"],
+        characteristics=["Deepening expertise", "Capable of a leadership role"],
+        challenges=["Needs new challenges"],
     ),
 }
